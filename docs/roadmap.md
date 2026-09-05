@@ -24,7 +24,7 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **P0-0 协议按状态拆分**（纯重构，零逻辑变更）— ✅ 2026-09-05 完成
 `tutoring-protocol.md` → `references/protocol/{_state-machine,ready,predict,deepen,main,assess,feedback,resume,finish}.md`，每文件 ≤ 40–60 行；`prerequisite-protocol.md` 同法拆三段；SKILL.md 只保留"哪个状态读哪个文件"。先做它，因为它立刻把教学时的有效规则集从约 560 行降到每时刻 ≤ 60 行，并验证三个宿主的渐进加载都可用。
 
-**P0-1 schema 1.1 + `mrg_export.py`**
+**P0-1 schema 1.1 + `mrg_export.py`** — ✅ 2026-09-05 完成
 概念 `id / layer / domain_path / aliases`、顶层 `relations[]`、`criteria[].id`、可选 `principle`；`validate_lesson.py` 同时接受 1.0 / 1.1；导出 `mrg/<id>.json`（公开层）与 `.deep.json`（高层）。用 `examples/project-consensus` 跑通导出。
 
 **P0-2 落盘 `criteria_met` 与 `depth_reached`**
