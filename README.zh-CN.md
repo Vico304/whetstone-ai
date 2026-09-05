@@ -21,16 +21,24 @@
 - 追问针对你回答里实际暴露的最弱一点，而不是照抄题库
 - 下次继续时，先用一道变式题检验上次的理解是否真的留存
 
-反馈受原文证据约束：AI 生成的参考结构不是标准答案，你的重建与它冲突时裁决依据是材料原文——任何一方都可能错。
+反馈受原文证据约束：机器参考图里每一条主张都带来源定位和支持类型（`explicit / entailed / external / pedagogical_inference / unsupported`）。在受信领域（经验证的教材、联网核实过的 CS 知识）参考图是尺子；你可以质疑它的任何一条，系统会出示证据。
 
-**项目状态：研究原型。** 核心教学闭环已实现并在日常自用中。最有原创性的机制——机器参考图与学习者重建图的双轨比较——已完成设计但尚未验证。[共识文档](docs/consensus.md)末尾列出十二个开放研究问题，它们不应被当作已证明的结论。
+系统刻意对你隐瞒两样东西：
+
+- **参考图的高层。** 知识分四层——`fact` 事实、`mechanism` 机制、`rationale` 设计理由、`principle` 设计思想。前两层可读可查；后两层永不展示，只用来出题和判断你的回答到了哪一层。"本质"一旦被总结给你看，就成了又一段要背的东西。
+- **你自己的重建日志。** 每次作答只追加、不可改、不可看。你过去的错误主张会以匿名命题的形式回来让你批判——错是你的，尴尬不是。
+
+**项目状态：研究原型。** 核心教学闭环已实现并在日常自用中。v2 设计——持久化知识库（分层机器参考图、只追加的学习者日志、跨课概念注册表与带时效的掌握状态、学科树可视化）——**已定稿，尚未实现**。规范见 [`docs/specs/`](docs/specs/)，实施顺序见 [`docs/roadmap.md`](docs/roadmap.md)。[共识文档](docs/consensus.md)末尾列出十八个开放研究问题，它们不应被当作已证明的结论。
 
 ## 仓库结构
 
 | 路径 | 内容 |
 |---|---|
 | [`docs/design.md`](docs/design.md) | 中心思想速览，一页读完 |
-| [`docs/consensus.md`](docs/consensus.md) | 规范性基线，规则冲突时的唯一权威 |
+| [`docs/consensus.md`](docs/consensus.md) | 规范性基线（v2），规则冲突时的唯一权威 |
+| [`docs/learning-layers.md`](docs/learning-layers.md) | 四层理解与不透明原则：系统为什么隐瞒高层 |
+| [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md) | 持久化知识库定稿：MRG / LRG / 概念索引 / 学习者状态 / 导出（schema 1.1） |
+| [`docs/specs/protocol-architecture.md`](docs/specs/protocol-architecture.md) | 协议按状态加载、build 管线、模型分层、eval 集 |
 | [`docs/roadmap.md`](docs/roadmap.md) | 当前进度与下一步 |
 | [`docs/reviews/`](docs/reviews/) | 学习科学证据评审，带效应量与文献出处 |
 | [`plugin/`](plugin/) | 可运行的技能插件，同一份技能目录适配三个宿主 |

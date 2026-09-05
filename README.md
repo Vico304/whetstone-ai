@@ -21,9 +21,14 @@ An LLM-powered learning system. Give it books, documents, or a codebase; it conv
 - Follow-ups target the weakest claim in your actual answer, not a question bank
 - On resume, a transfer-variant question checks whether last session's understanding survived
 
-Feedback is evidence-constrained: the AI-generated reference is not an answer key. When your reconstruction conflicts with it, the source text adjudicates — either side can be wrong.
+Feedback is evidence-constrained: every claim in the machine reference carries a source locator and a support type (`explicit / entailed / external / pedagogical_inference / unsupported`). Within trusted domains (vetted textbooks, web-verified CS material) the reference is treated as the ruler; you can challenge any of it and the system shows its evidence.
 
-**Status: research prototype.** The core teaching loop is implemented and in daily personal use. The project's most original mechanism — dual-track comparison between the machine reference graph and the learner's reconstruction — is designed but **not yet validated**. The [consensus document](docs/consensus.md) lists twelve open research questions that must not be treated as settled.
+Two things the system deliberately withholds:
+
+- **The higher layers of the reference.** Knowledge is modelled in four layers — `fact`, `mechanism`, `rationale`, `principle`. You can read and query the first two. The "why was it designed this way" and "what is the transferable idea" layers are never shown; they exist only to generate questions and to judge how deep your own answer went. A summary of the essence, once shown, is just another thing to memorise.
+- **Your own reconstruction log.** Every attempt is appended, never edited, never displayed. Your past wrong claims come back later as anonymous propositions to critique — the error is yours, the embarrassment isn't.
+
+**Status: research prototype.** The core teaching loop is implemented and in daily personal use. The v2 design — a persistent knowledge store with a layered machine reference graph, an append-only learner log, a cross-course concept registry with freshness-aware mastery, and a discipline-tree visualisation — is **finalised but not yet implemented**. See [`docs/specs/`](docs/specs/) for the specs and [`docs/roadmap.md`](docs/roadmap.md) for the order of work. The [consensus document](docs/consensus.md) lists eighteen open research questions that must not be treated as settled.
 
 **[中文说明 →](README.zh-CN.md)**
 
@@ -32,7 +37,10 @@ Feedback is evidence-constrained: the AI-generated reference is not an answer ke
 | Path | What it is |
 |---|---|
 | [`docs/design.md`](docs/design.md) | One-page synthesis of the core idea |
-| [`docs/consensus.md`](docs/consensus.md) | Normative baseline; the authority when rules conflict |
+| [`docs/consensus.md`](docs/consensus.md) | Normative baseline (v2); the authority when rules conflict |
+| [`docs/learning-layers.md`](docs/learning-layers.md) | The four layers of understanding and why the system withholds the top two |
+| [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md) | Persistent store spec: MRG / LRG / concept index / learner state / exports (schema 1.1) |
+| [`docs/specs/protocol-architecture.md`](docs/specs/protocol-architecture.md) | Staged protocol loading, build pipeline, model tiering, eval set |
 | [`docs/roadmap.md`](docs/roadmap.md) | Current coverage and next milestone |
 | [`docs/reviews/`](docs/reviews/) | Learning-science evidence review, with effect sizes and sources |
 | [`plugin/`](plugin/) | Working skills plugin; one skill directory, three hosts |
