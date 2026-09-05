@@ -33,6 +33,7 @@ comparator = load_module("comparator")
 lrg_record = load_module("lrg_record")
 index_match = load_module("index_match")
 learner_state_build = load_module("learner_state_build")
+review_pool = load_module("review_pool")
 
 TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -449,7 +450,7 @@ class KnowledgeStoreTests(unittest.TestCase):
             self.assertIn("2 attempts", buffer.getvalue())
 
 
-class RegistryAndLearnerStateTests(unittest.TestCase):
+class _StoreHelpers:
     def _store(self, root: Path) -> Path:
         store = root / "store"
         store_init.init_store(store, [])
@@ -462,6 +463,18 @@ class RegistryAndLearnerStateTests(unittest.TestCase):
         index_match.save_index(store, index)
         return store
 
+    def _append(self, store, at, kind, verdict, confidence=None, depth=None, props=None, section="s01"):
+        event = lrg_record.build_event(
+            lesson_id="sample-guided-lesson", section_id=section, kind=kind, attempt_number=1, response="r", feedback="",
+            verdict=verdict, confidence=confidence, criteria_met=[], depth_reached=depth, extraction=None,
+            comparison={"propositions": props or [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
+        )
+        event["at"] = at
+        lrg_record.append_event(store, "sample-guided-lesson", event)
+
+
+
+class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
     def test_register_and_recall_without_auto_merge(self):
         with tempfile.TemporaryDirectory() as temporary:
             store = self._store(Path(temporary))
@@ -487,15 +500,6 @@ class RegistryAndLearnerStateTests(unittest.TestCase):
             self.assertEqual(results[2]["decision_needed"], "disambiguate")
             with self.assertRaises(ValueError):
                 index_match.recall(index, [{"aliases": ["x"]}])
-
-    def _append(self, store, at, kind, verdict, confidence=None, depth=None, props=None, section="s01"):
-        event = lrg_record.build_event(
-            lesson_id="sample-guided-lesson", section_id=section, kind=kind, attempt_number=1, response="r", feedback="",
-            verdict=verdict, confidence=confidence, criteria_met=[], depth_reached=depth, extraction=None,
-            comparison={"propositions": props or [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
-        )
-        event["at"] = at
-        lrg_record.append_event(store, "sample-guided-lesson", event)
 
     def test_learner_state_freshness_tiers_depth_and_error_pool(self):
         from datetime import datetime, timezone
@@ -537,6 +541,45 @@ class RegistryAndLearnerStateTests(unittest.TestCase):
             self.assertEqual(learner_state_build.freshness_window(1).days, 7)
             self.assertEqual(learner_state_build.freshness_window(4).days, 56)
             self.assertEqual(learner_state_build.freshness_window(9).days, 180)
+
+
+class VariantAndReviewTests(_StoreHelpers, unittest.TestCase):
+    def test_prerequisite_lookup_maps_freshness_to_action(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            self._append(store, "2026-01-20T10:00:00Z", "review", "mastered", depth="mechanism")
+            state = learner_state_build.build(store, now=datetime(2026, 1, 25, tzinfo=timezone.utc))
+            store_init.atomic_write(store / "learner-state.json", state)
+            plan = {"prerequisites": [{"id": "p01", "name": "macro map"}, {"id": "p02", "name": "哈希函数"}]}
+
+            decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, index_match.load_learner_state(store))
+
+            self.assertEqual([(d["prerequisite_id"], d["action"]) for d in decisions], [("p01", "variant"), ("p02", "diagnose")])
+            self.assertEqual(decisions[0]["concept_id"], "learning-design.macro-map")
+            stale = learner_state_build.build(store, now=datetime(2026, 6, 1, tzinfo=timezone.utc))
+            decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, stale["concepts"])
+            self.assertEqual(decisions[0]["action"], "variant_then_diagnose")
+            with self.assertRaises(ValueError):
+                index_match.prerequisite_plan_lookup(index_match.load_index(store), {}, {})
+
+    def test_review_pool_orders_wrong_and_stale_first_and_respects_completed_sections(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            wrong = {"id": "p-w", "text": "错误主张", "status": "wrong", "concept_ids": ["learning-design.macro-map"], "confidence_high": False}
+            partial = {"id": "p-p", "text": "不完整主张", "status": "partial", "concept_ids": ["learning-design.system-boundary"], "confidence_high": False}
+            self._append(store, "2026-01-01T10:00:00Z", "checkpoint", "partial", props=[partial])
+            self._append(store, "2026-01-02T10:00:00Z", "checkpoint", "retry", props=[wrong])
+            state = learner_state_build.build(store, now=datetime(2026, 1, 3, tzinfo=timezone.utc))
+
+            items = review_pool.pool(state, "sample-guided-lesson", None, None, 5)
+            self.assertEqual([i["id"] for i in items], ["p-w", "p-p"])
+            self.assertEqual(items[0]["claim"], "错误主张")
+            self.assertNotIn("response", json.dumps(items))
+            self.assertEqual(review_pool.pool(state, "sample-guided-lesson", None, {"s02"}, 5), [])
+            self.assertEqual(review_pool.pool(state, "sample-guided-lesson", ["learning-design.system-boundary"], None, 5)[0]["id"], "p-p")
+            self.assertEqual(len(review_pool.pool(state, None, None, None, 1)), 1)
 
 
 class PrerequisiteValidationTests(unittest.TestCase):

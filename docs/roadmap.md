@@ -36,7 +36,7 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **P0-4 概念注册表 + 学习者状态** — ✅ 2026-09-05 完成
 `index_match.py`（别名召回 → 模型确认 → 歧义问学习者）；`learner_state_build.py` 从 `lrg/` 派生 `learner-state.json`（证据等级、稳定性、时效、到达层、错误命题池、仅供着色的估计值）。
 
-**P0-5 变式题替代诊断 + 去主体化复习**
+**P0-5 变式题替代诊断 + 去主体化复习** — ✅ 2026-09-05 完成
 前置阶段查注册表与状态：`fresh / stale` 出变式题（`kind = variant`），`unknown` 走原诊断；resume 与复习从 `error_propositions` 生成"有一种说法是……哪里有问题"。
 
 **P0-6 eval 集**

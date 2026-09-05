@@ -151,6 +151,50 @@ def command_recall(args: argparse.Namespace) -> int:
     return 0
 
 
+ACTION_BY_FRESHNESS = {
+    "fresh": "variant",                 # one variant retrieval question replaces the diagnostic; pass = ready
+    "stale": "variant_then_diagnose",   # variant first; on failure fall back to the normal diagnostic
+    "unknown": "diagnose",              # only immediate evidence or none: normal diagnostic
+}
+
+
+def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> list[dict]:
+    """For each prerequisite in a prerequisite-plan, decide how the prerequisite phase should treat it."""
+    prerequisites = plan.get("prerequisites")
+    if not isinstance(prerequisites, list):
+        raise ValueError("prerequisite plan must contain a prerequisites list")
+    candidates = [{"name": p.get("name"), "aliases": p.get("aliases", [])} for p in prerequisites if isinstance(p, dict)]
+    recalled = recall(index, candidates, learner_state)
+    decisions = []
+    for prerequisite, hit in zip(prerequisites, recalled):
+        best = None
+        for match in hit["matches"]:
+            learner = match.get("learner") or {}
+            rank = {"fresh": 2, "stale": 1}.get(learner.get("freshness"), 0)
+            if best is None or rank > best[0]:
+                best = (rank, match)
+        freshness = (best[1].get("learner") or {}).get("freshness", "unknown") if best else "unknown"
+        decisions.append({
+            "prerequisite_id": prerequisite.get("id"),
+            "name": prerequisite.get("name"),
+            "concept_id": best[1]["id"] if best else None,
+            "freshness": freshness if best else "unknown",
+            "evidence_tier": (best[1].get("learner") or {}).get("evidence_tier") if best else None,
+            "depth_max": (best[1].get("learner") or {}).get("depth_max") if best else None,
+            "ambiguous": hit["decision_needed"] == "disambiguate",
+            "action": ACTION_BY_FRESHNESS[freshness if best else "unknown"],
+        })
+    return decisions
+
+
+def command_prerequisites(args: argparse.Namespace) -> int:
+    store_init.load_store(args.store)
+    plan = json.loads(args.prerequisite_plan.read_text(encoding="utf-8"))
+    decisions = prerequisite_plan_lookup(load_index(args.store), plan, load_learner_state(args.store))
+    print(json.dumps({"decisions": decisions}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def command_register(args: argparse.Namespace) -> int:
     store_init.load_store(args.store)
     nodes: list[dict] = []
@@ -188,6 +232,10 @@ def parse_args() -> argparse.Namespace:
     r.add_argument("--store", type=Path, required=True)
     r.add_argument("--candidates", type=Path, required=True, help='JSON list of {"name", "aliases": [], "domain_path": []}')
     r.set_defaults(handler=command_recall)
+    q = sub.add_parser("prerequisites", help="Decide variant-vs-diagnose for each prerequisite in a plan")
+    q.add_argument("--store", type=Path, required=True)
+    q.add_argument("--prerequisite-plan", type=Path, required=True)
+    q.set_defaults(handler=command_prerequisites)
     g = sub.add_parser("register", help="Register a lesson's exported MRG nodes")
     g.add_argument("--store", type=Path, required=True)
     g.add_argument("--lesson-id", required=True)

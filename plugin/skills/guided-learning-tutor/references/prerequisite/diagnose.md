@@ -9,6 +9,24 @@
 
 前置地图是用来组织诊断的机器参考，不是对学习者的判决，也不是不可修订的标准答案。
 
+## 开启知识库时：先查学习者状态
+
+在提出任何诊断问题之前运行：
+
+```bash
+python3 scripts/index_match.py prerequisites --store <知识库目录> --prerequisite-plan path/to/prerequisite-plan.json
+```
+
+对每个前置项按返回的 `action` 处理：
+
+| `action` | 学习者状态 | 处理 |
+|---|---|---|
+| `variant` | `fresh`：近期有延迟或迁移证据 | **一道变式检索题替代诊断**：换情境或换角度考同一机制，禁止复用原 `diagnostic.prompt`。答对即 `ready`；答错进入正常诊断 |
+| `variant_then_diagnose` | `stale`：有证据但已过期 | 先出变式题；答错则走下方正常诊断 |
+| `diagnose` | `unknown`：无记录或只有即时证据 | 正常诊断 |
+
+`ambiguous = true` 的项（别名命中多个概念）先向学习者确认是不是同一概念，再决定。变式题的作答用 `lrg_record.py append --kind variant` 记录（同时 `prerequisite_state.py record` 记 verdict）——跨课复用因此同时是一次间隔复习。**替代不是跳过**：`fresh` 也要答一题。
+
 ## 阶段二：无提示、自适应诊断
 
 1. 简短说明将评估哪些"针对当前材料的准备能力"，并允许学习者回答"不知道"或跳过。
