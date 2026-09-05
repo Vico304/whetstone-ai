@@ -34,6 +34,7 @@ lrg_record = load_module("lrg_record")
 index_match = load_module("index_match")
 learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
+score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 
 TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -580,6 +581,54 @@ class VariantAndReviewTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(review_pool.pool(state, "sample-guided-lesson", None, {"s02"}, 5), [])
             self.assertEqual(review_pool.pool(state, "sample-guided-lesson", ["learning-design.system-boundary"], None, 5)[0]["id"], "p-p")
             self.assertEqual(len(review_pool.pool(state, None, None, None, 1)), 1)
+
+
+class EvalScoringTests(unittest.TestCase):
+    def test_scores_example_pack_with_locator_check_and_expectations(self):
+        metrics = score_pack.build_metrics(EXAMPLE_ROOT, PLUGIN_ROOT.parent, {"sections": [4, 9], "max_concepts_per_section": 4, "min_relations": 0})
+        self.assertEqual(metrics["validator_errors"], 0)
+        self.assertEqual(metrics["sections"], 8)
+        self.assertEqual(metrics["support"], {"explicit": 18})
+        self.assertEqual(metrics["layers"], {"mechanism": 24})
+        self.assertGreater(metrics["locator_checked"], 0)
+        self.assertIsNotNone(metrics["locator_hit_rate"])
+        self.assertTrue(all(metrics["expectations"].values()), metrics["expectations"])
+        self.assertTrue(score_pack.locator_hit("## 2. 项目要解决的问题 / 第一段", "…\n## 2. 项目要解决的问题\n…"))
+        self.assertFalse(score_pack.locator_hit("p. 42", "no page markers here"))
+
+    def test_scores_template_pack_and_diffs_against_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pack = Path(temporary) / "pack"
+            pack.mkdir()
+            assets = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets"
+            (pack / "lesson-plan.json").write_text(TEMPLATE_PLAN.read_text(encoding="utf-8"), encoding="utf-8")
+            (pack / "teaching-guide.md").write_text((assets / "teaching-guide-template.md").read_text(encoding="utf-8"), encoding="utf-8")
+            metrics = score_pack.build_metrics(pack, None, None)
+            self.assertEqual(metrics["relations"], 1)
+            self.assertEqual(metrics["layers"], {"fact": 1, "mechanism": 1})
+            self.assertIsNone(metrics["locator_hit_rate"])
+            changed = dict(metrics, sections=metrics["sections"] + 1)
+            lines = score_pack.diff_against({"build": metrics}, {"build": changed})
+            self.assertEqual(lines, ["  build.sections: 1 → 2"])
+
+    def test_teach_metrics_from_store_log(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = Path(temporary) / "store"
+            store_init.init_store(store, [])
+            for number, (kind, verdict, elapsed) in enumerate([("checkpoint", "partial", 200), ("checkpoint", "mastered", 100), ("review", "mastered", 50)], start=1):
+                event = lrg_record.build_event(
+                    lesson_id="l", section_id="s01", kind=kind, attempt_number=number, response="r", feedback="",
+                    verdict=verdict, confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
+                    comparison={"propositions": [], "diff": {"conflict": [{"kind": "proposition", "id": "p", "confidence_high": True}]}, "feedback_priority": []},
+                    elapsed_seconds=elapsed,
+                )
+                lrg_record.append_event(store, "l", event)
+            t = score_pack.teach_metrics(store, "l")
+            self.assertEqual(t["attempts"], 3)
+            self.assertEqual(t["median_checkpoint_elapsed_s"], 150)
+            self.assertEqual(t["conflicts_per_attempt"], 1.0)
+            self.assertEqual(t["high_confidence_conflict_share"], 1.0)
+            self.assertEqual(score_pack.teach_metrics(store, "missing"), {"attempts": 0})
 
 
 class PrerequisiteValidationTests(unittest.TestCase):

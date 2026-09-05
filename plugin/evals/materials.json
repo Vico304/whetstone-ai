@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "note": "Three small, real materials from this repository. Each is built into a lesson pack by the skill under test; score_pack.py then measures the pack. Paths are relative to the repository root.",
+  "materials": [
+    {
+      "id": "doc-learning-layers",
+      "kind": "document",
+      "paths": ["docs/learning-layers.md"],
+      "learning_goal": "能解释四层理解为什么后两层不能靠展示获得，并说明系统如何通过顺序与问题创造条件",
+      "expect": {"sections": [3, 6], "max_concepts_per_section": 4, "min_relations": 3}
+    },
+    {
+      "id": "code-store-scripts",
+      "kind": "codebase",
+      "paths": [
+        "plugin/skills/guided-learning-tutor/scripts/learning_state.py",
+        "plugin/skills/guided-learning-tutor/scripts/mrg_export.py",
+        "plugin/skills/guided-learning-tutor/scripts/comparator.py"
+      ],
+      "learning_goal": "能解释一次作答如何从自由文本变成 LRG 事件，以及比较器为什么只落类别不打分",
+      "expect": {"sections": [4, 8], "max_concepts_per_section": 4, "min_relations": 4}
+    },
+    {
+      "id": "paper-evidence-review",
+      "kind": "document",
+      "paths": ["docs/reviews/evidence-review.md"],
+      "learning_goal": "能说明检索练习、自我解释与概念图三类证据如何共同支撑'从记忆中重建'这一设计，并指出评审识别出的最大风险",
+      "expect": {"sections": [5, 9], "max_concepts_per_section": 4, "min_relations": 4}
+    }
+  ]
+}

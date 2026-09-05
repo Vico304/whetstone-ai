@@ -1,7 +1,7 @@
 # 设计定稿 A：持久化知识库（MRG / LRG / 概念索引 / 学习者状态）
 
 > 文档性质：规范性设计定稿（schema 1.1）。实现前的权威描述；实现落地后，以脚本与校验器为准，本文档同步修订。
-> 状态：已定稿，待实现（见 [roadmap.md](../roadmap.md) P0）。
+> 状态：§2–§6、§10 已实现（2026-09-05，P0）；§7 质疑通道与 §9 可视化导出待实现（P1）。实现与本文档不一致处以脚本为准并回改本文档。
 > 上位文档：[consensus.md](../consensus.md)（冲突时以共识为准）；理念背景见 [learning-layers.md](../learning-layers.md)。
 
 ---
@@ -305,15 +305,19 @@ MRG 由 `mrg_export.py` 从 lesson-plan 导出，不由模型直接写 MRG 文�
 
 ## 10. 与现有脚本的关系
 
-| 新脚本 | 职责 | 依赖 |
+| 脚本 | 职责 | 状态 |
 |---|---|---|
-| `store_init.py` | 创建 store 目录与 `store.json`，登记课程 | — |
-| `mrg_export.py` | lesson-plan 1.0/1.1 → `mrg/<id>.json` + `.deep.json` | `validate_lesson.py` 通过 |
-| `index_match.py` | 候选概念 → 召回已有 id；写入 appearance | `concepts/index.json` |
-| `lrg_record.py`（或扩展 `learning_state.py record`） | 追加 `attempt` 事件；同时维持 `learning-progress.json` 兼容 | 抽取 JSON 由模型提供 |
-| `comparator.py` | 抽取 + MRG → `diff` | `mrg/`、抽取 JSON |
-| `learner_state_build.py` | `lrg/` + `index` → `learner-state.json` | — |
-| `export_graph.py` | → `exports/graph.json` 与 Obsidian 目录 | `learner-state.json` |
+| `store_init.py` | `init / register / show`：创建 store 与 `store.json`，登记课程 | ✅ |
+| `mrg_export.py` | lesson-plan 1.0/1.1 → `mrg/<id>.json` + `.deep.json` | ✅ |
+| `index_match.py` | `recall`（候选 → 已有 id + 学习者状态）/ `register`（MRG 节点入注册表，别名冲突只报告）/ `prerequisites`（前置项 → `variant / variant_then_diagnose / diagnose`） | ✅ |
+| `lrg_record.py` | `append`：运行比较器、追加 `attempt` 事件、`--progress` 同步进度；`show` 只显示计数 | ✅ |
+| `comparator.py` | 抽取 + MRG → `diff` 与 `feedback_priority` | ✅ |
+| `learner_state_build.py` | `lrg/` + `mrg/` → `learner-state.json` | ✅ |
+| `review_pool.py` | 从派生状态列出去主体化错误命题 | ✅ |
+| `export_graph.py` | → `exports/graph.json` 与 Obsidian 目录 | P1 |
+| `challenge_record.py` | 质疑事件记录与 MRG 版本化 | P1 |
+
+`evals/score_pack.py` 对学习包与日志打分（build 与 teach 指标）。
 
 全部标准库 Python；全部有单元测试；`validate_lesson.py` 增加对 1.1 字段、`relations[]` 端点存在性、`layer` 枚举、`criteria[].id` 唯一性的检查，并对导出物做 LRG 原文泄漏检查。
 

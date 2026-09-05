@@ -34,6 +34,20 @@ jobs:
           python3 skills/guided-learning-tutor/scripts/validate_prerequisites.py \
             skills/guided-learning-tutor/assets/prerequisite-plan-template.json \
             --guide skills/guided-learning-tutor/assets/prerequisite-guide-template.md
+      - name: Store pipeline smoke test (init → export → register → append → build → score)
+        run: |
+          S=skills/guided-learning-tutor/scripts; A=skills/guided-learning-tutor/assets; T=$(mktemp -d)
+          python3 $S/store_init.py init --store $T/store --domain-root 学习设计
+          python3 $S/store_init.py register --store $T/store --lesson-plan $A/lesson-plan-template.json
+          python3 $S/mrg_export.py $A/lesson-plan-template.json --store $T/store
+          python3 $S/index_match.py register --store $T/store --lesson-id sample-guided-lesson
+          echo answer > $T/r.txt
+          python3 $S/lrg_record.py append --store $T/store --lesson-id sample-guided-lesson --section-id s01 \
+            --response-file $T/r.txt --verdict partial --confidence 4 --depth mechanism \
+            --extraction $A/extraction-template.json --elapsed-seconds 120
+          python3 $S/learner_state_build.py build --store $T/store
+          python3 $S/review_pool.py --store $T/store --lesson-id sample-guided-lesson > /dev/null
+          python3 evals/score_pack.py examples/project-consensus --sources-root .. --store $T/store
       - name: Manifests are valid JSON
         working-directory: .
         run: |
