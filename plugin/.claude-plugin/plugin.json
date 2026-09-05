@@ -1,0 +1,15 @@
+{
+  "name": "guided-learning-tutor",
+  "version": "0.2.0",
+  "description": "Diagnose prerequisite gaps, research cited supplements, and turn supplied materials into source-grounded lessons taught section by section.",
+  "author": {
+    "name": "Vico304"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "learning",
+    "teaching",
+    "source-analysis",
+    "active-recall"
+  ]
+}
