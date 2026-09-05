@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "lesson_id": "sample-guided-lesson",
+  "assessment_mode": "auto",
+  "scope_statement": "仅评估理解当前材料主线所需的前置能力，不推断学习者的一般智力或整体学习能力。",
+  "prerequisites": [
+    {
+      "id": "p01",
+      "name": "输入、处理与输出的基本区分",
+      "why_needed": "材料用端到端流程组织多个组件，需要先能区分一个系统接收什么、变换什么和产生什么。",
+      "required_for": [
+        "建立宏观系统地图",
+        "判断组件在整体流程中的位置"
+      ],
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Architecture",
+          "support": "entailed",
+          "note": "材料按输入到结果描述步骤，因而完成该区分是理解宏观地图的前置。"
+        }
+      ],
+      "diagnostic": {
+        "prompt": "请选择一个你熟悉的简单系统，用自己的话分别说明它的输入、处理和输出，并说明为什么三者不能随意互换。",
+        "criteria": [
+          "三个部分的边界可区分",
+          "描述了至少一个从输入到输出的因果变换",
+          "例子不依赖材料中的原句"
+        ],
+        "follow_up_prompt": "如果移除你所说的处理步骤，输出会发生什么变化？",
+        "bridge_prompt": "面对一份列出多个模块的新材料，你会用什么证据判断哪个是输入边界、核心处理和可观察输出？"
+      }
+    }
+  ],
+  "research_policy": {
+    "trigger": [
+      "fragile",
+      "gap",
+      "misconception"
+    ],
+    "source_priority": [
+      "official_or_primary",
+      "standards_or_textbooks",
+      "reputable_secondary"
+    ],
+    "separate_external_claims": true
+  },
+  "uncertainties": [
+    "示例前置关系是教学性推断，需要结合实际材料修订。"
+  ]
+}
+
