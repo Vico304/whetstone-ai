@@ -13,8 +13,12 @@ python3 scripts/learning_state.py record \
   --response-file path/to/raw-response.txt \
   --feedback-file path/to/feedback.txt \
   --verdict partial \
-  --confidence 4
+  --confidence 4 \
+  --criteria-met c1,c3 \
+  --depth mechanism
 ```
+
+`--criteria-met` 填回答满足的 `checkpoint.criteria[].id`（1.0 课程用 `c1`、`c2`… 按顺序编号）；`--depth` 填 [assess.md](assess.md) 判定的到达层。两者都可省略，但省略等于丢掉已经做完的诊断。
 
 resume 开场的变式检索题记录时加 `--review`（见 [resume.md](resume.md)），其余主问题和追问作答不加：
 

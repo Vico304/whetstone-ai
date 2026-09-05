@@ -225,6 +225,20 @@ class LearningStateTests(unittest.TestCase):
         self.assertEqual(state["status"], "completed")
         self.assertIsNone(state["current_section_id"])
 
+    def test_criteria_met_and_depth_are_persisted_and_validated(self):
+        state = learning_state.create_state(load_template())
+        learning_state.append_attempt(state, "s01", "a", "", "partial", 3, criteria_met=["c1", " c2 "], depth_reached="mechanism")
+        attempt = state["sections"][0]["attempts"][0]
+        self.assertEqual(attempt["criteria_met"], ["c1", "c2"])
+        self.assertEqual(attempt["depth_reached"], "mechanism")
+        learning_state.append_attempt(state, "s01", "b", "", "mastered", None)
+        self.assertEqual(state["sections"][0]["attempts"][1]["criteria_met"], [])
+        self.assertIsNone(state["sections"][0]["attempts"][1]["depth_reached"])
+        with self.assertRaises(ValueError):
+            learning_state.append_attempt(state, "s01", "c", "", "partial", None, depth_reached="deep")
+        with self.assertRaises(ValueError):
+            learning_state.append_attempt(state, "s01", "c", "", "partial", None, criteria_met=["c1", "c1"])
+
     @staticmethod
     def _three_section_state():
         plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
