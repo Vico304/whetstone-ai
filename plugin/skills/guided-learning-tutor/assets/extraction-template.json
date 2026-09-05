@@ -1,0 +1,23 @@
+{
+  "extracted_by": "model",
+  "concepts": [
+    {"ref": "learning-design.macro-map", "status": "correct"},
+    {"ref": "系统边界", "status": "partial"}
+  ],
+  "relations": [
+    {"from": "learning-design.system-boundary", "to": "learning-design.macro-map", "type": "depends_on", "status": "direction_reversed"}
+  ],
+  "propositions": [
+    {
+      "text": "宏观地图先于边界产生，边界是从地图里读出来的",
+      "status": "wrong",
+      "concept_refs": ["learning-design.system-boundary", "learning-design.macro-map"],
+      "confidence_high": true
+    },
+    {
+      "text": "宏观地图让每个细节有可挂接的位置",
+      "status": "correct",
+      "concept_refs": ["learning-design.macro-map"]
+    }
+  ]
+}

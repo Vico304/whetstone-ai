@@ -51,6 +51,17 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 开始时简短告知已推断的学习目标、材料范围和输出位置，但不必要求用户确认。只有材料不可访问、学习目标存在会导致完全不同课程的关键分歧，或输出会覆盖无法安全合并的现有课程时，才停下请求用户决定。
 
+## 知识库（可选）
+
+用户指定了一个持久化目录（调用语句中的"知识库 / store 目录"，或简报的 `knowledge_store` 字段）时，开启知识库模式；未指定时完全不涉及以下步骤，行为与不开启时一致。开启后：
+
+- 首次：`python3 scripts/store_init.py init --store <目录> [--domain-root 学科名]`；每门课 build 时 `store_init.py register --lesson-plan`；
+- build 校验通过后：`scripts/mrg_export.py <lesson-plan> --store <目录>`，得到公开层 `mrg/<id>.json` 与高层 `mrg/<id>.deep.json`；
+- 教学中每次产生 verdict：按 [references/protocol/assess.md](references/protocol/assess.md) 写抽取 JSON，用 `scripts/lrg_record.py append --progress <learning-progress.json>` 一次完成比较、追加日志、同步进度；
+- **三条硬约束**：只从公开层文件渲染任何面向学习者的内容，高层文件只在评估与出题时读取；`lrg/` 下的日志不向学习者展示、不引用原文；学习者对抽取或判定有异议时追加新一次作答，不修改任何已有记录。
+
+详见 `docs/specs/knowledge-store.md`。
+
 ## 工作流
 
 ### 1. 建立来源范围
