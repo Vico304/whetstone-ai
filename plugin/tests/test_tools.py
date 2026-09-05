@@ -47,6 +47,17 @@ class SourceManifestTests(unittest.TestCase):
             self.assertNotIn("node_modules/ignored.js", by_path)
             self.assertNotIn("sha256", by_path[".env"])
 
+    def test_code_named_after_sessions_is_not_a_conversation(self):
+        self.assertEqual(source_manifest.classify(Path("app/session.py")), "code")
+        self.assertEqual(source_manifest.classify(Path("store/session_store.go")), "code")
+        self.assertEqual(source_manifest.classify(Path("notes/obsession.md")), "document")
+
+    def test_exported_conversations_are_detected(self):
+        self.assertEqual(source_manifest.classify(Path("exports/chat-2026-01.json")), "conversation")
+        self.assertEqual(source_manifest.classify(Path("transcripts/2026-01-01.md")), "conversation")
+        self.assertEqual(source_manifest.classify(Path("sessions/index.html")), "conversation")
+        self.assertEqual(source_manifest.classify(Path("data/session_metrics.csv")), "data")
+
 
 class LessonValidationTests(unittest.TestCase):
     def test_template_is_valid_and_matches_guide(self):
@@ -96,6 +107,33 @@ class LessonValidationTests(unittest.TestCase):
 
         self.assertTrue(any("leaks assessment criterion" in error for error in errors))
 
+    def test_guide_leak_check_ignores_cosmetic_rewording(self):
+        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        leaked = plan["sections"][0]["checkpoint"]["criteria"][0]
+        # Insert punctuation and whitespace inside the criterion; a verbatim check would miss this.
+        disguised = "，\n".join(leaked[i : i + 4] for i in range(0, len(leaked), 4))
+        guide = guide_path.read_text(encoding="utf-8") + f"\n{disguised}\n"
+
+        errors = validate_lesson.validate_guide(guide, plan)
+
+        self.assertTrue(any("leaks assessment criterion" in error for error in errors))
+
+    def test_guide_leak_check_catches_partial_verbatim_copy(self):
+        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        criterion = "学习者需要说明输入如何经过处理步骤转化为可观察的输出结果并解释边界条件"
+        plan["sections"][0]["checkpoint"]["criteria"] = [criterion]
+        guide = guide_path.read_text(encoding="utf-8") + "\n提示：" + criterion[8:30] + "……\n"
+
+        errors = validate_lesson.validate_guide(guide, plan)
+
+        self.assertTrue(any("leaks assessment criterion" in error for error in errors))
+        self.assertTrue(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text(guide)))
+        self.assertFalse(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text("完全无关的讲义正文")))
+
     def test_cognitive_load_warnings(self):
         plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
@@ -121,8 +159,63 @@ class LearningStateTests(unittest.TestCase):
 
         attempts = state["sections"][0]["attempts"]
         self.assertEqual([item["response"] for item in attempts], ["first answer", "revised answer"])
+        self.assertEqual([item["kind"] for item in attempts], ["checkpoint", "checkpoint"])
         self.assertEqual(state["status"], "completed")
         self.assertIsNone(state["current_section_id"])
+
+    @staticmethod
+    def _three_section_state():
+        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        template = plan["sections"][0]
+        plan["sections"] = [
+            {**template, "id": "s01", "depends_on": []},
+            {**template, "id": "s02", "depends_on": ["s01"]},
+            {**template, "id": "s03", "depends_on": ["s02"]},
+        ]
+        return learning_state.create_state(plan)
+
+    def test_failed_review_does_not_move_position_backwards(self):
+        state = self._three_section_state()
+        learning_state.append_attempt(state, "s01", "a", "", "mastered", None)
+        learning_state.append_attempt(state, "s02", "b", "", "mastered", None)
+        self.assertEqual(state["current_section_id"], "s03")
+
+        # resume opener: variant retrieval on s01 fails -> forgetting signal, but learner stays on s03
+        learning_state.append_attempt(state, "s01", "forgot", "gap", "retry", 5, review=True)
+
+        self.assertEqual(state["sections"][0]["status"], "in_progress")
+        self.assertEqual(state["sections"][0]["attempts"][-1]["kind"], "review")
+        self.assertEqual(state["current_section_id"], "s03")
+        self.assertEqual(state["status"], "in_progress")
+
+        # finishing s03 then falls back to the regressed section instead of declaring the lesson done
+        learning_state.append_attempt(state, "s03", "c", "", "mastered", None)
+        self.assertEqual(state["current_section_id"], "s01")
+        self.assertEqual(state["status"], "in_progress")
+
+        learning_state.append_attempt(state, "s01", "recovered", "", "mastered", None)
+        self.assertEqual(state["status"], "completed")
+        self.assertIsNone(state["current_section_id"])
+        self.assertEqual(sum(1 for e in state["events"] if e["type"] == "lesson_completed"), 1)
+
+    def test_failed_review_after_completion_reopens_lesson(self):
+        state = self._three_section_state()
+        for section_id in ("s01", "s02", "s03"):
+            learning_state.append_attempt(state, section_id, "ok", "", "mastered", None)
+        self.assertEqual(state["status"], "completed")
+
+        learning_state.append_attempt(state, "s02", "hmm", "", "partial", 2, review=True)
+
+        self.assertEqual(state["status"], "in_progress")
+        self.assertEqual(state["current_section_id"], "s02")
+
+    def test_current_position_advances_past_completed_sections(self):
+        state = self._three_section_state()
+        learning_state.append_attempt(state, "s02", "skip ahead", "", "skipped", None)
+        self.assertEqual(state["current_section_id"], "s01")
+        learning_state.append_attempt(state, "s01", "ok", "", "mastered", None)
+        self.assertEqual(state["current_section_id"], "s03")
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
@@ -248,6 +341,29 @@ class ScanWikilinksTests(unittest.TestCase):
                 item["concept"]: item["found_in"] for item in result["unresolved_links"]
             }
             self.assertIn("concepts/页表.md", by_concept["虚拟内存"])
+
+    def test_block_list_aliases_and_inline_code_are_handled(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pack = Path(temporary)
+            concepts = pack / "concepts"
+            concepts.mkdir()
+            (concepts / "缓存.md").write_text(
+                "---\ntitle: 缓存\naliases:\n  - cache\n  - \"Cache Layer\"\nstatus: grounded\n---\n# 缓存\n",
+                encoding="utf-8",
+            )
+            (pack / "teaching-guide.md").write_text(
+                "正文提到 [[cache]] 与 [[Cache Layer]]，还有 [[命中率]]。\n"
+                "行内代码 `[[不算链接]]` 不应被扫描。\n"
+                "~~~\n[[波浪围栏内不算]]\n~~~\n"
+                "````md\n```\n[[嵌套围栏内不算]]\n```\n````\n",
+                encoding="utf-8",
+            )
+
+            result = scan_wikilinks.scan(pack, None)
+
+            self.assertEqual({"cache layer", "cache", "缓存"}, set(result["known_notes"]))
+            unresolved = {item["concept"] for item in result["unresolved_links"]}
+            self.assertEqual(unresolved, {"命中率"})
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,14 +67,28 @@ def is_sensitive(path: Path) -> bool:
     )
 
 
+CONVERSATION_NAME_TOKENS = ("chat", "conversation", "session", "transcript")
+CONVERSATION_DIRS = {"chats", "conversations", "sessions", "transcripts"}
+CONVERSATION_EXTENSIONS = DOCUMENT_EXTENSIONS | {".json", ".jsonl", ".html", ".xml", ".yaml", ".yml"}
+NAME_TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
+
+
 def classify(path: Path) -> str:
-    lowered_parts = {part.lower() for part in path.parts}
-    name = path.name.lower()
-    if any(token in name for token in ("conversation", "session", "transcript")) or lowered_parts.intersection(
-        {"chats", "conversations", "sessions", "transcripts"}
-    ):
-        return "conversation"
+    """Classify by extension first; only exported-looking files can be conversations.
+
+    Source code is never a conversation record even when its name mentions
+    sessions (``session.py``, ``session_store.go``). Name tokens are matched as
+    whole words so ``sessions`` and ``chat-2026`` count but ``obsession`` does not.
+    """
     suffix = path.suffix.lower()
+    if suffix in CODE_EXTENSIONS and suffix != ".html":
+        return "code"
+    if suffix in CONVERSATION_EXTENSIONS:
+        stem_tokens = set(NAME_TOKEN_SPLIT.split(path.stem.lower()))
+        lowered_dirs = {part.lower() for part in path.parts[:-1]}
+        name_hit = any(token in stem_tokens or f"{token}s" in stem_tokens for token in CONVERSATION_NAME_TOKENS)
+        if name_hit or lowered_dirs.intersection(CONVERSATION_DIRS):
+            return "conversation"
     if suffix in CODE_EXTENSIONS:
         return "code"
     if suffix in DOCUMENT_EXTENSIONS:

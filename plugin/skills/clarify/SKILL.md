@@ -32,7 +32,7 @@ shell 的 cwd 通常是用户项目目录，不要以相对路径直接执行脚
 python3 <技能目录>/scripts/scan_wikilinks.py <学习包目录> --inbox <学习包目录>/concepts/_inbox.md
 ```
 
-脚本按文件名和 frontmatter `aliases` 匹配已有笔记，输出缺失目标及其出现位置。代码块内的 `[[...]]` 可能被误报，处理前人工确认。
+脚本按文件名和 frontmatter `aliases`（行内 `[a, b]` 或 YAML 块列表均可）匹配已有笔记，输出缺失目标及其出现位置。围栏代码块与行内代码中的 `[[...]]` 会被跳过；HTML 注释等其他嵌入形式仍可能误报，处理前人工确认。
 
 ## 工作流
 

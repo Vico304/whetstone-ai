@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Validate lesson templates and example pack
+        run: |
+          python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
+            skills/guided-learning-tutor/assets/lesson-plan-template.json \
+            --guide skills/guided-learning-tutor/assets/teaching-guide-template.md
+          python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
+            examples/project-consensus/lesson-plan.json \
+            --guide examples/project-consensus/teaching-guide.md \
+            --manifest examples/project-consensus/sources.json
+          python3 skills/guided-learning-tutor/scripts/validate_prerequisites.py \
+            skills/guided-learning-tutor/assets/prerequisite-plan-template.json \
+            --guide skills/guided-learning-tutor/assets/prerequisite-guide-template.md
+      - name: Manifests are valid JSON
+        working-directory: .
+        run: |
+          python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python3 -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
+          python3 -m json.tool plugin/.codex-plugin/plugin.json > /dev/null
