@@ -13,6 +13,7 @@ from typing import Any
 
 
 VERDICTS = {"mastered", "partial", "retry", "skipped"}
+DEPTHS = ("fact", "mechanism", "rationale", "principle")
 
 
 def utc_now() -> str:
@@ -107,11 +108,18 @@ def append_attempt(
     verdict: str,
     confidence: int | None,
     review: bool = False,
+    criteria_met: list[str] | None = None,
+    depth_reached: str | None = None,
 ) -> None:
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
     if confidence is not None and not 1 <= confidence <= 5:
         raise ValueError("confidence must be between 1 and 5")
+    if depth_reached is not None and depth_reached not in DEPTHS:
+        raise ValueError(f"depth_reached must be one of {list(DEPTHS)}")
+    criteria_met = [item.strip() for item in (criteria_met or []) if item and item.strip()]
+    if len(criteria_met) != len(set(criteria_met)):
+        raise ValueError("criteria_met must not repeat ids")
     section = find_section(state, section_id)
     now = utc_now()
     attempt = {
@@ -122,6 +130,8 @@ def append_attempt(
         "feedback": feedback,
         "verdict": verdict,
         "confidence": confidence,
+        "criteria_met": criteria_met,
+        "depth_reached": depth_reached,
     }
     section.setdefault("attempts", []).append(attempt)
     section["status"] = "completed" if verdict in {"mastered", "skipped"} else "in_progress"
@@ -153,7 +163,11 @@ def command_record(args: argparse.Namespace) -> int:
         raise ValueError("progress state root must be an object")
     response = args.response_file.read_text(encoding="utf-8")
     feedback = args.feedback_file.read_text(encoding="utf-8") if args.feedback_file else ""
-    append_attempt(state, args.section_id, response, feedback, args.verdict, args.confidence, review=args.review)
+    criteria_met = [item for chunk in (args.criteria_met or []) for item in chunk.split(",")]
+    append_attempt(
+        state, args.section_id, response, feedback, args.verdict, args.confidence,
+        review=args.review, criteria_met=criteria_met, depth_reached=args.depth,
+    )
     atomic_write(args.state, state)
     print(f"OK: appended {'review' if args.review else 'checkpoint'} attempt for {args.section_id}")
     return 0
@@ -168,7 +182,10 @@ def command_show(args: argparse.Namespace) -> int:
     print(f"status: {state.get('status')}")
     print(f"current_section_id: {state.get('current_section_id')}")
     for section in state.get("sections", []):
-        print(f"- {section.get('id')}: {section.get('status')} ({len(section.get('attempts', []))} attempts)")
+        attempts = section.get("attempts", [])
+        depths = [a.get("depth_reached") for a in attempts if a.get("depth_reached")]
+        depth_note = f", depth {' → '.join(depths)}" if depths else ""
+        print(f"- {section.get('id')}: {section.get('status')} ({len(attempts)} attempts{depth_note})")
     return 0
 
 
@@ -188,6 +205,17 @@ def parse_args() -> argparse.Namespace:
     record_parser.add_argument("--feedback-file", type=Path)
     record_parser.add_argument("--verdict", choices=sorted(VERDICTS), required=True)
     record_parser.add_argument("--confidence", type=int)
+    record_parser.add_argument(
+        "--criteria-met",
+        action="append",
+        metavar="IDS",
+        help="Comma-separated checkpoint criteria ids the answer satisfied (e.g. c1,c3); repeatable",
+    )
+    record_parser.add_argument(
+        "--depth",
+        choices=DEPTHS,
+        help="Deepest understanding layer the answer actually reached (a layer, not a verdict)",
+    )
     record_parser.add_argument(
         "--review",
         action="store_true",
