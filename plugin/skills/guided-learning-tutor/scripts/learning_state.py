@@ -67,6 +67,38 @@ def find_section(state: dict, section_id: str) -> dict:
     raise ValueError(f"unknown section id: {section_id}")
 
 
+def recompute_position(state: dict, recorded_id: str) -> None:
+    """Update lesson status and current position after an attempt.
+
+    The current position never moves backwards on its own. A review attempt
+    (resume-time variant retrieval on an earlier, already completed section)
+    may flip that section back to ``in_progress`` as a forgetting signal, but
+    the learner keeps working from where they actually are. Regressed sections
+    are only revisited once every later section is completed.
+    """
+    sections = [item for item in state.get("sections", []) if isinstance(item, dict)]
+    ids = [item.get("id") for item in sections]
+    current = state.get("current_section_id")
+
+    if current is None or current == recorded_id:
+        start = ids.index(recorded_id) if recorded_id in ids else 0
+        pending = next((item for item in sections[start:] if item.get("status") != "completed"), None)
+        if pending is None:
+            pending = next((item for item in sections if item.get("status") != "completed"), None)
+        current = pending.get("id") if pending else None
+    elif current not in ids:
+        pending = next((item for item in sections if item.get("status") != "completed"), None)
+        current = pending.get("id") if pending else None
+
+    all_completed = all(item.get("status") == "completed" for item in sections)
+    if all_completed:
+        state["status"] = "completed"
+        state["current_section_id"] = None
+    else:
+        state["status"] = "in_progress"
+        state["current_section_id"] = current
+
+
 def append_attempt(
     state: dict,
     section_id: str,
@@ -74,6 +106,7 @@ def append_attempt(
     feedback: str,
     verdict: str,
     confidence: int | None,
+    review: bool = False,
 ) -> None:
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
@@ -84,6 +117,7 @@ def append_attempt(
     attempt = {
         "attempt_number": len(section.get("attempts", [])) + 1,
         "at": now,
+        "kind": "review" if review else "checkpoint",
         "response": response,
         "feedback": feedback,
         "verdict": verdict,
@@ -91,16 +125,14 @@ def append_attempt(
     }
     section.setdefault("attempts", []).append(attempt)
     section["status"] = "completed" if verdict in {"mastered", "skipped"} else "in_progress"
-    state.setdefault("events", []).append({"at": now, "type": "attempt_recorded", "section_id": section_id, "verdict": verdict})
+    state.setdefault("events", []).append(
+        {"at": now, "type": "attempt_recorded", "section_id": section_id, "verdict": verdict, "kind": attempt["kind"]}
+    )
 
-    pending = next((item for item in state.get("sections", []) if item.get("status") != "completed"), None)
-    if pending is None:
-        state["status"] = "completed"
-        state["current_section_id"] = None
+    was_completed = state.get("status") == "completed"
+    recompute_position(state, section_id)
+    if state["status"] == "completed" and not was_completed:
         state["events"].append({"at": now, "type": "lesson_completed"})
-    else:
-        state["status"] = "in_progress"
-        state["current_section_id"] = pending["id"]
     state["updated_at"] = now
 
 
@@ -121,9 +153,9 @@ def command_record(args: argparse.Namespace) -> int:
         raise ValueError("progress state root must be an object")
     response = args.response_file.read_text(encoding="utf-8")
     feedback = args.feedback_file.read_text(encoding="utf-8") if args.feedback_file else ""
-    append_attempt(state, args.section_id, response, feedback, args.verdict, args.confidence)
+    append_attempt(state, args.section_id, response, feedback, args.verdict, args.confidence, review=args.review)
     atomic_write(args.state, state)
-    print(f"OK: appended attempt for {args.section_id}")
+    print(f"OK: appended {'review' if args.review else 'checkpoint'} attempt for {args.section_id}")
     return 0
 
 
@@ -156,6 +188,12 @@ def parse_args() -> argparse.Namespace:
     record_parser.add_argument("--feedback-file", type=Path)
     record_parser.add_argument("--verdict", choices=sorted(VERDICTS), required=True)
     record_parser.add_argument("--confidence", type=int)
+    record_parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Variant-retrieval review of an already completed section (e.g. resume opener); "
+        "does not move the current position backwards",
+    )
     record_parser.set_defaults(handler=command_record)
 
     show_parser = subparsers.add_parser("show", help="Show current progress")

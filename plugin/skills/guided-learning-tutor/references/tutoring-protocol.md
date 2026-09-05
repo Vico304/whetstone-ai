@@ -99,7 +99,7 @@ teaching-guide 是宏观框架，不是全部深度。每节呈现 `solution` �
 
 进入 `resume` 时，先不进入未完成小节。开场从**已完成的小节**中选一个概念，出一道变式问题：换情境或换角度，但考察同一深层机制；禁止复用原 checkpoint 措辞。学习者作答并获得简短反馈后，再用一两句话重建上下文（“当前主线走到哪、上次遗留什么问题”），然后进入未完成小节的 READY。
 
-变式题的作答通过 `record` 追加到对应已完成小节，verdict 照常判定；`mastered` 的小节因变式失败可回到 `in_progress`，这是正常的遗忘信号，不是倒退。
+变式题的作答通过 `record --review` 追加到对应已完成小节，verdict 照常判定；`mastered` 的小节因变式失败可回到 `in_progress`，这是正常的遗忘信号，不是倒退。`--review` 告诉脚本这是复习而非当前进度：`current_section_id` 不会因此跳回早期小节，学习者仍从上次停下的位置继续；退回 `in_progress` 的小节会在后续小节全部完成后再被安排重做。不加 `--review` 记录变式题会把当前位置错误地拉回该早期小节。
 
 ## 评估
 
@@ -148,7 +148,18 @@ python3 scripts/learning_state.py record \
   --confidence 4
 ```
 
-`record` 会追加尝试并原子更新状态；它不会删除早期回答。学习者标注了信心就传 `--confidence`，未标注则省略。若不适合把回答写入文件，则只在当前对话保留，并明确无法跨 session 恢复。
+resume 开场的变式检索题记录时加 `--review`（见上节），其余主问题和追问作答不加：
+
+```bash
+python3 scripts/learning_state.py record \
+  --state path/to/learning-progress.json \
+  --section-id s01 \
+  --response-file path/to/variant-response.txt \
+  --verdict retry \
+  --review
+```
+
+`record` 会追加尝试并原子更新状态；它不会删除早期回答。每条尝试带 `kind`（`checkpoint` 或 `review`），便于日后区分即时证据与延迟证据。学习者标注了信心就传 `--confidence`，未标注则省略。若不适合把回答写入文件，则只在当前对话保留，并明确无法跨 session 恢复。
 
 ## 课程结束
 

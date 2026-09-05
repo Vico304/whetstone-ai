@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +170,7 @@ def manifest_paths(manifest: Any) -> set[str]:
 
 def validate_guide(guide: str, plan: dict) -> list[str]:
     errors: list[str] = []
+    normalized_guide = normalize_text(guide)
     for field in (plan.get("title"), *(section.get("title") for section in plan.get("sections", []) if isinstance(section, dict))):
         if nonempty(field) and field not in guide:
             errors.append(f"teaching guide does not contain title '{field}'")
@@ -184,11 +186,43 @@ def validate_guide(guide: str, plan: dict) -> list[str]:
         if not isinstance(criteria, list):
             continue
         for criterion in criteria:
-            if nonempty(criterion) and criterion in guide:
+            if nonempty(criterion) and criterion_leaked(criterion, normalized_guide):
                 errors.append(
                     f"teaching guide leaks assessment criterion from sections[{index}]: '{criterion}'"
                 )
     return errors
+
+
+LEAK_MIN_CHARS = 12
+LEAK_WINDOW_CHARS = 16
+NORMALIZE_STRIP = re.compile(r"[\s\W_]+", re.UNICODE)
+
+
+def normalize_text(text: str) -> str:
+    """Casefold and drop whitespace/punctuation so cosmetic rewording does not hide a leak."""
+    return NORMALIZE_STRIP.sub("", text).casefold()
+
+
+def criterion_leaked(criterion: str, normalized_guide: str) -> bool:
+    """Guardrail, not a proof: catches verbatim and near-verbatim copies.
+
+    A criterion counts as leaked when its normalized form appears in the guide,
+    or when a long enough contiguous window of it does (so splitting a criterion
+    across two sentences or changing punctuation does not evade the check).
+    Paraphrase remains undetectable by construction; that judgment stays with
+    the model and the author.
+    """
+    normalized = normalize_text(criterion)
+    if len(normalized) < LEAK_MIN_CHARS:
+        return bool(normalized) and normalized in normalized_guide
+    if normalized in normalized_guide:
+        return True
+    if len(normalized) <= LEAK_WINDOW_CHARS:
+        return False
+    return any(
+        normalized[start : start + LEAK_WINDOW_CHARS] in normalized_guide
+        for start in range(0, len(normalized) - LEAK_WINDOW_CHARS + 1)
+    )
 
 
 def load_json(path: Path) -> Any:

@@ -10,9 +10,11 @@ import unicodedata
 from pathlib import Path
 
 WIKILINK = re.compile(r"\[\[([^\[\]|#]+)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\]")
-FENCE = re.compile(r"```.*?```", re.DOTALL)
-FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
-ALIASES_LINE = re.compile(r"^aliases:\s*\[(.*)\]\s*$", re.MULTILINE)
+FENCE = re.compile(r"^(`{3,}|~{3,}).*?^\1[ \t]*$", re.DOTALL | re.MULTILINE)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---[ \t]*\r?\n", re.DOTALL)
+ALIASES_INLINE = re.compile(r"^aliases:\s*\[(.*)\]\s*$", re.MULTILINE)
+ALIASES_BLOCK = re.compile(r"^aliases:\s*$\n((?:[ \t]+-[ \t]*.*\n?)+)", re.MULTILINE)
 
 
 def normalize(name: str) -> str:
@@ -31,13 +33,33 @@ def note_names(concepts_dir: Path) -> set[str]:
         head = note.read_text(encoding="utf-8", errors="replace")[:2000]
         match = FRONTMATTER.match(head)
         if match:
-            alias_match = ALIASES_LINE.search(match.group(0))
-            if alias_match:
-                for alias in alias_match.group(1).split(","):
-                    alias = alias.strip().strip("\"'")
-                    if alias:
-                        known.add(normalize(alias))
+            for alias in frontmatter_aliases(match.group(0)):
+                known.add(normalize(alias))
     return known
+
+
+def frontmatter_aliases(frontmatter: str) -> list[str]:
+    """Read ``aliases`` from frontmatter in either inline-list or block-list form."""
+    aliases: list[str] = []
+    inline = ALIASES_INLINE.search(frontmatter)
+    if inline:
+        for alias in inline.group(1).split(","):
+            alias = alias.strip().strip("\"'")
+            if alias:
+                aliases.append(alias)
+        return aliases
+    block = ALIASES_BLOCK.search(frontmatter)
+    if block:
+        for line in block.group(1).splitlines():
+            alias = line.strip().lstrip("-").strip().strip("\"'")
+            if alias:
+                aliases.append(alias)
+    return aliases
+
+
+def strip_code(text: str) -> str:
+    """Remove fenced blocks and inline code spans so their [[links]] are not scanned."""
+    return INLINE_CODE.sub("", FENCE.sub("", text))
 
 
 def inbox_entries(inbox: Path) -> list[str]:
@@ -60,7 +82,7 @@ def scan(pack_dir: Path, inbox: Path | None) -> dict:
     for md_file in sorted(pack_dir.rglob("*.md")):
         if md_file.name.startswith("_") or "__pycache__" in md_file.parts:
             continue
-        text = FENCE.sub("", md_file.read_text(encoding="utf-8", errors="replace"))
+        text = strip_code(md_file.read_text(encoding="utf-8", errors="replace"))
         for match in WIKILINK.finditer(text):
             target = match.group(1).strip()
             if target and normalize(target) not in known:
