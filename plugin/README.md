@@ -51,7 +51,7 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 - **持久化知识库**：指定一个目录，build 时导出分层的机器参考图（`fact / mechanism` 公开层与 `rationale / principle` 高层分文件），教学时把每次作答的结构化抽取、差异清单与到达层次追加进对学习者不可见、不可编辑的日志；
 - **跨课复用**：概念注册表按别名召回已学概念，对有记录的概念用一道变式检索题替代完整前置诊断，并按证据等级与时效判断"已掌握"是否还有效；
 - **去主体化复习**：过去的错误主张以匿名命题形式回来让学习者批判，原回答永不展示；
-- **协议按状态加载**：`tutoring-protocol.md` 拆成状态机各状态各自的小文件，任一时刻加载给模型的规则 ≤ 60 行；
+- ~~协议按状态加载~~：已完成——`references/protocol/` 与 `references/prerequisite/` 按状态机各状态分文件，任一时刻加载给模型的规则 ≤ 40 行；
 - **可视化导出**：学科层级树 + 机制关系邻接，颜色深浅表示当前掌握估计，先导出为 Obsidian 目录。
 
 高层内容永不展示、LRG 不可见不可改、第四层理解只记录不评分——这三条是 v2 的硬约束，见 [`docs/learning-layers.md`](../docs/learning-layers.md)。
@@ -125,6 +125,10 @@ plugin/
     │   ├── agents/openai.yaml       # 仅 Codex 使用，其他宿主忽略
     │   ├── assets/
     │   ├── references/
+    │   │   ├── protocol/            # 教学协议，按状态机状态分文件加载
+    │   │   ├── prerequisite/        # 前置协议，按阶段分文件加载
+    │   │   ├── lesson-contract.md
+    │   │   └── source-handling.md
     │   └── scripts/
     └── clarify/                     # 概念笔记技能
         ├── SKILL.md

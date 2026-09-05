@@ -24,7 +24,7 @@
 
 ## 细化文档契约（`zoom/<section-id>-guide.md`）
 
-- 只在教学中学习者选择细化某节时生成（触发条件见 tutoring-protocol 的 DEEPEN 节），一节最多一份；
+- 只在教学中学习者选择细化某节时生成（触发条件见 [protocol/deepen.md](protocol/deepen.md) 与 [protocol/ready.md](protocol/ready.md)），一节最多一份；
 - 只覆盖该节内部的衍生概念与机制：每个概念给出"解决什么问题、机制、至少两个例子（一个材料语境、一个新情境）、边界"；
 - 不重复主讲义已有内容，不提前讲后续小节，不包含本节 checkpoint 的答案；
 - 来源约束与主讲义相同：`explicit / entailed` 用材料内定位，`external` 附出处；
