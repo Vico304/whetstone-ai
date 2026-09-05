@@ -64,7 +64,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 2. 检查并补足前置知识
 
-根据 `prerequisite_check` 判断是否运行前置阶段。运行时必须读取 [references/prerequisite-protocol.md](references/prerequisite-protocol.md)，并按以下顺序执行：
+根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](references/prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题；
@@ -115,7 +115,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 6. 逐节互动教学
 
-进入 `teach` 或 `resume` 时，读取 [references/tutoring-protocol.md](references/tutoring-protocol.md)。核心行为是：
+进入 `teach` 或 `resume` 时，先读取 [references/protocol/_state-machine.md](references/protocol/_state-machine.md)，然后**只读当前状态对应的文件**（加载表在该文件内）；不要一次读完整个 `protocol/` 目录。核心行为是：
 
 1. 每次只处理一个小节和一个主问题，不一次展示后续所有答案。按协议分段揭示：先给本节问题请学习者预测，再展示方案与机制，最后提出主问题。
 2. 提出主问题前告知学习者可选择细化本节（DEEPEN）：按需生成 `zoom/<section-id>-guide.md`，对本节内部的衍生概念讲得更细、例子更多；读完后仍回到本节主问题作答。细化文档不在 build 阶段预生成。

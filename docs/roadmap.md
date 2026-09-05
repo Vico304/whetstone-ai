@@ -21,7 +21,7 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 
 保留插件形态继续教学（在工作的部分不动），全部为本地脚本与文档切分，无服务端。按依赖顺序：
 
-**P0-0 协议按状态拆分**（纯重构，零逻辑变更）
+**P0-0 协议按状态拆分**（纯重构，零逻辑变更）— ✅ 2026-09-05 完成
 `tutoring-protocol.md` → `references/protocol/{_state-machine,ready,predict,deepen,main,assess,feedback,resume,finish}.md`，每文件 ≤ 40–60 行；`prerequisite-protocol.md` 同法拆三段；SKILL.md 只保留"哪个状态读哪个文件"。先做它，因为它立刻把教学时的有效规则集从约 560 行降到每时刻 ≤ 60 行，并验证三个宿主的渐进加载都可用。
 
 **P0-1 schema 1.1 + `mrg_export.py`**
