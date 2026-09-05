@@ -31,6 +31,8 @@ mrg_export = load_module("mrg_export")
 store_init = load_module("store_init")
 comparator = load_module("comparator")
 lrg_record = load_module("lrg_record")
+index_match = load_module("index_match")
+learner_state_build = load_module("learner_state_build")
 
 TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -445,6 +447,96 @@ class KnowledgeStoreTests(unittest.TestCase):
                 store_init.command_show(argparse.Namespace(store=store))
             self.assertNotIn(secret, buffer.getvalue())
             self.assertIn("2 attempts", buffer.getvalue())
+
+
+class RegistryAndLearnerStateTests(unittest.TestCase):
+    def _store(self, root: Path) -> Path:
+        store = root / "store"
+        store_init.init_store(store, [])
+        store_init.register_lesson(store, TEMPLATE_PLAN)
+        public, deep = mrg_export.export(load_template())
+        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.json", public)
+        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.deep.json", deep)
+        index = index_match.load_index(store)
+        index_match.register_nodes(index, public["nodes"] + deep["nodes"], "sample-guided-lesson")
+        index_match.save_index(store, index)
+        return store
+
+    def test_register_and_recall_without_auto_merge(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            index = index_match.load_index(store)
+            self.assertEqual(set(index["concepts"]), {"learning-design.system-boundary", "learning-design.macro-map"})
+            self.assertEqual(index["alias_index"]["macro map"], "learning-design.macro-map")
+
+            # second lesson reuses one id (appearance appended) and tries to claim an alias owned by another id
+            other = [{"id": "learning-design.macro-map", "name": "宏观地图", "aliases": ["big picture"], "domain_path": ["学习设计"], "layer": "mechanism", "section_ids": ["s01"]},
+                     {"id": "cs.other.thing", "name": "别的", "aliases": ["系统边界"], "domain_path": ["计算机科学"], "layer": "fact", "section_ids": ["s02"]}]
+            report = index_match.register_nodes(index, other, "lesson-2")
+            self.assertEqual(report["created"], ["cs.other.thing"])
+            self.assertEqual(report["updated"], ["learning-design.macro-map"])
+            self.assertEqual(report["alias_conflicts"][0]["alias"], "系统边界")
+            self.assertEqual(index["alias_index"]["系统边界"], "learning-design.system-boundary")  # not re-pointed
+            self.assertEqual(len(index["concepts"]["learning-design.macro-map"]["appearances"]), 2)
+            self.assertIn("big picture", index["concepts"]["learning-design.macro-map"]["aliases"])
+
+            results = index_match.recall(index, [{"name": "MACRO MAP"}, {"name": "未知概念"}, {"name": "系统边界", "aliases": ["big picture"]}])
+            self.assertEqual(results[0]["decision_needed"], "confirm_same")
+            self.assertEqual(results[0]["matches"][0]["id"], "learning-design.macro-map")
+            self.assertEqual(results[1]["decision_needed"], "none")
+            self.assertEqual(results[2]["decision_needed"], "disambiguate")
+            with self.assertRaises(ValueError):
+                index_match.recall(index, [{"aliases": ["x"]}])
+
+    def _append(self, store, at, kind, verdict, confidence=None, depth=None, props=None, section="s01"):
+        event = lrg_record.build_event(
+            lesson_id="sample-guided-lesson", section_id=section, kind=kind, attempt_number=1, response="r", feedback="",
+            verdict=verdict, confidence=confidence, criteria_met=[], depth_reached=depth, extraction=None,
+            comparison={"propositions": props or [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
+        )
+        event["at"] = at
+        lrg_record.append_event(store, "sample-guided-lesson", event)
+
+    def test_learner_state_freshness_tiers_depth_and_error_pool(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            prop = {"id": "p-1", "text": "去主体化的错误主张", "status": "wrong", "concept_ids": ["learning-design.macro-map"], "confidence_high": True}
+            self._append(store, "2026-01-01T10:00:00Z", "checkpoint", "retry", confidence=5, depth="fact", props=[prop])
+            self._append(store, "2026-01-01T11:00:00Z", "checkpoint", "mastered", confidence=2, depth="mechanism")
+            self._append(store, "2026-01-20T10:00:00Z", "review", "mastered", confidence=4, depth="rationale")
+
+            state = learner_state_build.build(store, now=datetime(2026, 1, 25, tzinfo=timezone.utc))
+            macro = state["concepts"]["learning-design.macro-map"]
+            self.assertEqual(macro["attempts"], 3)
+            self.assertEqual(macro["evidence_tier"], "delayed")
+            self.assertEqual(macro["stability"], 2)          # two distinct success days
+            self.assertEqual(macro["freshness"], "fresh")     # window 14 days, 5 days old
+            self.assertEqual(macro["depth_max"], "rationale")
+            self.assertEqual(macro["depth_latest"], "rationale")
+            self.assertEqual(macro["error_propositions"][0]["text"], "去主体化的错误主张")
+            self.assertEqual(macro["calibration"], {"overconfident": 1, "underconfident": 1})
+            self.assertAlmostEqual(macro["mastery_estimate"], 0.7)
+            boundary = state["concepts"]["learning-design.system-boundary"]
+            self.assertEqual(boundary["error_propositions"], [])  # proposition only referenced macro-map
+
+            stale = learner_state_build.build(store, now=datetime(2026, 3, 1, tzinfo=timezone.utc))
+            self.assertEqual(stale["concepts"]["learning-design.macro-map"]["freshness"], "stale")
+            self.assertAlmostEqual(stale["concepts"]["learning-design.macro-map"]["mastery_estimate"], 0.35)
+
+    def test_immediate_only_evidence_is_unknown(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            self._append(store, "2026-01-01T10:00:00Z", "checkpoint", "mastered", depth="mechanism")
+            state = learner_state_build.build(store, now=datetime(2026, 1, 2, tzinfo=timezone.utc))
+            macro = state["concepts"]["learning-design.macro-map"]
+            self.assertEqual(macro["evidence_tier"], "immediate")
+            self.assertEqual(macro["freshness"], "unknown")
+            self.assertAlmostEqual(macro["mastery_estimate"], 0.08)
+            self.assertEqual(learner_state_build.freshness_window(1).days, 7)
+            self.assertEqual(learner_state_build.freshness_window(4).days, 56)
+            self.assertEqual(learner_state_build.freshness_window(9).days, 180)
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
