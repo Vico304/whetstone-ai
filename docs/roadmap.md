@@ -39,7 +39,7 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **P0-5 变式题替代诊断 + 去主体化复习** — ✅ 2026-09-05 完成
 前置阶段查注册表与状态：`fresh / stale` 出变式题（`kind = variant`），`unknown` 走原诊断；resume 与复习从 `error_propositions` 生成"有一种说法是……哪里有问题"。
 
-**P0-6 eval 集**
+**P0-6 eval 集** — ✅ 2026-09-05 完成（`plugin/evals/`：材料清单、`score_pack.py`、CI 冒烟）
 `plugin/evals/` 三份小材料；build 与 teach 指标见 spec B §6。P0-0 之后、P0-3 之前建好——之后每一步的提示词改动都要能在它上面看到变化。
 
 ## P1 — 在 P0 有数据之后
@@ -55,6 +55,8 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **网页端 + 第三方模型 API**：仍然排在最后。理由不变——把未验证的教学假设浇进混凝土之前，先用两个脚本证明它值得。
 
 ## 已完成
+
+- 2026-09-05：**P0 全部落地**（P0-0 协议按状态拆分；P0-1 schema 1.1 + `mrg_export.py`；P0-2 `criteria_met` / `depth_reached`；P0-3 `store_init` / `comparator` / `lrg_record`；P0-4 `index_match` / `learner_state_build`；P0-5 变式题替代诊断 + `review_pool`；P0-6 evals）。下一步是**用它学一门真实课程**，拿到第一批 `elapsed_seconds` 与 `depth_reached` 数据，再决定 P1 顺序；
 
 - 2026-08-31：Claude Code / DeepSeek Harness 适配，同一技能目录接三宿主；
 - 2026-09-05：`record --review` 修复 resume 复习回退位置的问题；`scan_wikilinks` 支持块列表别名与行内代码；`source_manifest` 分类修正；泄漏检查归一化；CI；

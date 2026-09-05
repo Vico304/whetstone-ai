@@ -44,15 +44,18 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 
 它暂不实现持久化知识库、自动跨材料合并、多 Agent 发布流程、间隔复习调度或独立 Web UI。这样可以先验证最重要的假设：问题驱动的文档和逐节主动解释，是否真的比摘要更能帮助用户理解材料。
 
-### 已定稿、待实现（v2）
+### 知识库模式（v2，可选开启）
 
-下列能力的设计已在 [`docs/specs/`](../docs/specs/) 定稿，将以**可选开启**的方式加入本插件，不开启时行为与现在完全一致（实施顺序见 [`docs/roadmap.md`](../docs/roadmap.md)）：
+设计见 [`docs/specs/`](../docs/specs/)。在调用时指定一个持久化目录（或在简报里填 `knowledge_store`）即开启；不开启时行为与 v0.2 完全一致。开启后：
 
-- **持久化知识库**：指定一个目录，build 时导出分层的机器参考图（`fact / mechanism` 公开层与 `rationale / principle` 高层分文件），教学时把每次作答的结构化抽取、差异清单与到达层次追加进对学习者不可见、不可编辑的日志；
-- **跨课复用**：概念注册表按别名召回已学概念，对有记录的概念用一道变式检索题替代完整前置诊断，并按证据等级与时效判断"已掌握"是否还有效；
-- **去主体化复习**：过去的错误主张以匿名命题形式回来让学习者批判，原回答永不展示；
-- ~~协议按状态加载~~：已完成——`references/protocol/` 与 `references/prerequisite/` 按状态机各状态分文件，任一时刻加载给模型的规则 ≤ 40 行；
-- **可视化导出**：学科层级树 + 机制关系邻接，颜色深浅表示当前掌握估计，先导出为 Obsidian 目录。
+- **分层机器参考图**：build 校验通过后 `mrg_export.py` 把课程导出为 `mrg/<id>.json`（`fact / mechanism` 公开层）与 `mrg/<id>.deep.json`（`rationale / principle` 高层）。讲义、概念笔记、学习者查询只读公开层；高层只在评估与出题时加载。
+- **只追加、不可见的学习者日志**：每次作答由模型读成抽取 JSON（概念、关系、去主体化命题），`comparator.py` 落差异类别（不打分），`lrg_record.py` 追加到 `lrg/<id>.jsonl` 并同步 `learning-progress.json`。`show` 只显示计数与层次，永不打印回答。
+- **跨课注册表与带时效的学习者状态**：`index_match.py` 按别名召回已学概念（不自动合并）；`learner_state_build.py` 从日志派生每个概念的证据等级、稳定性、`fresh / stale / unknown` 时效、到达层与错误命题池。
+- **变式题替代诊断**：新课前置阶段 `index_match.py prerequisites` 对 `fresh / stale` 的概念给一道变式题而不是完整诊断——不跳过。
+- **去主体化复习**：`review_pool.py` 从派生状态取出过去的错误主张，以"有一种说法是……哪里有问题？"呈现，纠正同轮闭环，原回答永不展示。
+- **evals**：`evals/score_pack.py` 对任何学习包与日志打分，提示词改动前后可比。
+
+尚未实现：可视化导出（`exports/`，P1）、质疑通道的记录脚本（P1）、build 管线阶段化与廉价模型分工（P1）。
 
 高层内容永不展示、LRG 不可见不可改、第四层理解只记录不评分——这三条是 v2 的硬约束，见 [`docs/learning-layers.md`](../docs/learning-layers.md)。
 
@@ -68,7 +71,8 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 - 分段揭示教学：先给问题请学习者预测，再展示方案与机制；
 - 逐节提问、针对回答实际暴露的弱点追问、诊断高信心误解，并保留多次原始回答；
 - 恢复学习时先用变式检索题检验已完成小节的留存；
-- 使用标准库 Python 脚本清点来源、校验课程结构和维护学习进度。
+- 使用标准库 Python 脚本清点来源、校验课程结构和维护学习进度；
+- 可选的知识库模式：分层 MRG 导出、结构化 LRG 日志与比较器、跨课概念注册表、带时效的学习者状态、变式题替代诊断、去主体化复习（见下节）。
 
 ## 使用示例
 
@@ -116,6 +120,7 @@ plugin/
 │   ├── lesson-plan.json
 │   └── teaching-guide.md
 ├── tests/test_tools.py
+├── evals/                           # 材料清单 + score_pack.py
 └── skills/                          # 三宿主共享的技能目录
     ├── brief/                       # 课前简报技能
     │   ├── SKILL.md

@@ -1,0 +1,36 @@
+{
+  "pack": "examples/project-consensus",
+  "build": {
+    "schema_version": "1.0",
+    "validator_errors": 0,
+    "validator_warnings": 0,
+    "sections": 8,
+    "max_concepts_per_section": 3,
+    "mean_concepts_per_section": 3,
+    "source_refs": 18,
+    "support": {
+      "explicit": 18
+    },
+    "unsupported_ratio": 0.0,
+    "pedagogical_inference_ratio": 0.0,
+    "relations": 0,
+    "layers": {
+      "mechanism": 24
+    },
+    "criteria_per_section": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ],
+    "guide_chars": 8718,
+    "locator_checked": 18,
+    "locator_hit_rate": 0.667,
+    "errors": [],
+    "warnings": []
+  }
+}
