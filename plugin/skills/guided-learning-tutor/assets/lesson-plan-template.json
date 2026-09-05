@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "lesson_id": "sample-guided-lesson",
+  "title": "示例：从总体问题理解系统设计",
+  "learning_goal": "能解释每个方案为何出现，以及它如何引出下一步",
+  "source_manifest": null,
+  "big_picture": {
+    "problem": "如何把分散输入转成可以理解和验证的结果",
+    "outcome": "学习者能重述完整问题链，并将方法迁移到新项目",
+    "system_map": [
+      "输入范围",
+      "结构分析",
+      "教学路径",
+      "学习者解释",
+      "反馈与迁移"
+    ]
+  },
+  "sections": [
+    {
+      "id": "s01",
+      "title": "从线性材料到总体结构",
+      "depends_on": [],
+      "problem": "逐页或逐文件阅读会让局部信息遮住总体问题",
+      "solution": "先建立输入、关键过程和输出的宏观地图",
+      "mechanism": "把分散内容压缩成少数功能步骤，使细节能挂接到明确位置",
+      "meaning": "学习者能判断每个模块服务于哪一段流程",
+      "tradeoffs": [
+        "宏观地图会省略细节",
+        "错误的边界选择会误导后续课程"
+      ],
+      "new_problem": null,
+      "concepts": [
+        {
+          "name": "系统边界",
+          "explanation": "本次解释纳入和排除的输入、过程与输出"
+        },
+        {
+          "name": "宏观地图",
+          "explanation": "为细节提供位置的最小端到端流程"
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Architecture",
+          "support": "explicit",
+          "note": "来源直接列出主要步骤"
+        },
+        {
+          "path": "examples/source.md",
+          "locator": "course ordering",
+          "support": "pedagogical_inference",
+          "note": "先讲总体结构属于教学组织"
+        }
+      ],
+      "checkpoint": {
+        "prompt": "为什么直接按文件顺序阅读容易失去整体意义？宏观地图解决了什么，又没有解决什么？",
+        "criteria": [
+          "说明局部顺序不等于功能结构",
+          "说明宏观地图为细节提供位置",
+          "指出宏观地图仍不能解释设计理由"
+        ],
+        "hint": "分别从‘看见组件’和‘理解组件为何存在’考虑。"
+      }
+    }
+  ],
+  "final_challenge": {
+    "prompt": "选择一个熟悉的项目，先画宏观地图，再解释地图仍不足以回答的一个问题。",
+    "criteria": [
+      "包含输入、过程和输出",
+      "指出一个需要问题驱动解释的设计选择"
+    ]
+  },
+  "uncertainties": [
+    "示例来源没有说明长期存储策略"
+  ]
+}

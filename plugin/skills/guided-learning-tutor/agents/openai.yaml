@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guided Learning Tutor"
+  short_description: "Build source-grounded, problem-driven lessons"
+  default_prompt: "Use $guided-learning-tutor to analyze my materials, check prerequisite knowledge when needed, research and teach cited supplements for actual gaps, then continue one LearningUnit at a time."

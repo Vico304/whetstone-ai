@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-21T07:37:22.305974Z",
+  "base_path": ".",
+  "roots": [
+    "docs/consensus.md"
+  ],
+  "files": [
+    {
+      "path": "docs/consensus.md",
+      "kind": "document",
+      "status": "included",
+      "bytes": 27786,
+      "modified_at": "2026-08-19T07:28:23.711449Z",
+      "text_candidate": true,
+      "sha256": "66ab73e002bb4e2c38d3e9c0e77f96817794ddbb911d1941e6c8e19614a1b9ff"
+    }
+  ],
+  "problems": [],
+  "summary": {
+    "total_files": 1,
+    "included": 1,
+    "metadata_only": 0,
+    "skipped_sensitive": 0,
+    "problems": 0
+  }
+}
