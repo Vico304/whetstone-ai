@@ -102,12 +102,12 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 没有文件工作区时，在对话中提供同等内容，并在当前会话维护进度。使用 [assets/teaching-guide-template.md](assets/teaching-guide-template.md) 与 [assets/lesson-plan-template.json](assets/lesson-plan-template.json) 作为起点，不必保留不适合当前材料的可选段落。
 
-生成前读取 [references/lesson-contract.md](references/lesson-contract.md)。生成后运行 `scripts/validate_lesson.py`；前置产物运行 `scripts/validate_prerequisites.py`。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
+生成前读取 [references/lesson-contract.md](references/lesson-contract.md)。新课程使用 schema `1.1`（概念带 `id / layer / domain_path`，顶层 `relations[]`，`criteria` 为对象）。生成后运行 `scripts/validate_lesson.py`；前置产物运行 `scripts/validate_prerequisites.py`。用户开启了知识库目录时，校验通过后再运行 `scripts/mrg_export.py --store <目录>` 导出分层参考图。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
 
 ### 5. 教学文档质量要求
 
 - 开头给出学习目标、材料范围、总体问题、系统地图和完整问题链预览。
-- 每个主体小节围绕一个可解释步骤，至少包含：当前问题、解决方案、工作机制、实际意义、局限/代价、它引出的新问题、关键概念、来源定位和学习者检查点。
+- 每个主体小节围绕一个可解释步骤，至少包含：当前问题、解决方案、工作机制、它引出的新问题、关键概念、来源定位和学习者检查点。**意义、代价与设计思想不进讲义**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
 - “新问题”应自然引出下一小节；最后一节可转为未决问题、边界或迁移挑战。
 - 来源定位靠近相关结论。外部知识必须单独标记，不得用来填补材料缺口而不说明。
 - 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题。

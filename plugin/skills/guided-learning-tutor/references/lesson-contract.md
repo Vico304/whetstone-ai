@@ -45,7 +45,7 @@
 
 顶层必需字段：
 
-- `schema_version`：当前为 `1.0`；
+- `schema_version`：新课程写 `1.1`；校验器与导出脚本同时接受 `1.0`（旧课程）；
 - `lesson_id`、`title`、`learning_goal`；
 - `source_manifest`：清单相对路径或 `null`；
 - `big_picture.problem`：材料总体解决的问题；
@@ -64,9 +64,10 @@
 - `meaning`：它对理解、设计或使用的实际意义；
 - `tradeoffs`：边界、代价或失败方式数组；
 - `new_problem`：该方案暴露并引向下一节的问题；末节可为 `null`；
-- `concepts`：`name` 与面向学习者的 `explanation`；
+- `concepts`：`name` 与面向学习者的 `explanation`；**1.1 另需** `id`、`layer`、`domain_path`，可选 `aliases`；
 - `source_refs`：`path`、`locator`、`support` 与简短 `note`；
-- `checkpoint.prompt`、隐藏评估用 `criteria` 和渐进提示 `hint`。
+- `checkpoint.prompt`、隐藏评估用 `criteria` 和渐进提示 `hint`；**1.1 中 `criteria` 是对象数组** `{id, text, layer}`，`id` 节内唯一（如 `c1`、`c2`），供 `criteria_met` 引用；
+- **1.1 可选** `principle`：本节体现的可迁移设计思想（`principle` 层，只进高层文件，永不进讲义）。
 
 除最后一节外，`new_problem` 应为非空文本。`source_refs.support` 只能是：
 
@@ -76,6 +77,14 @@ explicit | entailed | pedagogical_inference | external | unsupported
 
 `unsupported` 只用于记录问题，不得作为稳定讲解的唯一依据。
 
+### 1.1 新增：概念 id、理解层、学科路径、关系
+
+- `concepts[].id`：`<domain>.<concept>` 形式的小写 ASCII，如 `cs.tee.enclave`、`learning-design.macro-map`。跨课程稳定；开启知识库时由概念注册表决定复用还是新建（见 `docs/specs/knowledge-store.md` §4）。同一 id 在多节出现时 `name` 必须一致。
+- `concepts[].layer`：`fact | mechanism | rationale | principle`。`fact` 是术语与事实，`mechanism` 是如何工作；这两层可进讲义。`rationale`（为什么这样设计）与 `principle`（可迁移思想）只进高层文件。
+- `concepts[].domain_path`：1–4 级学科路径，如 `["计算机科学", "可信计算"]`，属于教学推断。
+- 顶层 `relations[]`：概念之间有类型有方向的边，每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from / to` 必须是本课程出现的概念 id；`type` 取自 `is_a | part_of | depends_on | causes | enables | implements | contrasts_with | instance_of | prerequisite_for`；`prerequisite_for` 默认 `support = pedagogical_inference`。至少为每节的中心概念写出它与前一节中心概念的一条边。
+- `meaning` 与 `tradeoffs` 在 1.1 中语义不变，但归入 `rationale` 层：它们是主问题与追问的素材，**不再渲染进讲义**。
+
 ## `teaching-guide.md`
 
 教学文档面向学习者，不必逐字复制 JSON，但必须同步其顺序与含义：
@@ -83,7 +92,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 1. 学习目标、材料范围和阅读方式；
 2. 总体问题、系统边界和宏观流程；
 3. 问题链预览；
-4. 各小节的“问题、方案、机制、意义、代价、新问题、来源、检查点”；
+4. 各小节的"问题、方案、机制、新问题、关键概念、来源、检查点"——**不含**意义、代价、设计思想（它们是 `rationale / principle` 层，留给学习者在回答中自己得出，校验器对 1.1 课程报告逐字出现的意义与代价，并拒绝出现 `principle` 文本）；
 5. 总结、整体重述题和迁移挑战；
 6. 材料不确定性与进一步阅读。
 
@@ -109,3 +118,13 @@ python3 scripts/validate_lesson.py path/to/lesson-plan.json \
 ```
 
 清单不是由脚本生成或路径不能一一对应时可省略 `--manifest`，但仍需人工检查引用是否可定位。校验器检查结构和交叉引用，不证明教学解释本身正确。
+
+## 导出机器参考图（开启知识库时）
+
+校验通过后，把课程导出为分层的机器参考图：
+
+```bash
+python3 scripts/mrg_export.py path/to/lesson-plan.json --store <知识库目录> [--manifest path/to/sources.json]
+```
+
+产出 `<store>/mrg/<lesson-id>.json`（公开层：`fact / mechanism` 节点与边、各节的问题 / 方案 / 机制骨架）与 `<store>/mrg/<lesson-id>.deep.json`（高层：`rationale / principle` 节点与边、各节的意义、代价、设计思想、检查标准）。**渲染讲义、生成概念笔记、回答学习者查询时只读公开文件；高层文件只在评估与出题时加载。** 已存在的导出不覆盖；修订 MRG 应产生新版本。未开启知识库时不需要此步。

@@ -27,6 +27,14 @@ learning_state = load_module("learning_state")
 validate_prerequisites = load_module("validate_prerequisites")
 prerequisite_state = load_module("prerequisite_state")
 scan_wikilinks = load_module("scan_wikilinks", CLARIFY_SCRIPT_ROOT)
+mrg_export = load_module("mrg_export")
+
+TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
+
+
+def load_template():
+    return json.loads(TEMPLATE_PLAN.read_text(encoding="utf-8"))
 
 
 class SourceManifestTests(unittest.TestCase):
@@ -100,7 +108,7 @@ class LessonValidationTests(unittest.TestCase):
         plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
         guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        leaked = plan["sections"][0]["checkpoint"]["criteria"][0]
+        leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         guide = guide_path.read_text(encoding="utf-8") + f"\n参考答案：{leaked}\n"
 
         errors = validate_lesson.validate_guide(guide, plan)
@@ -111,7 +119,7 @@ class LessonValidationTests(unittest.TestCase):
         plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
         guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        leaked = plan["sections"][0]["checkpoint"]["criteria"][0]
+        leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         # Insert punctuation and whitespace inside the criterion; a verbatim check would miss this.
         disguised = "，\n".join(leaked[i : i + 4] for i in range(0, len(leaked), 4))
         guide = guide_path.read_text(encoding="utf-8") + f"\n{disguised}\n"
@@ -125,7 +133,7 @@ class LessonValidationTests(unittest.TestCase):
         guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         criterion = "学习者需要说明输入如何经过处理步骤转化为可观察的输出结果并解释边界条件"
-        plan["sections"][0]["checkpoint"]["criteria"] = [criterion]
+        plan["sections"][0]["checkpoint"]["criteria"] = [{"id": "c1", "text": criterion, "layer": "mechanism"}]
         guide = guide_path.read_text(encoding="utf-8") + "\n提示：" + criterion[8:30] + "……\n"
 
         errors = validate_lesson.validate_guide(guide, plan)
@@ -133,6 +141,60 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(any("leaks assessment criterion" in error for error in errors))
         self.assertTrue(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text(guide)))
         self.assertFalse(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text("完全无关的讲义正文")))
+
+    def test_schema_11_rejects_bad_ids_layers_relations_and_criteria(self):
+        plan = load_template()
+        self.assertEqual(plan["schema_version"], "1.1")
+        plan["sections"][0]["concepts"][0]["id"] = "NoDot"
+        plan["sections"][0]["concepts"][1]["layer"] = "vibes"
+        plan["sections"][0]["concepts"][1]["domain_path"] = []
+        plan["relations"][0]["to"] = "learning-design.missing"
+        plan["relations"][0]["type"] = "related_to"
+        plan["sections"][0]["checkpoint"]["criteria"].append({"id": "c1", "text": "dup", "layer": "fact"})
+        plan["sections"][0]["principle"] = "   "
+
+        errors = validate_lesson.validate_plan(plan)
+
+        joined = "\n".join(errors)
+        for needle in ("concepts[0].id", "concepts[1].layer", "domain_path", "relations[0].to",
+                       "relations[0].type", "criteria[3].id duplicates", "principle"):
+            self.assertIn(needle, joined, joined)
+
+    def test_schema_11_concept_id_reused_with_other_name_is_rejected(self):
+        plan = load_template()
+        section = dict(plan["sections"][0])
+        section["id"] = "s02"
+        section["depends_on"] = ["s01"]
+        section["concepts"] = [dict(plan["sections"][0]["concepts"][0], name="别的名字")]
+        plan["sections"][0]["new_problem"] = "下一步"
+        plan["sections"].append(section)
+
+        errors = validate_lesson.validate_plan(plan)
+
+        self.assertTrue(any("reused with a different name" in e for e in errors), errors)
+
+    def test_schema_10_rejects_relations(self):
+        plan = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))
+        plan["relations"] = []
+        errors = validate_lesson.validate_plan(plan)
+        self.assertTrue(any("requires schema_version '1.1'" in e for e in errors))
+
+    def test_guide_leaking_principle_is_rejected_and_meaning_is_warned(self):
+        plan = load_template()
+        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        guide = guide_path.read_text(encoding="utf-8")
+        self.assertEqual(validate_lesson.guide_warnings(guide, plan), [])
+        leaked = guide + "\n" + plan["sections"][0]["principle"] + "\n" + plan["sections"][0]["meaning"] + "\n"
+
+        errors = validate_lesson.validate_guide(leaked, plan)
+        warnings = validate_lesson.guide_warnings(leaked, plan)
+
+        self.assertTrue(any("principle-layer" in e for e in errors), errors)
+        self.assertTrue(any("meaning" in w for w in warnings), warnings)
+
+    def test_criteria_texts_handles_both_versions(self):
+        self.assertEqual(validate_lesson.criteria_texts({"criteria": ["a", {"id": "c", "text": "b", "layer": "fact"}]}), ["a", "b"])
+        self.assertEqual(validate_lesson.criteria_texts(None), [])
 
     def test_cognitive_load_warnings(self):
         plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
@@ -216,6 +278,48 @@ class LearningStateTests(unittest.TestCase):
         self.assertEqual(state["current_section_id"], "s01")
         learning_state.append_attempt(state, "s01", "ok", "", "mastered", None)
         self.assertEqual(state["current_section_id"], "s03")
+
+
+class MrgExportTests(unittest.TestCase):
+    def test_export_separates_public_and_deep_layers(self):
+        plan = load_template()
+        public, deep = mrg_export.export(plan)
+
+        self.assertEqual({n["id"] for n in public["nodes"]}, {"learning-design.system-boundary", "learning-design.macro-map"})
+        self.assertEqual([e["type"] for e in public["edges"]], ["depends_on"])
+        self.assertEqual(deep["nodes"], [])
+        self.assertEqual(deep["sections"][0]["principle"], plan["sections"][0]["principle"])
+        self.assertEqual([c["id"] for c in deep["sections"][0]["criteria"]], ["c1", "c2", "c3"])
+        public_text = json.dumps(public, ensure_ascii=False)
+        for hidden in (plan["sections"][0]["principle"], plan["sections"][0]["meaning"], *plan["sections"][0]["tradeoffs"],
+                       *(c["text"] for c in plan["sections"][0]["checkpoint"]["criteria"])):
+            self.assertNotIn(hidden, public_text)
+        self.assertEqual(public["sections"][0]["concept_ids"], [n["id"] for n in public["nodes"]])
+
+    def test_export_moves_rationale_layer_nodes_to_deep_file(self):
+        plan = load_template()
+        plan["sections"][0]["concepts"][1]["layer"] = "rationale"
+        plan["relations"][0]["layer"] = "principle"
+        public, deep = mrg_export.export(plan)
+        self.assertEqual([n["id"] for n in public["nodes"]], ["learning-design.system-boundary"])
+        self.assertEqual([n["id"] for n in deep["nodes"]], ["learning-design.macro-map"])
+        self.assertEqual(public["edges"], [])
+        self.assertEqual(len(deep["edges"]), 1)
+
+    def test_export_handles_schema_10_with_generated_ids_and_merged_mentions(self):
+        plan = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))
+        public, deep = mrg_export.export(plan)
+        self.assertEqual(public["source_schema_version"], "1.0")
+        ids = [n["id"] for n in public["nodes"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertTrue(all(i.startswith("weave-consensus-core.") for i in ids))
+        self.assertTrue(all(n["layer"] == "mechanism" for n in public["nodes"]))
+        self.assertEqual(len(deep["sections"]), len(plan["sections"]))
+        self.assertTrue(all(c["id"].startswith("c") for c in deep["sections"][0]["criteria"]))
+
+    def test_slugify_keeps_non_ascii(self):
+        self.assertEqual(mrg_export.slugify("  可调用的 心智模型 "), "可调用的-心智模型")
+        self.assertEqual(mrg_export.slugify("Chain of Trust!"), "chain-of-trust")
 
 
 class PrerequisiteValidationTests(unittest.TestCase):

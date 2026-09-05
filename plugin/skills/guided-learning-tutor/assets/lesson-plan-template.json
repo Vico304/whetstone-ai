@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "lesson_id": "sample-guided-lesson",
   "title": "示例：从总体问题理解系统设计",
   "learning_goal": "能解释每个方案为何出现，以及它如何引出下一步",
@@ -28,14 +28,23 @@
         "宏观地图会省略细节",
         "错误的边界选择会误导后续课程"
       ],
+      "principle": "先定位再深入：任何细节只有在知道它服务于哪个功能步骤后才值得记住",
       "new_problem": null,
       "concepts": [
         {
+          "id": "learning-design.system-boundary",
           "name": "系统边界",
+          "aliases": ["边界", "scope"],
+          "layer": "fact",
+          "domain_path": ["学习设计", "结构分析"],
           "explanation": "本次解释纳入和排除的输入、过程与输出"
         },
         {
+          "id": "learning-design.macro-map",
           "name": "宏观地图",
+          "aliases": ["系统地图", "macro map"],
+          "layer": "mechanism",
+          "domain_path": ["学习设计", "结构分析"],
           "explanation": "为细节提供位置的最小端到端流程"
         }
       ],
@@ -56,12 +65,30 @@
       "checkpoint": {
         "prompt": "为什么直接按文件顺序阅读容易失去整体意义？宏观地图解决了什么，又没有解决什么？",
         "criteria": [
-          "说明局部顺序不等于功能结构",
-          "说明宏观地图为细节提供位置",
-          "指出宏观地图仍不能解释设计理由"
+          {"id": "c1", "text": "说明局部顺序不等于功能结构", "layer": "mechanism"},
+          {"id": "c2", "text": "说明宏观地图为细节提供位置", "layer": "mechanism"},
+          {"id": "c3", "text": "指出宏观地图仍不能解释设计理由", "layer": "rationale"}
         ],
         "hint": "分别从‘看见组件’和‘理解组件为何存在’考虑。"
       }
+    }
+  ],
+  "relations": [
+    {
+      "id": "r01",
+      "from": "learning-design.system-boundary",
+      "to": "learning-design.macro-map",
+      "type": "depends_on",
+      "layer": "mechanism",
+      "rationale": "没有先划定边界，地图就不知道该收进哪些输入与输出",
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Architecture",
+          "support": "entailed",
+          "note": "来源先列范围再列步骤"
+        }
+      ]
     }
   ],
   "final_challenge": {

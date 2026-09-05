@@ -11,6 +11,15 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
+SCHEMA_VERSIONS = {"1.0", "1.1"}
+LAYERS = ("fact", "mechanism", "rationale", "principle")
+PUBLIC_LAYERS = {"fact", "mechanism"}
+RELATION_TYPES = {
+    "is_a", "part_of", "depends_on", "causes", "enables",
+    "implements", "contrasts_with", "instance_of", "prerequisite_for",
+}
+CONCEPT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$")
+MAX_DOMAIN_DEPTH = 4
 
 MAX_CONCEPTS_PER_SECTION = 4
 MAX_SECTIONS_PER_LESSON = 9
@@ -32,12 +41,121 @@ def require_text_list(container: dict, key: str, location: str, errors: list[str
         errors.append(f"{location}.{key} must be a list of non-empty strings{suffix}")
 
 
+def schema_version(plan: dict) -> str:
+    version = plan.get("schema_version")
+    return version if version in SCHEMA_VERSIONS else "1.0"
+
+
+def validate_source_refs(refs: Any, location: str, errors: list[str], manifest_paths: set[str] | None) -> None:
+    if not isinstance(refs, list) or not refs:
+        errors.append(f"{location}.source_refs must be a non-empty list")
+        return
+    for ref_index, ref in enumerate(refs):
+        ref_location = f"{location}.source_refs[{ref_index}]"
+        if not isinstance(ref, dict):
+            errors.append(f"{ref_location} must be an object")
+            continue
+        for key in ("path", "locator", "note"):
+            require_text(ref, key, ref_location, errors)
+        if ref.get("support") not in SUPPORT_TYPES:
+            errors.append(f"{ref_location}.support must be one of {sorted(SUPPORT_TYPES)}")
+        if manifest_paths is not None and nonempty(ref.get("path")) and ref["path"] not in manifest_paths:
+            errors.append(f"{ref_location}.path '{ref['path']}' is absent from the source manifest")
+
+
+def validate_concept_v11(concept: dict, location: str, errors: list[str], names_by_id: dict[str, str]) -> None:
+    concept_id = concept.get("id")
+    if not nonempty(concept_id) or not CONCEPT_ID.match(concept_id):
+        errors.append(f"{location}.id must match '<domain>.<concept>' in lowercase ascii, e.g. 'cs.tee.enclave'")
+    elif concept_id in names_by_id and names_by_id[concept_id] != concept.get("name"):
+        errors.append(f"{location}.id '{concept_id}' is reused with a different name ('{names_by_id[concept_id]}')")
+    elif nonempty(concept.get("name")):
+        names_by_id[concept_id] = concept["name"]
+    if concept.get("layer") not in LAYERS:
+        errors.append(f"{location}.layer must be one of {list(LAYERS)}")
+    path = concept.get("domain_path")
+    if not isinstance(path, list) or not path or len(path) > MAX_DOMAIN_DEPTH or not all(nonempty(item) for item in path):
+        errors.append(f"{location}.domain_path must be 1-{MAX_DOMAIN_DEPTH} non-empty strings")
+    aliases = concept.get("aliases", [])
+    if not isinstance(aliases, list) or not all(nonempty(item) for item in aliases):
+        errors.append(f"{location}.aliases must be a list of non-empty strings when present")
+
+
+def validate_criteria(checkpoint: dict, location: str, errors: list[str], version: str) -> None:
+    criteria = checkpoint.get("criteria")
+    if version == "1.0":
+        require_text_list(checkpoint, "criteria", location, errors)
+        return
+    if not isinstance(criteria, list) or not criteria:
+        errors.append(f"{location}.criteria must be a non-empty list of objects")
+        return
+    seen: set[str] = set()
+    for index, criterion in enumerate(criteria):
+        c_location = f"{location}.criteria[{index}]"
+        if not isinstance(criterion, dict):
+            errors.append(f"{c_location} must be an object with id, text and layer")
+            continue
+        require_text(criterion, "id", c_location, errors)
+        require_text(criterion, "text", c_location, errors)
+        if criterion.get("layer") not in LAYERS:
+            errors.append(f"{c_location}.layer must be one of {list(LAYERS)}")
+        if nonempty(criterion.get("id")):
+            if criterion["id"] in seen:
+                errors.append(f"{c_location}.id duplicates '{criterion['id']}'")
+            seen.add(criterion["id"])
+
+
+def validate_relations(plan: dict, concept_ids: set[str], errors: list[str], manifest_paths: set[str] | None) -> None:
+    relations = plan.get("relations", [])
+    if not isinstance(relations, list):
+        errors.append("root.relations must be a list")
+        return
+    seen: set[str] = set()
+    for index, relation in enumerate(relations):
+        location = f"relations[{index}]"
+        if not isinstance(relation, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        require_text(relation, "id", location, errors)
+        if nonempty(relation.get("id")):
+            if relation["id"] in seen:
+                errors.append(f"{location}.id duplicates '{relation['id']}'")
+            seen.add(relation["id"])
+        for end in ("from", "to"):
+            if relation.get(end) not in concept_ids:
+                errors.append(f"{location}.{end} '{relation.get(end)}' is not a concept id in this lesson")
+        if relation.get("from") == relation.get("to") and relation.get("from") is not None:
+            errors.append(f"{location} must not connect a concept to itself")
+        if relation.get("type") not in RELATION_TYPES:
+            errors.append(f"{location}.type must be one of {sorted(RELATION_TYPES)}")
+        if relation.get("layer") not in LAYERS:
+            errors.append(f"{location}.layer must be one of {list(LAYERS)}")
+        if "rationale" in relation and not nonempty(relation.get("rationale")):
+            errors.append(f"{location}.rationale must be a non-empty string when present")
+        validate_source_refs(relation.get("source_refs"), location, errors, manifest_paths)
+
+
+def criteria_texts(checkpoint: Any) -> list[str]:
+    """Criterion texts for either schema version (strings in 1.0, objects in 1.1)."""
+    if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("criteria"), list):
+        return []
+    texts: list[str] = []
+    for criterion in checkpoint["criteria"]:
+        if isinstance(criterion, str):
+            texts.append(criterion)
+        elif isinstance(criterion, dict) and isinstance(criterion.get("text"), str):
+            texts.append(criterion["text"])
+    return texts
+
+
 def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
         return ["lesson plan root must be an object"]
-    if plan.get("schema_version") != "1.0":
-        errors.append("schema_version must equal '1.0'")
+    if plan.get("schema_version") not in SCHEMA_VERSIONS:
+        errors.append(f"schema_version must be one of {sorted(SCHEMA_VERSIONS)}")
+    version = schema_version(plan)
+    names_by_id: dict[str, str] = {}
     for key in ("lesson_id", "title", "learning_goal"):
         require_text(plan, key, "root", errors)
 
@@ -95,22 +213,13 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
                     continue
                 require_text(concept, "name", concept_location, errors)
                 require_text(concept, "explanation", concept_location, errors)
+                if version != "1.0":
+                    validate_concept_v11(concept, concept_location, errors, names_by_id)
 
-        refs = section.get("source_refs")
-        if not isinstance(refs, list) or not refs:
-            errors.append(f"{location}.source_refs must be a non-empty list")
-        else:
-            for ref_index, ref in enumerate(refs):
-                ref_location = f"{location}.source_refs[{ref_index}]"
-                if not isinstance(ref, dict):
-                    errors.append(f"{ref_location} must be an object")
-                    continue
-                for key in ("path", "locator", "note"):
-                    require_text(ref, key, ref_location, errors)
-                if ref.get("support") not in SUPPORT_TYPES:
-                    errors.append(f"{ref_location}.support must be one of {sorted(SUPPORT_TYPES)}")
-                if manifest_paths is not None and nonempty(ref.get("path")) and ref["path"] not in manifest_paths:
-                    errors.append(f"{ref_location}.path '{ref['path']}' is absent from the source manifest")
+        if "principle" in section and not nonempty(section.get("principle")):
+            errors.append(f"{location}.principle must be a non-empty string when present")
+
+        validate_source_refs(section.get("source_refs"), location, errors, manifest_paths)
 
         checkpoint = section.get("checkpoint")
         if not isinstance(checkpoint, dict):
@@ -118,7 +227,12 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
         else:
             require_text(checkpoint, "prompt", f"{location}.checkpoint", errors)
             require_text(checkpoint, "hint", f"{location}.checkpoint", errors)
-            require_text_list(checkpoint, "criteria", f"{location}.checkpoint", errors)
+            validate_criteria(checkpoint, f"{location}.checkpoint", errors, version)
+
+    if version != "1.0":
+        validate_relations(plan, set(names_by_id), errors, manifest_paths)
+    elif "relations" in plan:
+        errors.append("root.relations requires schema_version '1.1'")
 
     final_challenge = plan.get("final_challenge")
     if not isinstance(final_challenge, dict):
@@ -179,18 +293,33 @@ def validate_guide(guide: str, plan: dict) -> list[str]:
     for index, section in enumerate(plan.get("sections", [])):
         if not isinstance(section, dict):
             continue
-        checkpoint = section.get("checkpoint")
-        if not isinstance(checkpoint, dict):
-            continue
-        criteria = checkpoint.get("criteria")
-        if not isinstance(criteria, list):
-            continue
-        for criterion in criteria:
+        for criterion in criteria_texts(section.get("checkpoint")):
             if nonempty(criterion) and criterion_leaked(criterion, normalized_guide):
                 errors.append(
                     f"teaching guide leaks assessment criterion from sections[{index}]: '{criterion}'"
                 )
+        principle = section.get("principle")
+        if nonempty(principle) and criterion_leaked(principle, normalized_guide):
+            errors.append(f"teaching guide leaks principle-layer content from sections[{index}]")
     return errors
+
+
+def guide_warnings(guide: str, plan: dict) -> list[str]:
+    """Advisories for 1.1 guides: meaning/tradeoffs belong to the rationale layer and should
+    feed questions rather than be printed. Verbatim copies are reported, not failed."""
+    warnings: list[str] = []
+    if schema_version(plan) == "1.0":
+        return warnings
+    normalized_guide = normalize_text(guide)
+    for index, section in enumerate(plan.get("sections", [])):
+        if not isinstance(section, dict):
+            continue
+        if nonempty(section.get("meaning")) and criterion_leaked(section["meaning"], normalized_guide):
+            warnings.append(f"sections[{index}].meaning appears verbatim in the guide; rationale-layer text should drive questions, not be shown")
+        for tradeoff in section.get("tradeoffs") or []:
+            if nonempty(tradeoff) and criterion_leaked(tradeoff, normalized_guide):
+                warnings.append(f"sections[{index}] tradeoff appears verbatim in the guide: '{tradeoff}'")
+    return warnings
 
 
 LEAK_MIN_CHARS = 12
@@ -245,7 +374,9 @@ def main() -> int:
         errors = validate_plan(plan, paths)
         warnings = collect_warnings(plan)
         if args.guide:
-            errors.extend(validate_guide(args.guide.read_text(encoding="utf-8"), plan))
+            guide = args.guide.read_text(encoding="utf-8")
+            errors.extend(validate_guide(guide, plan))
+            warnings.extend(guide_warnings(guide, plan))
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}")
         return 2
