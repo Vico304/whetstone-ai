@@ -30,7 +30,7 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **P0-2 落盘 `criteria_met` 与 `depth_reached`** — ✅ 2026-09-05 完成
 `learning_state.py record` 增加两个字段。三行改动，不做纯属浪费已经完成的诊断。
 
-**P0-3 LRG 结构化记录 + `comparator.py`**
+**P0-3 LRG 结构化记录 + `comparator.py`** — ✅ 2026-09-05 完成
 作答后模型输出抽取 JSON（概念状态、关系状态、去主体化命题）；`lrg_record.py` 追加事件到 `lrg/<id>.jsonl`；`comparator.py` 对照 MRG 输出差异清单（`conflict / missing / partial / representation_only / beyond_reference / weak_reference`），不出分数。**同时开始记录每节交互时间**——这是判断 P0-3 是否可承受的唯一指标（阈值 +30%）。
 
 **P0-4 概念注册表 + 学习者状态**

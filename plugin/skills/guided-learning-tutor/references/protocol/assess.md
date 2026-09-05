@@ -35,4 +35,14 @@
 
 如果怀疑课程参考本身有错，暂停判分并回到来源。把结果标记为材料/机器参考不确定，而不是自动判学习者错误。
 
+## 开启知识库时：结构化抽取
+
+判定之前，把学习者的回答读成一份抽取 JSON（格式见 `assets/extraction-template.json`），写到临时文件：
+
+- `concepts[]`：回答提到了哪些概念（可用 id、名称或别名），各自 `correct | partial | wrong | missing`；本节概念没提到的写 `missing` 或不写；
+- `relations[]`：回答断言的概念关系 `{from, to, type, status}`，`status ∈ correct | direction_reversed | wrong_type | missing | extra`；
+- `propositions[]`：回答拆成的原子命题，**去主体化**（不含"你说""我认为"，不引用原句），各自 `correct | partial | wrong | representation_only`，附涉及的概念与是否高信心。
+
+抽取是模型对回答的读取，标 `extracted_by: "model"`；学习者不确认、不修改。`lrg_record.py append --extraction` 会调用比较器，输出 `feedback_priority`（`conflict:high_confidence` → `conflict` → `missing` → `partial`；`weak_reference` 不判学习者错，`beyond_reference` 只记录）。按这个顺序做 [feedback.md](feedback.md) 的"一次只处理一个问题"。
+
 判定后按 [record.md](record.md) 记录，再按 [feedback.md](feedback.md) 反馈。达到本节标准、用户明确选择跳过，或用户要求停止时，才进入下一节。

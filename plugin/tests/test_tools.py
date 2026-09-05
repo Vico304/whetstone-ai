@@ -28,6 +28,9 @@ validate_prerequisites = load_module("validate_prerequisites")
 prerequisite_state = load_module("prerequisite_state")
 scan_wikilinks = load_module("scan_wikilinks", CLARIFY_SCRIPT_ROOT)
 mrg_export = load_module("mrg_export")
+store_init = load_module("store_init")
+comparator = load_module("comparator")
+lrg_record = load_module("lrg_record")
 
 TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -334,6 +337,114 @@ class MrgExportTests(unittest.TestCase):
     def test_slugify_keeps_non_ascii(self):
         self.assertEqual(mrg_export.slugify("  可调用的 心智模型 "), "可调用的-心智模型")
         self.assertEqual(mrg_export.slugify("Chain of Trust!"), "chain-of-trust")
+
+
+class KnowledgeStoreTests(unittest.TestCase):
+    def _store_with_template(self, root: Path) -> Path:
+        store = root / "store"
+        store_init.init_store(store, ["学习设计"])
+        store_init.register_lesson(store, TEMPLATE_PLAN)
+        public, deep = mrg_export.export(load_template())
+        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.json", public)
+        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.deep.json", deep)
+        return store
+
+    def test_init_creates_layout_and_refuses_reinit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = Path(temporary) / "store"
+            data = store_init.init_store(store, ["计算机科学", " "])
+            self.assertEqual(data["domain_roots"], ["计算机科学"])
+            for name in ("concepts", "mrg", "lrg", "exports"):
+                self.assertTrue((store / name).is_dir())
+            self.assertTrue((store / "concepts" / "index.json").is_file())
+            with self.assertRaises(ValueError):
+                store_init.init_store(store, [])
+            store_init.register_lesson(store, TEMPLATE_PLAN)
+            store_init.register_lesson(store, TEMPLATE_PLAN)  # idempotent
+            self.assertEqual(len(store_init.load_store(store)["lessons"]), 1)
+
+    def test_comparator_classifies_conflict_missing_partial_and_beyond(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store_with_template(Path(temporary))
+            reference = comparator.load_reference(store, "sample-guided-lesson")
+            extraction = json.loads((PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "extraction-template.json").read_text(encoding="utf-8"))
+            extraction["concepts"].append({"ref": "量子纠缠", "status": "correct"})
+
+            result = comparator.compare(reference, "s01", extraction)
+            diff = result["diff"]
+
+            self.assertEqual(diff["missing"], [])  # both section concepts mentioned (one via its name)
+            self.assertEqual([c["id"] for c in diff["partial"]], ["learning-design.system-boundary"])
+            kinds = sorted(c["kind"] for c in diff["conflict"])
+            self.assertEqual(kinds, ["proposition", "relation"])
+            self.assertEqual(diff["beyond_reference"][0]["ref"], "量子纠缠")
+            self.assertEqual(diff["unresolved_refs"], ["量子纠缠"])
+            self.assertEqual(result["feedback_priority"][0], "conflict:high_confidence")
+            self.assertTrue(all(p["id"].startswith("p-") for p in result["propositions"]))
+
+    def test_comparator_downgrades_conflicts_against_pedagogical_inference_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store_with_template(Path(temporary))
+            public = json.loads((store / "mrg" / "sample-guided-lesson.json").read_text(encoding="utf-8"))
+            for node in public["nodes"]:
+                for ref in node["source_refs"]:
+                    ref["support"] = "pedagogical_inference"
+            for edge in public["edges"]:
+                for ref in edge["source_refs"]:
+                    ref["support"] = "pedagogical_inference"
+            (store / "mrg" / "sample-guided-lesson.json").write_text(json.dumps(public, ensure_ascii=False), encoding="utf-8")
+            reference = comparator.load_reference(store, "sample-guided-lesson")
+            extraction = {"extracted_by": "model", "concepts": [], "relations": [],
+                          "propositions": [{"text": "一条错误主张", "status": "wrong", "concept_refs": ["宏观地图"]}]}
+
+            diff = comparator.compare(reference, "s01", extraction)["diff"]
+
+            self.assertEqual(diff["conflict"], [])
+            self.assertEqual(diff["weak_reference"][0]["kind"], "proposition")
+            self.assertEqual(sorted(diff["missing"]), ["learning-design.macro-map", "learning-design.system-boundary"])
+
+    def test_comparator_rejects_unknown_status_and_section(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store_with_template(Path(temporary))
+            reference = comparator.load_reference(store, "sample-guided-lesson")
+            with self.assertRaises(ValueError):
+                comparator.compare(reference, "s01", {"concepts": [{"ref": "x", "status": "meh"}]})
+            with self.assertRaises(ValueError):
+                comparator.compare(reference, "s99", {})
+
+    def test_lrg_append_is_append_only_mirrors_progress_and_never_prints_response(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            store = self._store_with_template(root)
+            reference = comparator.load_reference(store, "sample-guided-lesson")
+            extraction = {"extracted_by": "model", "concepts": [{"ref": "宏观地图", "status": "correct"}], "relations": [], "propositions": []}
+            comparison = comparator.compare(reference, "s01", extraction)
+            secret = "这是不该被展示的原始回答"
+            for number, verdict in ((1, "partial"), (2, "mastered")):
+                event = lrg_record.build_event(
+                    lesson_id="sample-guided-lesson", section_id="s01", kind="checkpoint", attempt_number=number,
+                    response=secret, feedback="fb", verdict=verdict, confidence=3, criteria_met=["c1"],
+                    depth_reached="mechanism", extraction=extraction, comparison=comparison, elapsed_seconds=120,
+                )
+                lrg_record.append_event(store, "sample-guided-lesson", event)
+            events = lrg_record.read_events(store, "sample-guided-lesson")
+            self.assertEqual([e["attempt_number"] for e in events], [1, 2])
+            self.assertEqual(events[0]["evidence_tier"], "immediate")
+            self.assertEqual(events[0]["diff"]["missing"], ["learning-design.system-boundary"])
+            self.assertEqual(lrg_record.evidence_tier("review"), "delayed")
+            self.assertEqual(lrg_record.evidence_tier("transfer"), "transfer")
+            with self.assertRaises(ValueError):
+                lrg_record.build_event(lesson_id="l", section_id="s", kind="quiz", attempt_number=1, response="", feedback="",
+                                       verdict="partial", confidence=None, criteria_met=[], depth_reached=None,
+                                       extraction=None, comparison=None, elapsed_seconds=None)
+
+            import io, contextlib, argparse
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                lrg_record.command_show(argparse.Namespace(store=store, lesson_id="sample-guided-lesson"))
+                store_init.command_show(argparse.Namespace(store=store))
+            self.assertNotIn(secret, buffer.getvalue())
+            self.assertIn("2 attempts", buffer.getvalue())
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
