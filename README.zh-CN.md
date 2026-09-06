@@ -52,7 +52,8 @@
 | 宿主 | 安装 | 调用 |
 |---|---|---|
 | Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$guided-learning-tutor` |
-| Claude Code | `claude --plugin-dir ./plugin` | `/guided-learning-tutor:guided-learning-tutor` |
+| Claude Code（CLI） | `claude --plugin-dir ./plugin`，或 `claude plugin marketplace add . && claude plugin install guided-learning-tutor@whetstone` | `/guided-learning-tutor:guided-learning-tutor` |
+| Claude Desktop（Code 标签页） | 先在终端用上面的命令安装（共用配置），或把 `plugin/skills/*` 复制到 `~/.claude/skills/` | `/guided-learning-tutor` |
 | DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/guided-learning-tutor` |
 
 ## 使用

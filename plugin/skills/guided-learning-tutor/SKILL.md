@@ -12,6 +12,7 @@ description: Analyze user-supplied documents, codebases, or conversation records
 本文档及 references 中出现的 `scripts/`、`assets/`、`references/` 均相对于**本 SKILL.md 所在目录**（下称技能目录）解析。执行脚本前先确定技能目录的绝对路径：
 
 - Claude Code（插件安装）：技能目录为 `${CLAUDE_PLUGIN_ROOT}/skills/guided-learning-tutor`，例如 `python3 "${CLAUDE_PLUGIN_ROOT}/skills/guided-learning-tutor/scripts/validate_lesson.py" ...`；
+- Claude Code 以个人/项目技能安装（`~/.claude/skills/guided-learning-tutor/` 或 `<project>/.claude/skills/guided-learning-tutor/`，Claude Desktop 的 Code 标签页也用这条）：技能目录为 `${CLAUDE_SKILL_DIR}`，例如 `python3 "${CLAUDE_SKILL_DIR}/scripts/validate_lesson.py" ...`；
 - DeepSeek Harness / 直接放入 `~/.agents/skills/` 或 `.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身；
 - Codex：按宿主提供的技能路径解析。
 

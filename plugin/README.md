@@ -143,12 +143,21 @@ plugin/
 
 ## 各宿主安装说明
 
-**Claude Code**（本地开发）：
+**Claude Code**（三种方式，任选其一）：
 
 ```bash
+# 1. 终端 CLI，仅当次会话加载（开发时最方便）
 claude --plugin-dir /path/to/whetstone-ai/plugin
-# 会话内输入 / 确认 /guided-learning-tutor:guided-learning-tutor 出现
+
+# 2. 终端 CLI 注册本地 marketplace 并安装（持久；Claude Desktop 的 Code 标签页共用同一份用户配置）
+claude plugin marketplace add /path/to/whetstone-ai
+claude plugin install guided-learning-tutor@whetstone
+
+# 3. 不走插件机制：作为个人技能放进 ~/.claude/skills/（调用名变为 /brief、/guided-learning-tutor、/clarify）
+cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clarify ~/.claude/skills/
 ```
+
+注意：**Claude Desktop 的 Code 标签页不支持 `/plugin` 斜杠命令**（它有图形化插件管理器）；在 Desktop 里用方式 2（先在终端装好）或方式 3。会话内输入 `/` 确认技能出现。
 
 **DeepSeek Harness**：
 

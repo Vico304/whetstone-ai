@@ -14,6 +14,7 @@ description: Maintain an Obsidian-compatible concept-note directory for a guided
 本文档中 `scripts/`、`assets/` 相对于本 SKILL.md 所在目录（技能目录）解析：
 
 - Claude Code（插件安装）：技能目录为 `${CLAUDE_PLUGIN_ROOT}/skills/clarify`；
+- Claude Code 以个人/项目技能安装（`~/.claude/skills/clarify/`）：技能目录为 `${CLAUDE_SKILL_DIR}`；
 - DeepSeek Harness / 直接放入 `~/.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身。
 
 shell 的 cwd 通常是用户项目目录，不要以相对路径直接执行脚本。概念笔记写入学习包的 `concepts/` 目录，与技能目录无关。
