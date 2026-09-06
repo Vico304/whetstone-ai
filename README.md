@@ -54,7 +54,8 @@ One skill directory, three hosts:
 | Host | Install | Invoke |
 |---|---|---|
 | Codex | install `plugin/` as a plugin (ships `.codex-plugin/`) | `$guided-learning-tutor` |
-| Claude Code | `claude --plugin-dir ./plugin` | `/guided-learning-tutor:guided-learning-tutor` |
+| Claude Code (CLI) | `claude --plugin-dir ./plugin`, or `claude plugin marketplace add . && claude plugin install guided-learning-tutor@whetstone` | `/guided-learning-tutor:guided-learning-tutor` |
+| Claude Desktop (Code tab) | install via the CLI above (shared config), or copy `plugin/skills/*` into `~/.claude/skills/` | `/guided-learning-tutor` |
 | DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/guided-learning-tutor` |
 
 ## Use

@@ -14,6 +14,7 @@ description: Before building a formal lesson pack, interview the learner to clar
 本文档中 `assets/` 相对于本 SKILL.md 所在目录（技能目录）解析：
 
 - Claude Code（插件安装）：技能目录为 `${CLAUDE_PLUGIN_ROOT}/skills/brief`；
+- Claude Code 以个人/项目技能安装（`~/.claude/skills/brief/`）：技能目录为 `${CLAUDE_SKILL_DIR}`；
 - DeepSeek Harness / 直接放入 `~/.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身。
 
 简报文件写入用户的可写工作区，与技能目录无关。
