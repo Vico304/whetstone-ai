@@ -24,19 +24,19 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Validate lesson templates and example pack
         run: |
-          python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
-            skills/guided-learning-tutor/assets/lesson-plan-template.json \
-            --guide skills/guided-learning-tutor/assets/teaching-guide-template.md
-          python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
+          python3 skills/learn/scripts/validate_lesson.py \
+            skills/learn/assets/lesson-plan-template.json \
+            --guide skills/learn/assets/teaching-guide-template.md
+          python3 skills/learn/scripts/validate_lesson.py \
             examples/project-consensus/lesson-plan.json \
             --guide examples/project-consensus/teaching-guide.md \
             --manifest examples/project-consensus/sources.json
-          python3 skills/guided-learning-tutor/scripts/validate_prerequisites.py \
-            skills/guided-learning-tutor/assets/prerequisite-plan-template.json \
-            --guide skills/guided-learning-tutor/assets/prerequisite-guide-template.md
+          python3 skills/learn/scripts/validate_prerequisites.py \
+            skills/learn/assets/prerequisite-plan-template.json \
+            --guide skills/learn/assets/prerequisite-guide-template.md
       - name: Store pipeline smoke test (init → export → register → append → build → score)
         run: |
-          S=skills/guided-learning-tutor/scripts; A=skills/guided-learning-tutor/assets; T=$(mktemp -d)
+          S=skills/learn/scripts; A=skills/learn/assets; T=$(mktemp -d)
           python3 $S/store_init.py init --store $T/store --domain-root 学习设计
           python3 $S/store_init.py register --store $T/store --lesson-plan $A/lesson-plan-template.json
           python3 $S/mrg_export.py $A/lesson-plan-template.json --store $T/store

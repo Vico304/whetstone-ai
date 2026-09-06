@@ -24,7 +24,7 @@ from pathlib import Path
 
 
 EVALS_DIR = Path(__file__).resolve().parent
-SCRIPTS = EVALS_DIR.parent / "skills" / "guided-learning-tutor" / "scripts"
+SCRIPTS = EVALS_DIR.parent / "skills" / "learn" / "scripts"
 
 
 def _load(name: str):

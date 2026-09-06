@@ -6,16 +6,16 @@
 
 | 宿主 | 安装方式 | 调用方式（brief / 主技能 / clarify） |
 |---|---|---|
-| **Codex** | 通过 `.codex-plugin/plugin.json` 作为插件安装 | `$brief` / `$guided-learning-tutor` / `$clarify` |
-| **Claude Code** | 通过 `.claude-plugin/plugin.json` 作为插件安装 | `/guided-learning-tutor:brief`、`/guided-learning-tutor:guided-learning-tutor`、`/guided-learning-tutor:clarify`，或自然语言自动触发 |
-| **DeepSeek Harness (dsh)** | 把 `skills/` 下各技能目录复制到 `~/.agents/skills/`（全局）或项目的 `.agents/skills/` | `/brief` / `/guided-learning-tutor` / `/clarify` |
+| **Codex** | 通过 `.codex-plugin/plugin.json` 作为插件安装 | `$brief` / `$learn` / `$clarify` |
+| **Claude Code** | 通过 `.claude-plugin/plugin.json` 作为插件安装 | `/whetstone:brief`、`/whetstone:learn`、`/whetstone:clarify`，或自然语言自动触发 |
+| **DeepSeek Harness (dsh)** | 把 `skills/` 下各技能目录复制到 `~/.agents/skills/`（全局）或项目的 `.agents/skills/` | `/brief` / `/learn` / `/clarify` |
 
 三个宿主共享同一份 `SKILL.md` 契约（YAML frontmatter + 渐进加载的 references/scripts），无需为各宿主维护分支。
 
 插件包含三个技能：
 
 - **brief**：课前简报。生成正式教学包之前，通过少量提问澄清学习者背景、学习目标、材料性质与约束，轻量扫描材料后生成一份《学习任务简报》（含粗粒度阶段规划和可复制的调用话术），学习者自行细化修改；后续每次调用主技能时随材料一并提供，避免重复解释背景；
-- **guided-learning-tutor**：主技能。材料 → 问题链课程 → 逐节主动重建教学；提供了简报时自动将其作为任务背景读取；
+- **learn**：主技能（v0.3 前名为 guided-learning-tutor）。材料 → 问题链课程 → 逐节主动重建教学；提供了简报时自动将其作为任务背景读取；
 - **clarify**：概念笔记维护。学习者在任何文档里用 `[[概念名]]` 标记不理解的概念，或写进 `concepts/_inbox.md`，调用后自动生成有来源、多例子的概念笔记，与教学文档 Obsidian 双链互通。
 
 ## 为什么是这个版本
@@ -81,7 +81,7 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 Codex：
 
 ```text
-使用 $guided-learning-tutor 学习这些材料：
+使用 $learn 学习这些材料：
 - /path/to/document.pdf
 - /path/to/repository
 
@@ -91,14 +91,14 @@ Codex：
 Claude Code（或直接用自然语言描述学习需求触发）：
 
 ```text
-/guided-learning-tutor:guided-learning-tutor 学习 /path/to/document.pdf，
+/whetstone:learn 学习 /path/to/document.pdf，
 我希望学完后能解释核心设计并应用到新问题。
 ```
 
 DeepSeek Harness：
 
 ```text
-/guided-learning-tutor 学习 /path/to/document.pdf，
+/learn 学习 /path/to/document.pdf，
 我希望学完后能解释核心设计并应用到新问题。
 ```
 
@@ -125,7 +125,7 @@ plugin/
     ├── brief/                       # 课前简报技能
     │   ├── SKILL.md
     │   └── assets/
-    ├── guided-learning-tutor/       # 主技能
+    ├── learn/                       # 主技能
     │   ├── SKILL.md
     │   ├── agents/openai.yaml       # 仅 Codex 使用，其他宿主忽略
     │   ├── assets/
@@ -151,10 +151,10 @@ claude --plugin-dir /path/to/whetstone-ai/plugin
 
 # 2. 终端 CLI 注册本地 marketplace 并安装（持久；Claude Desktop 的 Code 标签页共用同一份用户配置）
 claude plugin marketplace add /path/to/whetstone-ai
-claude plugin install guided-learning-tutor@whetstone
+claude plugin install whetstone@whetstone-ai
 
-# 3. 不走插件机制：作为个人技能放进 ~/.claude/skills/（调用名变为 /brief、/guided-learning-tutor、/clarify）
-cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clarify ~/.claude/skills/
+# 3. 不走插件机制：作为个人技能放进 ~/.claude/skills/（调用名变为 /brief、/learn、/clarify）
+cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.claude/skills/
 ```
 
 注意：**Claude Desktop 的 Code 标签页不支持 `/plugin` 斜杠命令**（它有图形化插件管理器）；在 Desktop 里用方式 2（先在终端装好）或方式 3。会话内输入 `/` 确认技能出现。
@@ -162,7 +162,7 @@ cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clar
 **Claude Desktop / Cowork 上传安装**：两个入口都接受 zip 格式的插件包（`.plugin` 就是改了后缀的 zip，根目录含 `.claude-plugin/plugin.json`）。在仓库根目录执行
 
 ```bash
-python3 package_plugin.py            # 生成 ../dist/guided-learning-tutor.plugin
+python3 package_plugin.py            # 生成 ../dist/whetstone.plugin
 ```
 
 然后在 Desktop 的插件上传处选择该文件。改过技能后重新打包、重新上传。Cowork 模式下插件被同步到云端容器，而学习包和知识库应放在连接的本地文件夹里——首条消息里说明知识库与课程目录的本地路径即可。
@@ -170,7 +170,7 @@ python3 package_plugin.py            # 生成 ../dist/guided-learning-tutor.plug
 **DeepSeek Harness**：
 
 ```bash
-cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clarify ~/.agents/skills/
+cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.agents/skills/
 # 或项目级：复制到 <project>/.agents/skills/
 ```
 
@@ -182,11 +182,11 @@ cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clar
 
 ```bash
 python3 -m unittest discover -s tests -v
-python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
-  skills/guided-learning-tutor/assets/lesson-plan-template.json \
-  --guide skills/guided-learning-tutor/assets/teaching-guide-template.md
+python3 skills/learn/scripts/validate_lesson.py \
+  skills/learn/assets/lesson-plan-template.json \
+  --guide skills/learn/assets/teaching-guide-template.md
 
-python3 skills/guided-learning-tutor/scripts/validate_lesson.py \
+python3 skills/learn/scripts/validate_lesson.py \
   examples/project-consensus/lesson-plan.json \
   --guide examples/project-consensus/teaching-guide.md \
   --manifest examples/project-consensus/sources.json

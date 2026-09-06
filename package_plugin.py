@@ -3,7 +3,7 @@
 
 A .plugin is a zip whose root contains .claude-plugin/plugin.json. Usage:
 
-    python3 package_plugin.py [--output ../dist/guided-learning-tutor.plugin]
+    python3 package_plugin.py [--output ../dist/whetstone.plugin]
 
 Includes: .claude-plugin/, .codex-plugin/, skills/, docs/, README.md.
 Excludes: tests/, evals/, examples/, __pycache__, learning packs, dotfiles.
@@ -41,7 +41,7 @@ def package(output: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--output", type=Path, default=ROOT.parent.parent / "dist" / "guided-learning-tutor.plugin")
+    parser.add_argument("--output", type=Path, default=ROOT.parent.parent / "dist" / "whetstone.plugin")
     args = parser.parse_args()
     return package(args.output)
 
