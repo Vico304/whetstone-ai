@@ -159,6 +159,14 @@ cp -r plugin/skills/brief plugin/skills/guided-learning-tutor plugin/skills/clar
 
 注意：**Claude Desktop 的 Code 标签页不支持 `/plugin` 斜杠命令**（它有图形化插件管理器）；在 Desktop 里用方式 2（先在终端装好）或方式 3。会话内输入 `/` 确认技能出现。
 
+**Claude Desktop / Cowork 上传安装**：两个入口都接受 zip 格式的插件包（`.plugin` 就是改了后缀的 zip，根目录含 `.claude-plugin/plugin.json`）。在仓库根目录执行
+
+```bash
+python3 package_plugin.py            # 生成 ../dist/guided-learning-tutor.plugin
+```
+
+然后在 Desktop 的插件上传处选择该文件。改过技能后重新打包、重新上传。Cowork 模式下插件被同步到云端容器，而学习包和知识库应放在连接的本地文件夹里——首条消息里说明知识库与课程目录的本地路径即可。
+
 **DeepSeek Harness**：
 
 ```bash
