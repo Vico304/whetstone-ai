@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "scripts"
+SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "learn" / "scripts"
 CLARIFY_SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "clarify" / "scripts"
 
 
@@ -36,7 +36,7 @@ learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 
-TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
 
 
@@ -76,8 +76,8 @@ class SourceManifestTests(unittest.TestCase):
 
 class LessonValidationTests(unittest.TestCase):
     def test_template_is_valid_and_matches_guide(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
 
         self.assertEqual(validate_lesson.validate_plan(plan), [])
@@ -94,7 +94,7 @@ class LessonValidationTests(unittest.TestCase):
         self.assertEqual(validate_lesson.validate_guide(guide, plan), [])
 
     def test_forward_dependency_is_rejected(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         plan["sections"][0]["depends_on"] = ["s02"]
 
@@ -103,7 +103,7 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(any("before it is available" in error for error in errors))
 
     def test_self_dependency_is_rejected(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         plan["sections"][0]["depends_on"] = ["s01"]
 
@@ -112,8 +112,8 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(any("before it is available" in error for error in errors))
 
     def test_guide_leaking_criteria_is_rejected(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         guide = guide_path.read_text(encoding="utf-8") + f"\n参考答案：{leaked}\n"
@@ -123,8 +123,8 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(any("leaks assessment criterion" in error for error in errors))
 
     def test_guide_leak_check_ignores_cosmetic_rewording(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         # Insert punctuation and whitespace inside the criterion; a verbatim check would miss this.
@@ -136,8 +136,8 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(any("leaks assessment criterion" in error for error in errors))
 
     def test_guide_leak_check_catches_partial_verbatim_copy(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         criterion = "学习者需要说明输入如何经过处理步骤转化为可观察的输出结果并解释边界条件"
         plan["sections"][0]["checkpoint"]["criteria"] = [{"id": "c1", "text": criterion, "layer": "mechanism"}]
@@ -188,7 +188,7 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_guide_leaking_principle_is_rejected_and_meaning_is_warned(self):
         plan = load_template()
-        guide_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "teaching-guide-template.md"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
         guide = guide_path.read_text(encoding="utf-8")
         self.assertEqual(validate_lesson.guide_warnings(guide, plan), [])
         leaked = guide + "\n" + plan["sections"][0]["principle"] + "\n" + plan["sections"][0]["meaning"] + "\n"
@@ -204,7 +204,7 @@ class LessonValidationTests(unittest.TestCase):
         self.assertEqual(validate_lesson.criteria_texts(None), [])
 
     def test_cognitive_load_warnings(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         section = plan["sections"][0]
         section["concepts"] = [
@@ -219,7 +219,7 @@ class LessonValidationTests(unittest.TestCase):
 
 class LearningStateTests(unittest.TestCase):
     def test_attempts_are_appended_without_losing_history(self):
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         state = learning_state.create_state(plan)
 
@@ -248,7 +248,7 @@ class LearningStateTests(unittest.TestCase):
 
     @staticmethod
     def _three_section_state():
-        plan_path = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "lesson-plan-template.json"
+        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         template = plan["sections"][0]
         plan["sections"] = [
@@ -371,7 +371,7 @@ class KnowledgeStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             store = self._store_with_template(Path(temporary))
             reference = comparator.load_reference(store, "sample-guided-lesson")
-            extraction = json.loads((PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets" / "extraction-template.json").read_text(encoding="utf-8"))
+            extraction = json.loads((PLUGIN_ROOT / "skills" / "learn" / "assets" / "extraction-template.json").read_text(encoding="utf-8"))
             extraction["concepts"].append({"ref": "量子纠缠", "status": "correct"})
 
             result = comparator.compare(reference, "s01", extraction)
@@ -600,7 +600,7 @@ class EvalScoringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             pack = Path(temporary) / "pack"
             pack.mkdir()
-            assets = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets"
+            assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
             (pack / "lesson-plan.json").write_text(TEMPLATE_PLAN.read_text(encoding="utf-8"), encoding="utf-8")
             (pack / "teaching-guide.md").write_text((assets / "teaching-guide-template.md").read_text(encoding="utf-8"), encoding="utf-8")
             metrics = score_pack.build_metrics(pack, None, None)
@@ -633,7 +633,7 @@ class EvalScoringTests(unittest.TestCase):
 
 class PrerequisiteValidationTests(unittest.TestCase):
     def test_prerequisite_templates_are_valid(self):
-        asset_root = PLUGIN_ROOT / "skills" / "guided-learning-tutor" / "assets"
+        asset_root = PLUGIN_ROOT / "skills" / "learn" / "assets"
         plan = json.loads((asset_root / "prerequisite-plan-template.json").read_text(encoding="utf-8"))
         guide = (asset_root / "prerequisite-guide-template.md").read_text(encoding="utf-8")
 
@@ -644,7 +644,7 @@ class PrerequisiteValidationTests(unittest.TestCase):
         plan_path = (
             PLUGIN_ROOT
             / "skills"
-            / "guided-learning-tutor"
+            / "learn"
             / "assets"
             / "prerequisite-plan-template.json"
         )
@@ -661,7 +661,7 @@ class PrerequisiteStateTests(unittest.TestCase):
         plan_path = (
             PLUGIN_ROOT
             / "skills"
-            / "guided-learning-tutor"
+            / "learn"
             / "assets"
             / "prerequisite-plan-template.json"
         )

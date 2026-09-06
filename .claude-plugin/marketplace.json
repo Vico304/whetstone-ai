@@ -1,14 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "whetstone",
+  "name": "whetstone-ai",
   "owner": {
     "name": "Vico304"
   },
   "plugins": [
     {
-      "name": "guided-learning-tutor",
+      "name": "whetstone",
       "source": "./plugin",
-      "description": "Source-grounded, problem-driven lessons taught section by section, plus an Obsidian-compatible concept-note skill.",
+      "description": "Whetstone: source-grounded, problem-driven lessons taught section by section (learn), a pre-course brief (brief) and Obsidian-compatible concept notes (clarify).",
       "category": "education"
     }
   ]

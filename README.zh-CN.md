@@ -51,17 +51,17 @@
 
 | 宿主 | 安装 | 调用 |
 |---|---|---|
-| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$guided-learning-tutor` |
-| Claude Code（CLI） | `claude --plugin-dir ./plugin`，或 `claude plugin marketplace add . && claude plugin install guided-learning-tutor@whetstone` | `/guided-learning-tutor:guided-learning-tutor` |
-| Claude Desktop（Code 标签页） | 先在终端用上面的命令安装（共用配置），或把 `plugin/skills/*` 复制到 `~/.claude/skills/` | `/guided-learning-tutor` |
-| DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/guided-learning-tutor` |
+| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$learn` |
+| Claude Code（CLI） | `claude --plugin-dir ./plugin`，或 `claude plugin marketplace add . && claude plugin install whetstone@whetstone-ai` | `/whetstone:learn` |
+| Claude Desktop（Code 标签页） | 先在终端用上面的命令安装（共用配置），或把 `plugin/skills/*` 复制到 `~/.claude/skills/` | `/learn` |
+| DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/learn` |
 
 ## 使用
 
 开始一门课：
 
 ```text
-使用 guided-learning-tutor 技能学习这些材料：
+使用 learn 技能学习这些材料：
 - /path/to/document.md
 - /path/to/repository
 

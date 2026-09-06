@@ -13,9 +13,9 @@
       "id": "code-store-scripts",
       "kind": "codebase",
       "paths": [
-        "plugin/skills/guided-learning-tutor/scripts/learning_state.py",
-        "plugin/skills/guided-learning-tutor/scripts/mrg_export.py",
-        "plugin/skills/guided-learning-tutor/scripts/comparator.py"
+        "plugin/skills/learn/scripts/learning_state.py",
+        "plugin/skills/learn/scripts/mrg_export.py",
+        "plugin/skills/learn/scripts/comparator.py"
       ],
       "learning_goal": "能解释一次作答如何从自由文本变成 LRG 事件，以及比较器为什么只落类别不打分",
       "expect": {"sections": [4, 8], "max_concepts_per_section": 4, "min_relations": 4}

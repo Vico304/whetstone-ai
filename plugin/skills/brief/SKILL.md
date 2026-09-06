@@ -1,13 +1,13 @@
 ---
 name: brief
-description: Before building a formal lesson pack, interview the learner to clarify background, goals, material nature, and constraints; then draft a learning-task brief (学习任务简报) the learner can refine by hand. The brief becomes reusable context for every later guided-learning-tutor / clarify invocation. Use when the learner wants to plan a course of study, or when materials exist but goals and background are still vague.
+description: Before building a formal lesson pack, interview the learner to clarify background, goals, material nature, and constraints; then draft a learning-task brief (学习任务简报) the learner can refine by hand. The brief becomes reusable context for every later learn / clarify invocation. Use when the learner wants to plan a course of study, or when materials exist but goals and background are still vague.
 ---
 
 # Brief：课前学习任务简报
 
-在生成正式教学包**之前**运行。通过少量结构化提问澄清学习者背景与学习目标，扫描材料建立性质清单，生成一份学习者可自行细化修改的《学习任务简报》。简报是后续每次调用 guided-learning-tutor / clarify 时的复用背景，避免学习者反复解释"我是谁、材料是什么、要学到什么程度"。
+在生成正式教学包**之前**运行。通过少量结构化提问澄清学习者背景与学习目标，扫描材料建立性质清单，生成一份学习者可自行细化修改的《学习任务简报》。简报是后续每次调用 learn / clarify 时的复用背景，避免学习者反复解释"我是谁、材料是什么、要学到什么程度"。
 
-调用方式：Codex 中 `$brief`；Claude Code 中 `/guided-learning-tutor:brief` 或自然语言触发（"帮我规划学习""先澄清我的学习目标"）；DeepSeek Harness 中 `/brief`。
+调用方式：Codex 中 `$brief`；Claude Code 中 `/whetstone:brief` 或自然语言触发（"帮我规划学习""先澄清我的学习目标"）；DeepSeek Harness 中 `/brief`。
 
 ## 路径解析约定
 

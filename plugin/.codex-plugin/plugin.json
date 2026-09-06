@@ -1,6 +1,6 @@
 {
-  "name": "guided-learning-tutor",
-  "version": "0.2.0",
+  "name": "whetstone",
+  "version": "0.3.0",
   "description": "Diagnose prerequisite gaps, research cited supplements, and turn supplied materials into source-grounded lessons taught section by section.",
   "author": {
     "name": "Vico304"
@@ -23,7 +23,7 @@
       "Interactive"
     ],
     "defaultPrompt": [
-      "Use $guided-learning-tutor to learn these materials. Check my prerequisite knowledge, research cited supplements for actual gaps, then teach one LearningUnit at a time.",
+      "Use $learn to learn these materials. Check my prerequisite knowledge, research cited supplements for actual gaps, then teach one LearningUnit at a time.",
       "Analyze this codebase as a course and start with the big picture.",
       "Resume my lesson from the saved prerequisite or course progress.",
       "Use $clarify to expand the unresolved [[concepts]] in my lesson pack into source-grounded concept notes."
