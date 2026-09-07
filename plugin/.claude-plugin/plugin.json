@@ -1,7 +1,7 @@
 {
   "name": "whetstone",
-  "version": "0.4.0",
-  "description": "Diagnose prerequisite gaps, research cited supplements, and turn supplied materials into source-grounded lessons taught section by section.",
+  "version": "0.5.0",
+  "description": "Plan, outline and tutor source-grounded courses: learner profile, material triage, course-by-course plan, confirmed outlines, per-unit documents, section-by-section active reconstruction with an append-only learner log.",
   "author": {
     "name": "Vico304"
   },

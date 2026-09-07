@@ -57,12 +57,14 @@ One skill directory, three hosts:
 
 | Host | Install | Invoke |
 |---|---|---|
-| Codex | install `plugin/` as a plugin (ships `.codex-plugin/`) | `$learn` |
+| Codex | install `plugin/` as a plugin (ships `.codex-plugin/`) | `$guide` / `$outline` / `$learn` / `$clarify` |
 | Claude Code (CLI) | `claude --plugin-dir ./plugin`, or `claude plugin marketplace add . && claude plugin install whetstone@whetstone-ai` | `/whetstone:learn` |
 | Claude Desktop (Code tab) | install via the CLI above (shared config), or copy `plugin/skills/*` into `~/.claude/skills/` | `/learn` |
 | DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/learn` |
 
 ## Use
+
+`learn` is the full flow and fills in whatever planning is missing — a cross-course learner profile, a triage of a messy directory (repos, generated notes, logs; graded primary / authored / generated-intermediate / noise) and a course-by-course confirmed plan, then the course outline. `guide` runs just the planning part and always asks first whether you want a tour or a plan; `outline` shows or revises one course's outline. AI-generated intermediates are never sources.
 
 Start a course:
 

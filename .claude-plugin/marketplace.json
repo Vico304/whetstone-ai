@@ -8,7 +8,7 @@
     {
       "name": "whetstone",
       "source": "./plugin",
-      "description": "Whetstone: source-grounded, problem-driven lessons taught section by section (learn), a pre-course brief (brief) and Obsidian-compatible concept notes (clarify).",
+      "description": "Whetstone: guide (profile, material triage, course-by-course plan), outline (confirmed course outline), learn (full flow: plan → outline → per-unit build → section-by-section tutoring), clarify (Obsidian concept notes).",
       "category": "education"
     }
   ]
