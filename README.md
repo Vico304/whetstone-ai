@@ -36,6 +36,7 @@ Two things the system deliberately withholds:
 
 | Path | What it is |
 |---|---|
+| [`docs/user-guide.md`](docs/user-guide.md) | **User manual** (Chinese): install, directory layout, a full course walkthrough with example dialogues, knowledge store, troubleshooting |
 | [`docs/design.md`](docs/design.md) | One-page synthesis of the core idea |
 | [`docs/consensus.md`](docs/consensus.md) | Normative baseline (v2); the authority when rules conflict |
 | [`docs/learning-layers.md`](docs/learning-layers.md) | The four layers of understanding and why the system withholds the top two |
@@ -49,6 +50,8 @@ Two things the system deliberately withholds:
 Documentation is a first-class citizen here. If you build AI learning tools, the [consensus constraints](docs/consensus.md) and the [evidence review](docs/reviews/evidence-review.md) may be worth more to you than the code.
 
 ## Install
+
+Full manual with examples: [`docs/user-guide.md`](docs/user-guide.md) (Chinese).
 
 One skill directory, three hosts:
 
