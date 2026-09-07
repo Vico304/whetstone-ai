@@ -400,14 +400,16 @@ Extractor 只提交候选变更，不得直接修改正式图。Verifier 应附�
 
 为初学者提供概念名是合理的脚手架，但不能长期停留在该模式，也不能把"看到名称后能解释"等同于自由回忆。
 
-### 9.3 学习子图应控制认知负担
+### 9.3 学习子图应控制认知负担，但不以删除概念为代价
 
 AI 可以维护更完整的章节结构，但不要求学习者一次重建全部内容。一次活动宜围绕：
 
 - 一个中心概念；
-- 少量直接相关概念（新概念 ≤ 4）；
+- 少量直接相关概念（需重建的 `core` 新概念 ≤ 4）；
 - 一至两个需要解释的关键关系；
 - 一个例子、反例、预测或应用任务。
+
+上限约束的是**要重建的**概念数，不是**出现的**概念数。超出上限的概念降为 `supporting`（讲、可要求验收）或 `listed`（只列名与一句事实层定义），不得删除。材料的每个部分与每个抽取到的概念都必须在覆盖账本里有去处（core / supporting / listed / deferred / excluded 带理由）——**遗漏不得静默**。课程先以大纲呈现给学习者确认模式（完整 / 快速）与取舍，再按 unit 逐份生成正文（见 [specs/course-planning.md](specs/course-planning.md)）。
 
 选择子图时可综合学习目标、概念重要度、先修影响、过去错误、遗忘状态、参考图不确定性和可用时间。
 
@@ -779,6 +781,7 @@ AI 可以维护更完整的章节结构，但不要求学习者一次重建全�
 - [`learning-layers.md`](learning-layers.md)：四层理解与不透明原则的理念阐述；
 - [`specs/knowledge-store.md`](specs/knowledge-store.md)：持久化知识库数据结构定稿（schema 1.1）；
 - [`specs/protocol-architecture.md`](specs/protocol-architecture.md)：协议阶段化、模型分层与 eval 定稿；
+- [`specs/course-planning.md`](specs/course-planning.md)：大纲确认、按 unit 生成、模式与概念角色、覆盖账本（schema 1.2）；
 - [`roadmap.md`](roadmap.md)：当前实现相对于整体规划的覆盖度与下一步优先级；
 - [`reviews/evidence-review.md`](reviews/evidence-review.md)：对照学习科学文献与同类产品的外部证据评审。
 

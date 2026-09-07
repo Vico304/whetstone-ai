@@ -39,6 +39,7 @@
 | [`docs/learning-layers.md`](docs/learning-layers.md) | 四层理解与不透明原则：系统为什么隐瞒高层 |
 | [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md) | 持久化知识库定稿：MRG / LRG / 概念索引 / 学习者状态 / 导出（schema 1.1） |
 | [`docs/specs/protocol-architecture.md`](docs/specs/protocol-architecture.md) | 协议按状态加载、build 管线、模型分层、eval 集 |
+| [`docs/specs/course-planning.md`](docs/specs/course-planning.md) | 先大纲后生成、按 unit 分文档、完整/快速模式、概念角色、覆盖账本（schema 1.2） |
 | [`docs/roadmap.md`](docs/roadmap.md) | 当前进度与下一步 |
 | [`docs/reviews/`](docs/reviews/) | 学习科学证据评审，带效应量与文献出处 |
 | [`plugin/`](plugin/) | 可运行的技能插件，同一份技能目录适配三个宿主 |

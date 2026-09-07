@@ -26,7 +26,8 @@ jobs:
         run: |
           python3 skills/learn/scripts/validate_lesson.py \
             skills/learn/assets/lesson-plan-template.json \
-            --guide skills/learn/assets/teaching-guide-template.md
+            --outline skills/learn/assets/outline-template.md \
+            --units-dir skills/learn/assets/units-template
           python3 skills/learn/scripts/validate_lesson.py \
             examples/project-consensus/lesson-plan.json \
             --guide examples/project-consensus/teaching-guide.md \

@@ -62,6 +62,7 @@ def build_nodes(plan: dict) -> dict[str, dict]:
     """Merge concept mentions across sections into one node per id."""
     nodes: dict[str, dict] = {}
     lesson_id = plan.get("lesson_id")
+    deferred_ids = {item.get("id") for item in (plan.get("deferred") or []) if isinstance(item, dict)}
     for section in plan.get("sections", []):
         section_refs = section.get("source_refs", [])
         for concept in section.get("concepts", []):
@@ -74,11 +75,14 @@ def build_nodes(plan: dict) -> dict[str, dict]:
                     "aliases": list(concept.get("aliases", [])),
                     "domain_path": list(concept.get("domain_path", [])),
                     "layer": concept.get("layer", "mechanism"),
+                    "role": concept.get("role", "core"),
                     "lesson_id": lesson_id,
                     "section_ids": [],
                     "explanation": concept.get("explanation"),
                     "source_refs": [],
                 }
+                if cid in deferred_ids or section["id"] in deferred_ids:
+                    node["deferred"] = True
                 nodes[cid] = node
             else:
                 for alias in concept.get("aliases", []):
@@ -112,10 +116,12 @@ def build_edges(plan: dict) -> list[dict]:
 def section_skeleton(plan: dict) -> list[dict]:
     """What the learner may see about each section: problem, solution, mechanism, new problem."""
     skeleton = []
+    deferred_ids = {item.get("id") for item in (plan.get("deferred") or []) if isinstance(item, dict) and item.get("type") == "section"}
     for section in plan.get("sections", []):
         skeleton.append(
             {
                 "id": section["id"],
+                "deferred": section["id"] in deferred_ids,
                 "title": section.get("title"),
                 "depends_on": list(section.get("depends_on", [])),
                 "problem": section.get("problem"),
@@ -123,6 +129,9 @@ def section_skeleton(plan: dict) -> list[dict]:
                 "mechanism": section.get("mechanism"),
                 "new_problem": section.get("new_problem"),
                 "concept_ids": [concept_id(plan, concept) for concept in section.get("concepts", [])],
+                "core_concept_ids": [concept_id(plan, c) for c in section.get("concepts", []) if c.get("role", "core") == "core"],
+                "supporting_concept_ids": [concept_id(plan, c) for c in section.get("concepts", []) if c.get("role") == "supporting"],
+                "listed_concept_ids": [concept_id(plan, c) for c in section.get("concepts", []) if c.get("role") == "listed"],
                 "checkpoint_prompt": (section.get("checkpoint") or {}).get("prompt"),
             }
         )
@@ -140,9 +149,16 @@ def section_deep(plan: dict) -> list[dict]:
                 criteria.append({"id": f"c{index + 1}", "text": criterion, "layer": "mechanism"})
             elif isinstance(criterion, dict):
                 criteria.append({"id": criterion.get("id"), "text": criterion.get("text"), "layer": criterion.get("layer")})
+        supporting_checks = []
+        for concept in section.get("concepts", []) or []:
+            check = concept.get("check") if isinstance(concept, dict) else None
+            if isinstance(check, dict):
+                supporting_checks.append({"concept_id": concept_id(plan, concept), "prompt": check.get("prompt"),
+                                          "criteria": check.get("criteria"), "hint": check.get("hint")})
         deep.append(
             {
                 "id": section["id"],
+                "supporting_checks": supporting_checks,
                 "meaning": section.get("meaning"),
                 "tradeoffs": list(section.get("tradeoffs", []) or []),
                 "principle": section.get("principle"),
@@ -157,9 +173,10 @@ def export(plan: dict) -> tuple[dict, dict]:
     nodes = build_nodes(plan)
     edges = build_edges(plan)
     base = {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "lesson_id": plan.get("lesson_id"),
         "title": plan.get("title"),
+        "mode": plan.get("mode", "full"),
         "source_schema_version": validate_lesson.schema_version(plan),
         "generated_at": utc_now(),
     }

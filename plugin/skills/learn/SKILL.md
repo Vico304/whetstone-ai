@@ -88,9 +88,9 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
 
-### 3. 从大框架建立问题链
+### 3. 大纲：从大框架建立问题链，并列出全部概念
 
-先回答以下问题，再组织小节：
+先回答以下问题，再组织 unit：
 
 1. 这组材料总体要解决什么真实问题？
 2. 系统、论证或代码的边界是什么？输入、关键过程和输出是什么？
@@ -100,38 +100,41 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 不要按文件顺序机械摘要。课程顺序应优先服务因果理解和先修关系；必要时说明它与原材料顺序不同。
 
-### 4. 生成教学包
+然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-在可写工作区且用户期望文件产物时，创建一个独立目录，通常包含：
+产出 `lesson-plan.json`（schema `1.2`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/protocol/outline.md](references/protocol/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
-- `teaching-guide.md`：给学习者阅读的详细教学文档；
-- `lesson-plan.json`：小节、来源、检查点和评估标准的机器可读计划；
+### 4. 生成教学包：按 unit 逐份生成
+
+大纲确认后，在同一目录生成：
+
+- `outline.md`：路线图与全部概念清单（已生成，按确认结果更新）；
+- `units/<section-id>.md`：**每个非 deferred 的 unit 一份，每份是一次独立生成**——只带该 unit 的来源定位去读原文，长度预算按 unit 计，不受整包限制；宿主支持并行子代理时可并行生成；生成后逐份运行 `validate_lesson.py <plan> --units-dir units/`；
+- `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本；
 - `sources.json`：多文件输入时的来源清单；
-- `prerequisite-plan.json`：运行前置检查时的概念簇、诊断问题和主材料依赖；
-- `prerequisite-progress.json`：前置诊断、补充来源和桥接复测记录；
-- `prerequisite-guide.md`：实际暴露前置缺口时生成的有引用补充文档；
-- `learning-progress.json`：进入教学或用户要求持久化进度时创建。
+- `prerequisite-plan.json` / `prerequisite-progress.json` / `prerequisite-guide.md`：前置阶段产物（条件生成）；
+- `learning-progress.json`：进入教学时用 `scripts/learning_state.py init` 创建（deferred 的 unit 自动标为 `deferred`，不计入完成）。
 
-教学过程中还可能按需产生（不在 build 阶段预生成）：`zoom/<section-id>-guide.md`（学习者选择细化某节时）与 `concepts/`（clarify 技能维护的概念笔记目录，Obsidian 双链兼容）。
+教学过程中还可能按需产生：`zoom/<section-id>-guide.md`（学习者选择细化某节时，候选来自该节的 `listed` 概念）与 `concepts/`（clarify 技能维护）。旧的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受，新课程不再生成。
 
-没有文件工作区时，在对话中提供同等内容，并在当前会话维护进度。使用 [assets/teaching-guide-template.md](assets/teaching-guide-template.md) 与 [assets/lesson-plan-template.json](assets/lesson-plan-template.json) 作为起点，不必保留不适合当前材料的可选段落。
+没有文件工作区时，在对话中提供同等内容，并在当前会话维护进度。使用 [assets/outline-template.md](assets/outline-template.md)、[assets/units-template/s01.md](assets/units-template/s01.md) 与 [assets/lesson-plan-template.json](assets/lesson-plan-template.json) 作为起点。
 
-生成前读取 [references/lesson-contract.md](references/lesson-contract.md)。新课程使用 schema `1.1`（概念带 `id / layer / domain_path`，顶层 `relations[]`，`criteria` 为对象）。生成后运行 `scripts/validate_lesson.py`；前置产物运行 `scripts/validate_prerequisites.py`。用户开启了知识库目录时，校验通过后再运行 `scripts/mrg_export.py --store <目录>` 导出分层参考图。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
+生成前读取 [references/lesson-contract.md](references/lesson-contract.md)。前置产物运行 `scripts/validate_prerequisites.py`。用户开启了知识库目录时，校验通过后再运行 `scripts/mrg_export.py --store <目录>` 导出分层参考图并 `index_match.py register`。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
 
-### 5. 教学文档质量要求
+### 5. 大纲与 unit 文档质量要求
 
-- 开头给出学习目标、材料范围、总体问题、系统地图和完整问题链预览。
-- 每个主体小节围绕一个可解释步骤，至少包含：当前问题、解决方案、工作机制、它引出的新问题、关键概念、来源定位和学习者检查点。**意义、代价与设计思想不进讲义**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
-- “新问题”应自然引出下一小节；最后一节可转为未决问题、边界或迁移挑战。
+- `outline.md`：学习目标与模式、材料范围、总体问题、系统地图、问题链（每 unit 一行问题 → 方案）、**全部概念按 unit 与角色列出**、覆盖账本摘要、使用说明。不含任何 unit 的机制、意义、代价、criteria、principle。
+- `units/<id>.md`：围绕一个可解释步骤，至少包含：当前问题、解决方案、工作机制、它引出的新问题、本节概念（core / supporting / listed 三块都可见）、来源定位和学习者检查点。`supporting` 概念各有一段"它在本节机制里的位置"；`listed` 只有名 + 一句 + 定位，**不讲机制**。**意义、代价与设计思想不进文档**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
+- "新问题"应自然引出下一 unit；最后一个 unit 可转为未决问题、边界或迁移挑战。
 - 来源定位靠近相关结论。外部知识必须单独标记，不得用来填补材料缺口而不说明。
 - 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题。
-- 课程只覆盖能支撑学习目标的主线；把次要细节放入附录或“进一步探索”。
+- 快速模式下只保留主线 core unit，其余进 `deferred[]`；被略过的内容在 outline 里可见，日后可补。
 
 ### 6. 逐节互动教学
 
 进入 `teach` 或 `resume` 时，先读取 [references/protocol/_state-machine.md](references/protocol/_state-machine.md)，然后**只读当前状态对应的文件**（加载表在该文件内）；不要一次读完整个 `protocol/` 目录。核心行为是：
 
-1. 每次只处理一个小节和一个主问题，不一次展示后续所有答案。按协议分段揭示：先给本节问题请学习者预测，再展示方案与机制，最后提出主问题。
+1. 每次只处理一个 unit 和一个主问题，不一次展示后续所有答案。按协议分段揭示：先给本节问题请学习者预测，再展示方案与机制（来自 `units/<id>.md`），最后提出主问题。学习者要求"验收 <supporting 概念>"时，用该概念的 `check` 出题，作答记为 `--kind supporting`，不影响本节进度。
 2. 提出主问题前告知学习者可选择细化本节（DEEPEN）：按需生成 `zoom/<section-id>-guide.md`，对本节内部的衍生概念讲得更细、例子更多；读完后仍回到本节主问题作答。细化文档不在 build 阶段预生成。
 3. 要求学习者用自己的话说明“是什么、为什么需要、如何工作、与前后步骤什么关系”；按小节内容选择最相关的部分，不要求固定措辞。主问题作答前请学习者自评信心（1–5）。
 4. 等待学习者回答后再评估。评估概念和关系，不以文本相似度或辞藻判断理解。
@@ -145,7 +148,8 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ## 完成标准
 
-- 课程从总体问题出发，各小节形成可追踪的问题—方案链。
+- 课程从总体问题出发，各 unit 形成可追踪的问题—方案链；大纲经学习者确认后才生成 unit 文档。
+- 材料的每个标题与每个抽取到的概念都有去处（core / supporting / listed / deferred / excluded），没有静默遗漏。
 - 关键结论具有来源定位和支持类型；不确定性没有被流畅措辞掩盖。
 - 前置阶段若触发，诊断只量化当前材料所需的准备度；原始回答保留，外部补充可引用且与原材料分层，桥接复测完成后再进入正课。
 - 学习者至少被邀请完成第一小节的主动解释；互动模式下一次只推进一节。

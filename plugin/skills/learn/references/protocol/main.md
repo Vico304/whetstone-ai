@@ -27,3 +27,8 @@
 学习者不愿标注时不坚持，记录为空即可。
 
 提出主问题后进入 AWAITING_ATTEMPT，把对话交还学习者。
+
+## supporting 概念的验收（学习者主动要求时）
+
+学习者说"验收 X"且 X 是本节（或已完成 unit）的 `supporting` 概念时：从 lesson-plan 该概念的 `check` 取 `prompt` 出题（不展示 criteria），等待作答，按 [assess.md](assess.md) 评估，用 `check.criteria` 判 `criteria_met`，记录为 `lrg_record.py append --kind supporting --concept <id>`（不加 `--progress`，不影响本节 verdict）。反馈按 [feedback.md](feedback.md) 但最多一层追问。学习者不要求时不出。
+

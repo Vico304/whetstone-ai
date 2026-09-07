@@ -66,8 +66,9 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 - 从材料中识别会阻断主线理解的最小前置概念簇；
 - 通过无提示、一次一问的方式评估与当前材料相关的学习准备度；
 - 针对实际缺口检索权威或一手来源，生成标记为 `external` 的补充文档和桥接复测；
-- 生成从大框架到细节的 `teaching-guide.md`；
-- 生成可校验的 `lesson-plan.json` 和 `sources.json`；
+- 先出大纲（问题链 + 全部概念 + 覆盖账本）并停下让学习者确认模式与取舍，再按 unit 逐份生成 `units/<id>.md`；
+- 概念分角色（core / supporting / listed），超出认知负担上限的概念降级而不是删除；材料每个标题在账本里都有去处；
+- 生成可校验的 `lesson-plan.json`（schema 1.2）和 `sources.json`；
 - 分段揭示教学：先给问题请学习者预测，再展示方案与机制；
 - 逐节提问、针对回答实际暴露的弱点追问、诊断高信心误解，并保留多次原始回答；
 - 恢复学习时先用变式检索题检验已完成小节的留存；
@@ -184,7 +185,8 @@ cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.agents/sk
 python3 -m unittest discover -s tests -v
 python3 skills/learn/scripts/validate_lesson.py \
   skills/learn/assets/lesson-plan-template.json \
-  --guide skills/learn/assets/teaching-guide-template.md
+  --outline skills/learn/assets/outline-template.md \
+  --units-dir skills/learn/assets/units-template
 
 python3 skills/learn/scripts/validate_lesson.py \
   examples/project-consensus/lesson-plan.json \

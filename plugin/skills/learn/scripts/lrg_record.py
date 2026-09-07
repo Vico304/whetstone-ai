@@ -20,8 +20,9 @@ from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-KINDS = ("checkpoint", "review", "variant", "transfer", "bridge", "final")
-IMMEDIATE_KINDS = {"checkpoint", "bridge"}
+KINDS = ("checkpoint", "supporting", "review", "variant", "transfer", "bridge", "final")
+RIGORS = ("full", "fast")
+IMMEDIATE_KINDS = {"checkpoint", "supporting", "bridge"}
 DELAYED_KINDS = {"review", "variant"}
 TRANSFER_KINDS = {"transfer", "final"}
 
@@ -91,9 +92,15 @@ def build_event(
     extraction: dict | None,
     comparison: dict | None,
     elapsed_seconds: int | None,
+    rigor: str = "full",
+    target_concept_ids: list[str] | None = None,
 ) -> dict:
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {list(KINDS)}")
+    if rigor not in RIGORS:
+        raise ValueError(f"rigor must be one of {list(RIGORS)}")
+    if kind == "supporting" and not target_concept_ids:
+        raise ValueError("a supporting check needs --concept <id>")
     if verdict not in learning_state.VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(learning_state.VERDICTS)}")
     if depth_reached is not None and depth_reached not in learning_state.DEPTHS:
@@ -108,6 +115,7 @@ def build_event(
         "lesson_id": lesson_id,
         "section_id": section_id,
         "kind": kind,
+        "rigor": rigor,
         "evidence_tier": evidence_tier(kind),
         "attempt_number": attempt_number,
         "confidence": confidence,
@@ -117,6 +125,8 @@ def build_event(
         "response": response,
         "feedback": feedback,
     }
+    if target_concept_ids:
+        event["target_concept_ids"] = list(target_concept_ids)
     if elapsed_seconds is not None:
         event["elapsed_seconds"] = elapsed_seconds
     if extraction is not None:
@@ -140,15 +150,23 @@ def command_append(args: argparse.Namespace) -> int:
         reference = comparator.load_reference(args.store, args.lesson_id)
         comparison = comparator.compare(reference, args.section_id, extraction)
 
+    rigor = args.rigor
     attempt_number = None
     if args.progress:
         state = learning_state.read_json(args.progress)
-        learning_state.append_attempt(
-            state, args.section_id, response, feedback, args.verdict, args.confidence,
-            review=(args.kind == "review"), criteria_met=criteria_met, depth_reached=args.depth,
-        )
-        attempt_number = learning_state.find_section(state, args.section_id)["attempts"][-1]["attempt_number"]
-        learning_state.atomic_write(args.progress, state)
+        if rigor is None:
+            rigor = state.get("mode", "full")
+        if args.kind == "supporting":
+            pass  # supporting checks do not change section progress
+        else:
+            learning_state.append_attempt(
+                state, args.section_id, response, feedback, args.verdict, args.confidence,
+                review=(args.kind == "review"), criteria_met=criteria_met, depth_reached=args.depth,
+            )
+            attempt_number = learning_state.find_section(state, args.section_id)["attempts"][-1]["attempt_number"]
+            learning_state.atomic_write(args.progress, state)
+    if rigor is None:
+        rigor = "full"
     if attempt_number is None:
         attempt_number = 1 + sum(
             1 for e in read_events(args.store, args.lesson_id)
@@ -159,7 +177,7 @@ def command_append(args: argparse.Namespace) -> int:
         lesson_id=args.lesson_id, section_id=args.section_id, kind=args.kind, attempt_number=attempt_number,
         response=response, feedback=feedback, verdict=args.verdict, confidence=args.confidence,
         criteria_met=criteria_met, depth_reached=args.depth, extraction=extraction, comparison=comparison,
-        elapsed_seconds=args.elapsed_seconds,
+        elapsed_seconds=args.elapsed_seconds, rigor=rigor, target_concept_ids=args.concept,
     )
     append_event(args.store, args.lesson_id, event)
     summary = f"OK: appended {args.kind} attempt #{attempt_number} for {args.lesson_id}/{args.section_id}"
@@ -203,6 +221,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-compare", action="store_true", help="Store the extraction without running the comparator")
     p.add_argument("--progress", type=Path, help="learning-progress.json to mirror the attempt into")
     p.add_argument("--elapsed-seconds", type=int, help="Wall-clock time for this section step (interaction-cost metric)")
+    p.add_argument("--rigor", choices=RIGORS, help="full|fast; defaults to the progress file's mode, else full")
+    p.add_argument("--concept", action="append", metavar="ID", help="Target concept id(s); required for --kind supporting")
     p.set_defaults(handler=command_append)
     s = sub.add_parser("show", help="Counts and layers only; never prints responses")
     s.add_argument("--store", type=Path, required=True)

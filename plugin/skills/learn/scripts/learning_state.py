@@ -14,6 +14,7 @@ from typing import Any
 
 VERDICTS = {"mastered", "partial", "retry", "skipped"}
 DEPTHS = ("fact", "mechanism", "rationale", "principle")
+DONE_STATUSES = {"completed", "deferred"}
 
 
 def utc_now() -> str:
@@ -43,19 +44,25 @@ def create_state(plan: dict) -> dict:
     sections = plan.get("sections")
     if not isinstance(sections, list) or not sections:
         raise ValueError("lesson plan has no sections")
+    deferred = {item.get("id") for item in (plan.get("deferred") or []) if isinstance(item, dict) and item.get("type") == "section"}
     section_states = []
     for section in sections:
         if not isinstance(section, dict) or not isinstance(section.get("id"), str) or not section["id"].strip():
             raise ValueError("every lesson section needs a non-empty id")
-        section_states.append({"id": section["id"], "status": "pending", "attempts": []})
+        status = "deferred" if section["id"] in deferred else "pending"
+        section_states.append({"id": section["id"], "status": status, "attempts": []})
+    first = next((item for item in section_states if item["status"] != "deferred"), None)
+    if first is None:
+        raise ValueError("every section is deferred; nothing to teach")
     now = utc_now()
     return {
         "schema_version": "1.0",
         "lesson_id": plan.get("lesson_id"),
+        "mode": plan.get("mode", "full"),
         "created_at": now,
         "updated_at": now,
         "status": "in_progress",
-        "current_section_id": section_states[0]["id"],
+        "current_section_id": first["id"],
         "sections": section_states,
         "events": [{"at": now, "type": "initialized"}],
     }
@@ -83,15 +90,15 @@ def recompute_position(state: dict, recorded_id: str) -> None:
 
     if current is None or current == recorded_id:
         start = ids.index(recorded_id) if recorded_id in ids else 0
-        pending = next((item for item in sections[start:] if item.get("status") != "completed"), None)
+        pending = next((item for item in sections[start:] if item.get("status") not in DONE_STATUSES), None)
         if pending is None:
-            pending = next((item for item in sections if item.get("status") != "completed"), None)
+            pending = next((item for item in sections if item.get("status") not in DONE_STATUSES), None)
         current = pending.get("id") if pending else None
     elif current not in ids:
-        pending = next((item for item in sections if item.get("status") != "completed"), None)
+        pending = next((item for item in sections if item.get("status") not in DONE_STATUSES), None)
         current = pending.get("id") if pending else None
 
-    all_completed = all(item.get("status") == "completed" for item in sections)
+    all_completed = all(item.get("status") in DONE_STATUSES for item in sections)
     if all_completed:
         state["status"] = "completed"
         state["current_section_id"] = None
@@ -121,6 +128,8 @@ def append_attempt(
     if len(criteria_met) != len(set(criteria_met)):
         raise ValueError("criteria_met must not repeat ids")
     section = find_section(state, section_id)
+    if section.get("status") == "deferred":
+        raise ValueError(f"section {section_id} is deferred in this course; un-defer it in the lesson plan first")
     now = utc_now()
     attempt = {
         "attempt_number": len(section.get("attempts", [])) + 1,

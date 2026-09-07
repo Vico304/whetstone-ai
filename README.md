@@ -41,6 +41,7 @@ Two things the system deliberately withholds:
 | [`docs/learning-layers.md`](docs/learning-layers.md) | The four layers of understanding and why the system withholds the top two |
 | [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md) | Persistent store spec: MRG / LRG / concept index / learner state / exports (schema 1.1) |
 | [`docs/specs/protocol-architecture.md`](docs/specs/protocol-architecture.md) | Staged protocol loading, build pipeline, model tiering, eval set |
+| [`docs/specs/course-planning.md`](docs/specs/course-planning.md) | Outline-first build, per-unit documents, full/fast mode, concept roles, coverage ledger (schema 1.2) |
 | [`docs/roadmap.md`](docs/roadmap.md) | Current coverage and next milestone |
 | [`docs/reviews/`](docs/reviews/) | Learning-science evidence review, with effect sizes and sources |
 | [`plugin/`](plugin/) | Working skills plugin; one skill directory, three hosts |
