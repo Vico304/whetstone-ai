@@ -4,18 +4,19 @@
 
 同一份技能目录同时适配三个宿主：
 
-| 宿主 | 安装方式 | 调用方式（brief / 主技能 / clarify） |
+| 宿主 | 安装方式 | 调用方式（guide / outline / learn / clarify） |
 |---|---|---|
-| **Codex** | 通过 `.codex-plugin/plugin.json` 作为插件安装 | `$brief` / `$learn` / `$clarify` |
-| **Claude Code** | 通过 `.claude-plugin/plugin.json` 作为插件安装 | `/whetstone:brief`、`/whetstone:learn`、`/whetstone:clarify`，或自然语言自动触发 |
-| **DeepSeek Harness (dsh)** | 把 `skills/` 下各技能目录复制到 `~/.agents/skills/`（全局）或项目的 `.agents/skills/` | `/brief` / `/learn` / `/clarify` |
+| **Codex** | 通过 `.codex-plugin/plugin.json` 作为插件安装 | `$guide` / `$outline` / `$learn` / `$clarify` |
+| **Claude Code** | 通过 `.claude-plugin/plugin.json` 作为插件安装 | `/whetstone:guide`、`/whetstone:outline`、`/whetstone:learn`、`/whetstone:clarify`，或自然语言自动触发 |
+| **DeepSeek Harness (dsh)** | 把 `skills/` 下各技能目录复制到 `~/.agents/skills/`（全局）或项目的 `.agents/skills/` | `/guide` / `/outline` / `/learn` / `/clarify` |
 
 三个宿主共享同一份 `SKILL.md` 契约（YAML frontmatter + 渐进加载的 references/scripts），无需为各宿主维护分支。
 
-插件包含三个技能：
+插件包含四个技能，规划阶段的协议只在 `learn` 里维护一份，`guide` 与 `outline` 是从某个阶段重入的入口：
 
-- **brief**：课前简报。生成正式教学包之前，通过少量提问澄清学习者背景、学习目标、材料性质与约束，轻量扫描材料后生成一份《学习任务简报》（含粗粒度阶段规划和可复制的调用话术），学习者自行细化修改；后续每次调用主技能时随材料一并提供，避免重复解释背景；
-- **learn**：主技能（v0.3 前名为 guided-learning-tutor）。材料 → 问题链课程 → 逐节主动重建教学；提供了简报时自动将其作为任务背景读取；
+- **guide**：向导。每次调用先问"想知道怎么用，还是规划之后的学习"；规划 = 目标与背景（`learner-profile.md`，跨课）→ 材料评估（`survey_materials.py` 清点目录，四级定级：一手 / 自著已核实 / 生成中间物 / 噪声）→ 学习计划（`learning-plan.md`，**逐门确认**）。可随时重跑以修改目标、背景或计划；不 build、不教学；
+- **outline**：对一门课生成 / 讨论 / 修改大纲（问题链、全部概念与角色、覆盖账本、模式），确认后写回 `outline.md` 与 `lesson-plan.json`；不生成 units；
+- **learn**：总入口，**缺什么补什么**——无档案则先目标与背景，材料是目录则评估并切计划，本课无确认大纲则做大纲，然后逐份生成 `units/`、前置诊断、逐节教学；有进度则 resume；
 - **clarify**：概念笔记维护。学习者在任何文档里用 `[[概念名]]` 标记不理解的概念，或写进 `concepts/_inbox.md`，调用后自动生成有来源、多例子的概念笔记，与教学文档 Obsidian 双链互通。
 
 ## 为什么是这个版本
@@ -23,7 +24,13 @@
 Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/consensus.md`](../docs/consensus.md) v2）包含来源证据层、分层的机器参考图、只追加的学习者重建日志、跨课概念注册表、带时效的学习者状态和多角色审核。当前插件只保留能构成完整学习闭环的最小主链：
 
 ```text
-（可选）课前简报：澄清背景与目标 → 学习者细化修改
+目标与背景（learner-profile.md，跨课）
+        ↓
+材料评估 → 学习计划（逐门确认）
+        ↓
+课程大纲（全部概念与角色、覆盖账本）→ 学习者确认模式与取舍
+        ↓
+逐份生成 units/<id>.md
         ↓
 材料范围与来源定位
         ↓
@@ -46,7 +53,7 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 
 ### 知识库模式（v2，可选开启）
 
-设计见 [`docs/specs/`](../docs/specs/)。在调用时指定一个持久化目录（或在简报里填 `knowledge_store`）即开启；不开启时行为与 v0.2 完全一致。开启后：
+设计见 [`docs/specs/`](../docs/specs/)。在调用时指定一个持久化目录（或在 `learner-profile.md` 里填 `knowledge_store`）即开启；不开启时行为与 v0.2 完全一致。开启后：
 
 - **分层机器参考图**：build 校验通过后 `mrg_export.py` 把课程导出为 `mrg/<id>.json`（`fact / mechanism` 公开层）与 `mrg/<id>.deep.json`（`rationale / principle` 高层）。讲义、概念笔记、学习者查询只读公开层；高层只在评估与出题时加载。
 - **只追加、不可见的学习者日志**：每次作答由模型读成抽取 JSON（概念、关系、去主体化命题），`comparator.py` 落差异类别（不打分），`lrg_record.py` 追加到 `lrg/<id>.jsonl` 并同步 `learning-progress.json`。`show` 只显示计数与层次，永不打印回答。
@@ -125,14 +132,17 @@ plugin/
 ├── tests/test_tools.py
 ├── evals/                           # 材料清单 + score_pack.py
 └── skills/                          # 三宿主共享的技能目录
-    ├── brief/                       # 课前简报技能
+    ├── guide/                       # 向导：怎么用 / 规划（档案、材料评估、计划）
     │   ├── SKILL.md
-    │   └── assets/
+    │   └── references/how-to-use.md
+    ├── outline/                     # 一门课的大纲：生成 / 讨论 / 修改
+    │   └── SKILL.md
     ├── learn/                       # 主技能
     │   ├── SKILL.md
     │   ├── agents/openai.yaml       # 仅 Codex 使用，其他宿主忽略
     │   ├── assets/
     │   ├── references/
+    │   │   ├── stages/              # 规划阶段协议：profile / triage / plan / outline（guide、outline 共用）
     │   │   ├── protocol/            # 教学协议，按状态机状态分文件加载
     │   │   ├── prerequisite/        # 前置协议，按阶段分文件加载
     │   │   ├── lesson-contract.md
@@ -156,8 +166,8 @@ claude --plugin-dir /path/to/whetstone-ai/plugin
 claude plugin marketplace add /path/to/whetstone-ai
 claude plugin install whetstone@whetstone-ai
 
-# 3. 不走插件机制：作为个人技能放进 ~/.claude/skills/（调用名变为 /brief、/learn、/clarify）
-cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.claude/skills/
+# 3. 不走插件机制：作为个人技能放进 ~/.claude/skills/（调用名变为 /guide、/outline、/learn、/clarify）
+cp -r plugin/skills/guide plugin/skills/outline plugin/skills/learn plugin/skills/clarify ~/.claude/skills/
 ```
 
 注意：**Claude Desktop 的 Code 标签页不支持 `/plugin` 斜杠命令**（它有图形化插件管理器）；在 Desktop 里用方式 2（先在终端装好）或方式 3。会话内输入 `/` 确认技能出现。
@@ -173,7 +183,7 @@ python3 package_plugin.py            # 生成 ../dist/whetstone.plugin
 **DeepSeek Harness**：
 
 ```bash
-cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.agents/skills/
+cp -r plugin/skills/guide plugin/skills/outline plugin/skills/learn plugin/skills/clarify ~/.agents/skills/
 # 或项目级：复制到 <project>/.agents/skills/
 ```
 

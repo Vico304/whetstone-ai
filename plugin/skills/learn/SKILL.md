@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Analyze user-supplied documents, codebases, or conversation records; diagnose material-specific prerequisite gaps; research cited supplements when needed; then build a source-grounded, problem-driven course and tutor it section by section. Use for learning from provided materials, not for generic summaries or quizzes without instruction.
+description: Whetstone's main entry point — the full flow from planning to tutoring. Fills in whatever is missing (learner profile, material triage, course-by-course learning plan, confirmed course outline), then generates one document per unit, diagnoses prerequisites, and tutors section by section with prediction, own-words reconstruction, confidence rating, targeted follow-ups and an append-only learner log. Use to learn from provided documents, codebases or conversation records, or to resume a course; not for generic summaries or quizzes.
 ---
 
 # Guided Learning Tutor
@@ -37,9 +37,9 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ## 低输入自动补全
 
-用户明确要用本技能学习一组材料时，不要要求其重复粘贴完整的配置提示词。只要材料可访问且目标足以开始，就在内部建立学习任务简报并继续执行。
+用户明确要用本技能学习一组材料时，不要要求其重复粘贴完整的配置提示词。只要材料可访问且目标足以开始，就按 §0 的判断补齐缺失阶段后继续执行；单个小文件加一句目标即可开课。
 
-若用户提供了简报文件（如 `学习任务简报.md` / `learning-brief.md`，通常由 brief 技能生成、学习者手工细化），或调用语句引用了它：先读取简报，把其中的学习者画像、材料性质说明、目标与偏好作为任务背景采用，其字段优先于下述默认值；简报本身是背景说明，不纳入来源清单与课程内容。简报中的背景自述仅供参考，前置诊断仍按 `prerequisite_check` 正常执行。除简报或用户覆盖外，使用以下默认值：
+工作区里有 `learner-profile.md`（由 guide 维护）时先读取它：情境、背景、终点能力、默认深度、前置策略、知识库路径都从档案取，其字段优先于下述默认值；档案是背景说明，不纳入来源清单与课程内容，其中的背景自述仅供参考，前置诊断仍按 `prerequisite_check` 执行。有 `learning-plan.md` 且本次材料对应其中某门课时，材料子集与目标从计划取。除档案、计划或用户覆盖外，使用以下默认值：
 
 - 模式：`build + teach`；
 - 学习目标：从用户描述和材料主题推断，重点是延迟重建知识结构并迁移到新问题，而不是仅完成摘要；
@@ -54,7 +54,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ## 知识库（可选）
 
-用户指定了一个持久化目录（调用语句中的"知识库 / store 目录"，或简报的 `knowledge_store` 字段）时，开启知识库模式；未指定时完全不涉及以下步骤，行为与不开启时一致。开启后：
+用户指定了一个持久化目录（调用语句中的"知识库 / store 目录"，或 `learner-profile.md` 的 `knowledge_store` 字段）时，开启知识库模式；未指定时完全不涉及以下步骤，行为与不开启时一致。开启后：
 
 - 首次：`python3 scripts/store_init.py init --store <目录> [--domain-root 学科名]`；每门课 build 时 `store_init.py register --lesson-plan`；
 - build 抽概念时：把候选概念（名称 + 别名）写成 JSON 列表，运行 `scripts/index_match.py recall --candidates`，对每个命中项判断"同一概念 / 同名异义 / 粒度不同"：同一则复用已有 id，不同则新建 id；模型无法确定的（`decision_needed = disambiguate`，或语义上拿不准）向学习者问一句，一次最多 3 个；**禁止按名称相似自动合并**；
@@ -66,6 +66,10 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 详见 `docs/specs/knowledge-store.md`。
 
 ## 工作流
+
+### 0. 缺什么补什么（启动时静默判断）
+
+读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
 
 ### 1. 建立来源范围
 
@@ -102,7 +106,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-产出 `lesson-plan.json`（schema `1.2`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/protocol/outline.md](references/protocol/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.2`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/stages/outline.md](references/stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ### 4. 生成教学包：按 unit 逐份生成
 

@@ -1,5 +1,16 @@
-# 大纲确认（build 第一阶段结束时，必经）
+# 阶段 4：课程大纲 → `outline.md` + `lesson-plan.json`（确认后才生成 units）
 
+对**一门课**做：范围 → 抽概念 → 大纲 → 校验 → 呈现 → 确认 → 写回。已有确认过的大纲时，本阶段是"讨论与修改"：读现有 `outline.md` 与 `lesson-plan.json`，只改学习者要改的部分，重新校验，更新 `outline_confirmed_at`。
+
+## 生成大纲之前
+
+1. 读 `learner-profile.md`（目标、深度默认值、知识库）与 `learning-plan.md` 里这门课的条目（材料子集、目标）；
+2. 建立来源范围（learn SKILL.md 工作流 §1）；
+3. 从大框架建立问题链、给每个 unit 分配全部概念并标角色、填覆盖账本（learn SKILL.md 工作流 §3）；
+4. 写 `lesson-plan.json`（schema 1.2，`outline_confirmed_at: null`）与 `outline.md`，运行
+   `validate_lesson.py <plan> --outline outline.md [--sources-root <材料根>]`。
+
+## 呈现与确认
 大纲生成并通过校验后，**停下**，把下面这些呈现给学习者（直接给 `outline.md` 的路径，并在对话里摘要）：
 
 1. 推断的学习目标与材料范围；
@@ -19,4 +30,4 @@
 - 更新 `outline.md` 的模式与状态列，重新校验；
 - **确认前不得生成任何 `units/<id>.md`。**
 
-学习者说"你定"时：完整模式、不略过；照常写回并继续。若学习者提供了简报且其中已写明模式，用简报值作默认，但仍呈现大纲并问这一句。
+学习者说"你定"时：完整模式、不略过；照常写回并继续。`learner-profile.md` 已写明默认深度时用它作默认，但仍呈现大纲并问这一句。

@@ -1,7 +1,7 @@
 {
   "name": "whetstone",
-  "version": "0.4.0",
-  "description": "Diagnose prerequisite gaps, research cited supplements, and turn supplied materials into source-grounded lessons taught section by section.",
+  "version": "0.5.0",
+  "description": "Plan, outline and tutor source-grounded courses: learner profile, material triage, course-by-course plan, confirmed outlines, per-unit documents, section-by-section active reconstruction with an append-only learner log.",
   "author": {
     "name": "Vico304"
   },
@@ -14,7 +14,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Guided Learning Tutor",
-    "shortDescription": "Build source-grounded, problem-driven lessons.",
+    "shortDescription": "Plan, outline and tutor source-grounded courses.",
     "longDescription": "Analyze user-supplied documents, repositories, and exported conversations; identify material-specific prerequisite dependencies; assess the learner one question at a time; research cited supplements for actual gaps; then create and teach a problem-driven course with traceable evidence.",
     "developerName": "Vico304",
     "category": "Education",
@@ -23,9 +23,10 @@
       "Interactive"
     ],
     "defaultPrompt": [
-      "Use $learn to learn these materials. Check my prerequisite knowledge, research cited supplements for actual gaps, then teach one LearningUnit at a time.",
-      "Analyze this codebase as a course and start with the big picture.",
-      "Resume my lesson from the saved prerequisite or course progress.",
+      "Use $learn to learn these materials. Fill in whatever planning is missing, confirm the outline with me, then teach one unit at a time.",
+      "Use $guide — I am new to this, or I want to (re)plan my goals, background and course sequence for this directory of materials.",
+      "Use $outline to show or revise the outline of courses/<id>/.",
+      "Resume my course from the saved progress.",
       "Use $clarify to expand the unresolved [[concepts]] in my lesson pack into source-grounded concept notes."
     ]
   }

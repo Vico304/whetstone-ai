@@ -43,7 +43,7 @@ claude plugin install whetstone@whetstone-ai
 claude plugin list
 ```
 
-新开会话，输入 `/`，应看到 `whetstone:learn`、`whetstone:brief`、`whetstone:clarify`。
+新开会话，输入 `/`，应看到 `whetstone:guide`、`whetstone:outline`、`whetstone:learn`、`whetstone:clarify`。
 
 ### Claude Desktop
 
@@ -55,13 +55,13 @@ claude plugin list
 把三个技能目录拷到 Claude Code 的个人技能目录，调用名去掉前缀：
 
 ```bash
-cp -r plugin/skills/brief plugin/skills/learn plugin/skills/clarify ~/.claude/skills/
-# 调用：/brief  /learn  /clarify
+cp -r plugin/skills/guide plugin/skills/outline plugin/skills/learn plugin/skills/clarify ~/.claude/skills/
+# 调用：/guide  /outline  /learn  /clarify
 ```
 
 ### Codex / DeepSeek Harness
 
-Codex 通过 `.codex-plugin/plugin.json` 作为插件安装，调用 `$learn / $brief / $clarify`；DeepSeek Harness 把 `plugin/skills/*` 拷到 `~/.agents/skills/`，调用 `/learn / /brief / /clarify`。
+Codex 通过 `.codex-plugin/plugin.json` 作为插件安装，调用 `$guide / $outline / $learn / $clarify`；DeepSeek Harness 把 `plugin/skills/*` 拷到 `~/.agents/skills/`，调用 `/guide / /outline / /learn / /clarify`。
 
 ### 检查
 
@@ -94,11 +94,12 @@ Learning System/
 ## 4. 一门课的完整流程
 
 ```text
-（可选）/whetstone:brief  → 学习任务简报（背景、目标、材料性质、知识库路径）
+/whetstone:learn 材料 + 目标 [+ 知识库目录]     （总入口：缺什么补什么）
         ↓
-/whetstone:learn 材料 + 目标 [+ 知识库目录]
+⓪ 无 learner-profile.md → 一轮问目标与背景 → 写档案（跨课）        ← 也可单独 /whetstone:guide
+   材料是目录 / 太大 → 扫描定级 → 切成学习计划，逐门确认              ← 也可单独 /whetstone:guide
         ↓
-① 扫描来源 → 抽概念 → 出大纲：问题链 + 全部概念（core/supporting/listed）+ 覆盖账本
+① 本课大纲：问题链 + 全部概念（core/supporting/listed）+ 覆盖账本   ← 也可单独 /whetstone:outline
         ↓  ★ 停下：你确认模式（完整 / 快速）与取舍
 ② 逐份生成 units/<id>.md（每个 unit 一次独立生成，全部生成完再开课）
         ↓
@@ -116,6 +117,8 @@ Learning System/
 第一门课用**一章教材或一个模块**，30 KB 以内，能切 4–6 个 unit。整本书或整份规范会得到一份很长的大纲，先从中挑一段。代码库先给入口和主流程所在的目录。
 
 ### 4.2 开课
+
+熟手（档案已有、材料是单个小文件）一句话就直接到大纲；新手最多三轮：目标与背景一轮、（材料是目录时）计划逐门确认、大纲确认。
 
 ```text
 /whetstone:learn 学习 /Users/me/Learning System/materials/cove-ch4-attestation.adoc，
@@ -301,15 +304,54 @@ python3 $S/review_pool.py --store store --lesson-id x --progress courses/x/learn
 python3 $S/store_init.py show --store store
 ```
 
-## 7. 三个技能的分工
+## 7. 四个技能的分工
 
 | 技能 | 何时用 | 产出 |
 |---|---|---|
-| `brief` | 材料有了但目标模糊、或想规划一系列课程 | `学习任务简报.md`：背景自述、材料性质清单、终点能力、反目标、分阶段调用话术、`knowledge_store` |
-| `learn` | 开课、教学、继续 | 学习包（outline、units、lesson-plan、进度）；开启知识库时写 store |
+| `guide` | 每次都先问"怎么用 / 规划"。第一次用；或想（重新）定目标与背景；或手里是一个混杂目录、不确定该学哪部分 | `learner-profile.md`（跨课的背景与目标）、`materials-survey.md/json`、`learning-plan.md`（课程序列，逐门确认，每门带调用语句） |
+| `outline` | 想看、改或重做某门课的大纲 | `courses/<id>/outline.md` + `lesson-plan.json`（确认后写回） |
+| `learn` | 总入口：开课、教学、继续。缺档案 / 计划 / 大纲时自动补，等价于依次跑 guide → outline 再 build | 学习包（outline、units、lesson-plan、进度）；开启知识库时写 store |
 | `clarify` | 遇到不懂的概念，写了 `[[概念]]` 之后 | `concepts/<概念>.md`，Obsidian 双链 |
 
-简报是可选的：有它时 `learn` 会读取其中的目标与偏好作为默认值，但大纲确认仍会问你一次。
+三个规划文件的寿命不同：档案跨课（慢变），计划跨几门课，大纲只属于一门课。改哪个就调哪个技能；`learn` 读全部。阶段协议只在 `learn/references/stages/` 维护一份，`guide` 与 `outline` 是入口。
+
+### 7.1 材料太杂时：先跑向导
+
+典型场景：一个工作目录里有几个上游仓库、自己写的方案、AI 会话生成的总结与交接、几 GB 的日志。直接把整个目录喂给 `learn` 也会走同样的评估，但单独跑 `guide` 可以只做规划不开课。
+
+> **你**：/whetstone:guide
+
+> **模型**：想先知道**怎么用**，还是现在就**规划之后的学习**？
+
+> **你**：规划。目录 /Users/me/Project/tee，我想学的是里面的可信计算部分
+
+> **模型**：先一轮背景与目标（写进 `learner-profile.md`）：为什么学、相关经验、学完要能做什么、默认深度和要不要知识库？
+
+> **你**：巩固自己做的 MySQL-in-Occlum + mTLS 工作；Occlum 和 SGX 有半年经验；要能解释为什么这样设计并能排障；完整；知识库 /Users/me/Learning System/store
+
+> **模型**：扫描完成（`materials-survey.md`）：14 个顶层条目，3 GB——4 个上游仓库（`occlum` 416 MB，有 docs；`trustflow-teeapps`；`trustflow-capsule-manager` 513 KB；`teeapp-sgx-rwa-release` 是发布树，与 `trustflow-teeapps-rwa` 重叠）；`文档/` 12 份，4 份带会话/汇报信号；顶层 6 份进展汇报与交接；`data/` 2 GB 日志：排除。
+> 目的是巩固自己的工作，所以你的方案是课程材料、上游源码作证据；`文档/2_…需求与评估.md` 和 `…mTLS_精简实施方案.md` 是你写的还是会话生成的？
+
+> **你**：方案是我写的、核实过；需求评估是会话生成的。
+
+> **模型**：候选 3 门课，先看全貌：1「Capsule Manager 的密钥分发链路」（`trustflow-capsule-manager/capsule-manager/src/` + 你的精简实施方案，≈ 2400 行 + 9 KB，5 个 unit）→ 2「双 enclave mTLS 最小链路」（`trustflow-teeapps/teeapps/mysql_server_launcher/` + 分阶段规划）→ 3「Occlum SEFS 子系统」（`occlum/src/libos/crates/sefs*`）。会话记录、交接、汇报不作来源，只摘"待做事项"做迁移题素材；发布树排除。
+> 逐门确认——**课程 1**：接受 / 修改 / 删掉？
+
+> **你**：接受。后面的都接受。
+
+> **模型**：写入 `learning-plan.md`，三门均已确认，第一门是课程 1。调用语句：`/whetstone:learn 学习 …，课程目录 courses/capsule-manager-keys/`。想先看大纲：`/whetstone:outline courses/capsule-manager-keys/`。
+
+向导到此结束，不开课。
+
+### 7.2 只改大纲
+
+> **你**：/whetstone:outline courses/capsule-manager-keys/ 把第 3 节拆成两节，"证书轮换"升成 core
+
+> **模型**：改后大纲：第 3 节拆为「密钥派发」与「证书轮换」，core 概念各 3 个，账本已更新，校验通过。确认模式仍为完整？
+
+> **你**：确认。
+
+> **模型**：已写回，`outline_confirmed_at` 更新。`units/s03.md` 受影响需要重生成——下次 `learn` 会处理。
 
 ## 8. 学习者纪律
 

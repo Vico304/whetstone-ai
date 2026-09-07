@@ -55,12 +55,14 @@
 
 | 宿主 | 安装 | 调用 |
 |---|---|---|
-| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$learn` |
+| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$guide` / `$outline` / `$learn` / `$clarify` |
 | Claude Code（CLI） | `claude --plugin-dir ./plugin`，或 `claude plugin marketplace add . && claude plugin install whetstone@whetstone-ai` | `/whetstone:learn` |
 | Claude Desktop（Code 标签页） | 先在终端用上面的命令安装（共用配置），或把 `plugin/skills/*` 复制到 `~/.claude/skills/` | `/learn` |
 | DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/learn` |
 
 ## 使用
+
+`learn` 是完整流程，缺什么规划就补什么——跨课的学习者档案、混杂目录的材料评估（源码仓库、生成笔记、日志；定级为一手 / 自著已核实 / 生成中间物 / 噪声）、逐门确认的学习计划，再到本课大纲。`guide` 只做规划，每次都先问你想了解怎么用还是要规划；`outline` 单独查看或修改某门课的大纲。生成的中间文档永远不当来源。
 
 开始一门课：
 

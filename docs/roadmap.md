@@ -46,6 +46,10 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 
 使用者用 CoVE 规范（长材料）反馈"核心概念抓得准，但关键细节没涉及"。诊断与决策见 [specs/course-planning.md](specs/course-planning.md)。落地：schema 1.2（`mode`、概念 `role`、`deferred[]`、`coverage[]`、supporting `check`）；`outline.md` 取代 `teaching-guide.md`，unit 正文按份独立生成到 `units/`；大纲确认为必经停顿（`protocol/outline.md`）；快速模式在 assess / feedback / finish 各有分支；LRG 事件带 `rigor`，快速证据跨课打折；校验器对照真实来源标题检查账本；`score_pack` 增加角色、账本、units 指标。
 
+## P0.6 — 规划管线：guide / outline / learn 分层（2026-09-07）— ✅ 完成
+
+用户提议并批准：`learn` 是总入口、缺什么补什么；`guide`（每次先问"怎么用 / 规划"：目标与背景 → 材料评估 → 逐门确认的学习计划）与 `outline`（单门课大纲的生成 / 讨论 / 修改）是可重入的阶段入口；`brief` 并入 `guide`。阶段协议只在 `learn/references/stages/` 维护一份。三层产物寿命不同：`learner-profile.md`（跨课）、`learning-plan.md`（一组课）、`courses/<id>/outline.md`（一门课）。`survey_materials.py` 清点混杂目录（起因：用户的 `~/Project/tee`：4 仓库 + 12 份生成文档 + 2 GB 日志）。
+
 ## P1 — 在 P0 有数据之后
 
 **导出与可视化**：`export_graph.py` → `exports/graph.json` 与 Obsidian 目录（学科路径 = 目录，frontmatter 带时效与掌握估计）。先用 Obsidian graph 看一周，再决定是否做单文件 HTML。

@@ -35,6 +35,7 @@ index_match = load_module("index_match")
 learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
+survey_materials = load_module("survey_materials")
 
 TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
 EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -788,6 +789,77 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
             state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc))
             decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
             self.assertEqual(decisions[0]["action"], "variant")
+
+
+class SurveyMaterialsTests(unittest.TestCase):
+    def test_survey_classifies_repos_documents_generated_and_noise(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "upstream"
+            (repo / ".git").mkdir(parents=True)
+            (repo / "src").mkdir()
+            (repo / "src" / "main.rs").write_text("fn main() {}\n", encoding="utf-8")
+            (repo / "src" / "lib.rs").write_text("pub mod x;\n", encoding="utf-8")
+            (repo / "README.md").write_text("# Upstream\n", encoding="utf-8")
+            (repo / "docs").mkdir()
+            (repo / "docs" / "spec.md").write_text("# Specification\n", encoding="utf-8")
+            (repo / "demos").mkdir()
+            (repo / "demos" / "main.c").write_text("int main(){}\n", encoding="utf-8")
+            docs = root / "文档"
+            docs.mkdir()
+            (docs / "5_conversation_record.md").write_text("This session is being continued from a previous conversation. Summary below covers…\n", encoding="utf-8")
+            (docs / "2_设计方案.md").write_text("# 设计方案\n\n## 1. 目标\n\n## 2. 架构\n", encoding="utf-8")
+            (root / "进展汇报_2026-09-06.md").write_text("# 进展汇报\n\n> 日期：2026-09-06\n\n## 1. 完成度\n", encoding="utf-8")
+            (root / "textbook-ch3.md").write_text("# 第三章 内存隔离\n\n习题 3.1\n", encoding="utf-8")
+            data = root / "data"
+            data.mkdir()
+            (data / "big.log").write_text("x" * 100, encoding="utf-8")
+            (data / "dump.json").write_text("{}", encoding="utf-8")
+            (root / "tmp.log").write_text("log\n", encoding="utf-8")
+            (root / ".env").write_text("SECRET=1\n", encoding="utf-8")
+            (root / "paper.pdf").write_bytes(b"%PDF-1.4")
+
+            result = survey_materials.survey(root, 1000)
+            by_name = {e["name"]: e for e in result["entries"]}
+
+            self.assertEqual(by_name["upstream"]["kind"], "git_repo")
+            self.assertEqual(by_name["upstream"]["readme"], "README.md")
+            self.assertEqual(by_name["upstream"]["doc_dirs"], ["docs"])
+            self.assertEqual(by_name["upstream"]["entry_hints"], ["src/lib.rs", "src/main.rs"])  # demos/main.c skipped
+            self.assertEqual(by_name["文档"]["kind"], "document_folder")
+            docs_by = {Path(d["path"]).name: d for d in by_name["文档"]["documents"]}
+            self.assertEqual(docs_by["5_conversation_record.md"]["likely"], "generated_intermediate")
+            self.assertIn("session_summary", docs_by["5_conversation_record.md"]["generated_signals"])
+            self.assertNotEqual(docs_by["2_设计方案.md"]["likely"], "generated_intermediate")
+            self.assertEqual(by_name["进展汇报_2026-09-06.md"]["likely"], "generated_intermediate")
+            self.assertEqual(by_name["textbook-ch3.md"]["likely"], "primary_or_authored")
+            self.assertIn("textbook_like", by_name["textbook-ch3.md"]["primary_signals"])
+            self.assertEqual(by_name["data"]["kind"], "data_or_logs")
+            self.assertEqual(by_name["tmp.log"]["kind"], "log")
+            self.assertEqual(by_name[".env"]["kind"], "sensitive_skipped")
+            self.assertEqual(by_name["paper.pdf"]["kind"], "document")
+            self.assertIn("binary document", by_name["paper.pdf"]["note"])
+
+            md = survey_materials.render_markdown(result)
+            self.assertIn("| `upstream` | git_repo |", md)
+            self.assertIn("文档夹内明细", md)
+            self.assertNotIn("SECRET", md)
+            self.assertNotIn("This session is being continued", md)  # no content copied
+
+    def test_survey_ignores_build_dirs_and_marks_release_trees(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rel = root / "release"
+            (rel / "node_modules").mkdir(parents=True)
+            (rel / "node_modules" / "x.js").write_text("", encoding="utf-8")
+            (rel / "bin").mkdir()
+            for i in range(5):
+                (rel / "bin" / f"lib{i}.so").write_bytes(b"\x00")
+            (rel / "bin" / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            result = survey_materials.survey(root, 1000)
+            entry = result["entries"][0]
+            self.assertEqual(entry["kind"], "release_tree")
+            self.assertEqual(entry["files"], 6)
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
