@@ -7,7 +7,7 @@ named, which relations asserted, which propositions are correct / partial / wron
 this script decides *categories* deterministically and never scores.
 
 Output categories (docs/specs/knowledge-store.md §5.1):
-  missing              section concept never mentioned
+  missing              core concept of the section never mentioned (supporting/listed never count as missing)
   partial              concept or proposition only partly covered
   conflict             wrong proposition / wrong relation against explicit|entailed|external reference
   weak_reference       wrong against a pedagogical_inference-only reference → do NOT judge the learner wrong
@@ -69,11 +69,15 @@ class Reference:
             return None
         return self.lookup.get(normalize(ref))
 
-    def section_concepts(self, section_id: str) -> list[str]:
+    def section_concepts(self, section_id: str, role: str = "core") -> list[str]:
+        """Concept ids of a section by role. Exports without role info treat every concept as core."""
         section = self.sections.get(section_id)
         if section is None:
             raise ValueError(f"section '{section_id}' not found in MRG")
-        return list(section.get("concept_ids", []))
+        key = f"{role}_concept_ids"
+        if key in section:
+            return list(section[key])
+        return list(section.get("concept_ids", [])) if role == "core" else []
 
     def edge_between(self, a: str, b: str) -> dict | None:
         for edge in self.edges:
@@ -104,7 +108,7 @@ class Reference:
 def compare(reference: Reference, section_id: str, extraction: dict) -> dict:
     diff: dict[str, list] = {
         "missing": [], "partial": [], "conflict": [], "weak_reference": [],
-        "representation_only": [], "beyond_reference": [], "unresolved_refs": [],
+        "representation_only": [], "beyond_reference": [], "unresolved_refs": [], "unmentioned_supporting": [],
     }
     mentioned: set[str] = set()
 
@@ -126,9 +130,11 @@ def compare(reference: Reference, section_id: str, extraction: dict) -> dict:
             bucket = "conflict" if reference.strongest_support([cid]) == "strong" else "weak_reference"
             diff[bucket].append({"kind": "concept", "id": cid})
 
-    for cid in reference.section_concepts(section_id):
+    for cid in reference.section_concepts(section_id, "core"):
         if cid not in mentioned:
             diff["missing"].append(cid)
+    # supporting concepts are taught but not required in the main answer; listed ones are never expected
+    diff["unmentioned_supporting"] = [cid for cid in reference.section_concepts(section_id, "supporting") if cid not in mentioned]
 
     for item in extraction.get("relations", []) or []:
         status = item.get("status")

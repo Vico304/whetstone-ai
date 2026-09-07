@@ -1,8 +1,10 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "lesson_id": "sample-guided-lesson",
   "title": "示例：从总体问题理解系统设计",
   "learning_goal": "能解释每个方案为何出现，以及它如何引出下一步",
+  "mode": "full",
+  "outline_confirmed_at": "2026-09-06T00:00:00Z",
   "source_manifest": null,
   "big_picture": {
     "problem": "如何把分散输入转成可以理解和验证的结果",
@@ -34,18 +36,76 @@
         {
           "id": "learning-design.system-boundary",
           "name": "系统边界",
-          "aliases": ["边界", "scope"],
+          "aliases": [
+            "边界",
+            "scope"
+          ],
           "layer": "fact",
-          "domain_path": ["学习设计", "结构分析"],
-          "explanation": "本次解释纳入和排除的输入、过程与输出"
+          "domain_path": [
+            "学习设计",
+            "结构分析"
+          ],
+          "explanation": "本次解释纳入和排除的输入、过程与输出",
+          "role": "core"
         },
         {
           "id": "learning-design.macro-map",
           "name": "宏观地图",
-          "aliases": ["系统地图", "macro map"],
+          "aliases": [
+            "系统地图",
+            "macro map"
+          ],
           "layer": "mechanism",
-          "domain_path": ["学习设计", "结构分析"],
-          "explanation": "为细节提供位置的最小端到端流程"
+          "domain_path": [
+            "学习设计",
+            "结构分析"
+          ],
+          "explanation": "为细节提供位置的最小端到端流程",
+          "role": "core"
+        },
+        {
+          "id": "learning-design.problem-chain",
+          "name": "问题链",
+          "aliases": [
+            "problem chain"
+          ],
+          "layer": "mechanism",
+          "role": "supporting",
+          "domain_path": [
+            "学习设计",
+            "结构分析"
+          ],
+          "explanation": "把材料重组为“问题 → 方案 → 新问题”的序列，使每个组件都有它回应的问题",
+          "check": {
+            "prompt": "用一个你熟悉的系统举例：它的第一个设计决策回应了什么问题，又引出了什么新问题？",
+            "criteria": [
+              {
+                "id": "k1",
+                "text": "给出的决策确实回应了一个此前存在的问题",
+                "layer": "mechanism"
+              },
+              {
+                "id": "k2",
+                "text": "指出该决策暴露的新问题而非只描述决策本身",
+                "layer": "rationale"
+              }
+            ],
+            "hint": "先说问题，再说方案，最后问自己“这个方案付出了什么代价”。"
+          }
+        },
+        {
+          "id": "learning-design.appendix",
+          "name": "附录",
+          "aliases": [
+            "进一步探索"
+          ],
+          "layer": "fact",
+          "role": "listed",
+          "domain_path": [
+            "学习设计",
+            "结构分析"
+          ],
+          "explanation": "不进入主线、但学习者可按需展开的次要细节集合（见来源 ## Appendix）"
         }
       ],
       "source_refs": [
@@ -65,9 +125,21 @@
       "checkpoint": {
         "prompt": "为什么直接按文件顺序阅读容易失去整体意义？宏观地图解决了什么，又没有解决什么？",
         "criteria": [
-          {"id": "c1", "text": "说明局部顺序不等于功能结构", "layer": "mechanism"},
-          {"id": "c2", "text": "说明宏观地图为细节提供位置", "layer": "mechanism"},
-          {"id": "c3", "text": "指出宏观地图仍不能解释设计理由", "layer": "rationale"}
+          {
+            "id": "c1",
+            "text": "说明局部顺序不等于功能结构",
+            "layer": "mechanism"
+          },
+          {
+            "id": "c2",
+            "text": "说明宏观地图为细节提供位置",
+            "layer": "mechanism"
+          },
+          {
+            "id": "c3",
+            "text": "指出宏观地图仍不能解释设计理由",
+            "layer": "rationale"
+          }
         ],
         "hint": "分别从‘看见组件’和‘理解组件为何存在’考虑。"
       }
@@ -89,6 +161,33 @@
           "note": "来源先列范围再列步骤"
         }
       ]
+    }
+  ],
+  "deferred": [],
+  "coverage": [
+    {
+      "path": "examples/source.md",
+      "heading": "Architecture",
+      "disposition": "core",
+      "section_id": "s01"
+    },
+    {
+      "path": "examples/source.md",
+      "heading": "Course ordering",
+      "disposition": "supporting",
+      "section_id": "s01"
+    },
+    {
+      "path": "examples/source.md",
+      "heading": "Appendix",
+      "disposition": "listed",
+      "section_id": "s01"
+    },
+    {
+      "path": "examples/source.md",
+      "heading": "Deployment notes",
+      "disposition": "excluded",
+      "reason": "与学习目标无关的运维细节"
     }
   ],
   "final_challenge": {

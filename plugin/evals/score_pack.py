@@ -50,6 +50,8 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     plan_path = pack / "lesson-plan.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     guide_path = pack / "teaching-guide.md"
+    outline_path = pack / "outline.md"
+    units_dir = pack / "units"
     manifest_path = pack / "sources.json"
     manifest = validate_lesson.manifest_paths(json.loads(manifest_path.read_text(encoding="utf-8"))) if manifest_path.is_file() else None
     errors = validate_lesson.validate_plan(plan, manifest)
@@ -58,6 +60,22 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     if guide:
         errors += validate_lesson.validate_guide(guide, plan)
         warnings += validate_lesson.guide_warnings(guide, plan)
+    outline = outline_path.read_text(encoding="utf-8") if outline_path.is_file() else ""
+    if outline:
+        errors += validate_lesson.validate_outline(outline, plan)
+    units_present = None
+    if validate_lesson.schema_version(plan) == "1.2":
+        if units_dir.is_dir():
+            unit_errors, unit_warnings = validate_lesson.validate_units(units_dir, plan)
+            errors += unit_errors
+            warnings += unit_warnings
+        deferred = validate_lesson.deferred_section_ids(plan)
+        expected = [s["id"] for s in plan.get("sections", []) if isinstance(s, dict) and s.get("id") not in deferred]
+        present = sum(1 for sid in expected if (units_dir / f"{sid}.md").is_file())
+        units_present = f"{present}/{len(expected)}"
+        if sources_root is not None:
+            errors += validate_lesson.validate_coverage_against_sources(plan, sources_root)
+    unit_chars = sum(len(p.read_text(encoding="utf-8")) for p in units_dir.glob("*.md")) if units_dir.is_dir() else 0
 
     sections = plan.get("sections", []) if isinstance(plan.get("sections"), list) else []
     concepts_per_section = [len(s.get("concepts", []) or []) for s in sections if isinstance(s, dict)]
@@ -67,6 +85,8 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     layers = Counter(c.get("layer", "mechanism" if plan.get("schema_version") == "1.0" else None)
                      for s in sections if isinstance(s, dict) for c in (s.get("concepts") or []) if isinstance(c, dict))
     criteria = [len(validate_lesson.criteria_texts(s.get("checkpoint"))) for s in sections if isinstance(s, dict)]
+    roles = Counter(c.get("role") for s in sections if isinstance(s, dict) for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("role"))
+    coverage = Counter(item.get("disposition") for item in (plan.get("coverage") or []) if isinstance(item, dict))
 
     locator_checked = locator_found = 0
     file_cache: dict[str, str] = {}
@@ -97,7 +117,12 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
         "relations": len(plan.get("relations") or []),
         "layers": dict(layers),
         "criteria_per_section": criteria,
-        "guide_chars": len(guide),
+        "mode": plan.get("mode"),
+        "roles": dict(roles),
+        "coverage": dict(coverage),
+        "deferred": len(plan.get("deferred") or []),
+        "units_present": units_present,
+        "guide_chars": len(guide) + len(outline) + unit_chars,
         "locator_checked": locator_checked,
         "locator_hit_rate": round(locator_found / locator_checked, 3) if locator_checked else None,
         "errors": errors[:20],

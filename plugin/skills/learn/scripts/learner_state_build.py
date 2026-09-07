@@ -81,6 +81,7 @@ def load_events(store: Path) -> list[dict]:
 
 def concepts_for_event(event: dict, section_concepts: dict) -> set[str]:
     ids: set[str] = set(section_concepts.get(event.get("lesson_id"), {}).get(event.get("section_id"), []))
+    ids.update(event.get("target_concept_ids", []) or [])
     for prop in event.get("propositions", []) or []:
         ids.update(prop.get("concept_ids", []) or [])
     for item in (event.get("extraction") or {}).get("concepts", []) or []:
@@ -99,6 +100,7 @@ def new_state() -> dict:
         "depth_latest": None,
         "depth_max": None,
         "stability": 0,
+        "rigor_max": None,
         "attempts": 0,
         "freshness": "unknown",
         "error_propositions": [],
@@ -123,9 +125,12 @@ def build(store: Path, now: datetime | None = None) -> dict:
         confidence = event.get("confidence")
         at = event.get("at")
         conflicts_high = any(c.get("confidence_high") for c in (event.get("diff") or {}).get("conflict", []))
+        rigor = event.get("rigor", "full")
         for cid in concepts_for_event(event, section_concepts):
             state = states.setdefault(cid, new_state())
             state["attempts"] += 1
+            if verdict in SUCCESS_VERDICTS and (state["rigor_max"] is None or rigor == "full"):
+                state["rigor_max"] = rigor
             state["last_evidence_at"] = at
             state["last_verdict"] = verdict
             if event.get("lesson_id") and event["lesson_id"] not in state["lessons"]:

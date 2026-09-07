@@ -84,6 +84,7 @@ def recall(index: dict, candidates: list[dict], learner_state: dict | None = Non
                 if state:
                     match["learner"] = {
                         "freshness": state.get("freshness"),
+                        "rigor_max": state.get("rigor_max"),
                         "evidence_tier": state.get("evidence_tier"),
                         "depth_max": state.get("depth_max"),
                         "last_evidence_at": state.get("last_evidence_at"),
@@ -106,7 +107,9 @@ def register_nodes(index: dict, nodes: list[dict], lesson_id: str) -> dict:
         cid = node["id"]
         aliases = [node.get("name"), *(node.get("aliases") or [])]
         aliases = [a for a in aliases if isinstance(a, str) and a.strip()]
-        appearances = [{"lesson_id": lesson_id, "section_id": sid, "layer": node.get("layer")} for sid in node.get("section_ids", [])]
+        appearances = [{"lesson_id": lesson_id, "section_id": sid, "layer": node.get("layer"),
+                        "role": "deferred" if node.get("deferred") else node.get("role", "core")}
+                       for sid in node.get("section_ids", [])]
         if cid not in concepts:
             concepts[cid] = {
                 "name": node.get("name"),
@@ -174,6 +177,9 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
             if best is None or rank > best[0]:
                 best = (rank, match)
         freshness = (best[1].get("learner") or {}).get("freshness", "unknown") if best else "unknown"
+        rigor = (best[1].get("learner") or {}).get("rigor_max") if best else None
+        if freshness == "fresh" and rigor == "fast":
+            freshness = "stale"  # fast-mode evidence never counts as full mastery
         decisions.append({
             "prerequisite_id": prerequisite.get("id"),
             "name": prerequisite.get("name"),
@@ -181,6 +187,7 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
             "freshness": freshness if best else "unknown",
             "evidence_tier": (best[1].get("learner") or {}).get("evidence_tier") if best else None,
             "depth_max": (best[1].get("learner") or {}).get("depth_max") if best else None,
+            "rigor_max": rigor,
             "ambiguous": hit["decision_needed"] == "disambiguate",
             "action": ACTION_BY_FRESHNESS[freshness if best else "unknown"],
         })

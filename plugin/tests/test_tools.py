@@ -75,13 +75,17 @@ class SourceManifestTests(unittest.TestCase):
 
 
 class LessonValidationTests(unittest.TestCase):
-    def test_template_is_valid_and_matches_guide(self):
-        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    def test_template_is_valid_and_matches_outline_and_units(self):
+        assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
+        plan = load_template()
 
+        self.assertEqual(plan["schema_version"], "1.2")
         self.assertEqual(validate_lesson.validate_plan(plan), [])
-        self.assertEqual(validate_lesson.validate_guide(guide_path.read_text(encoding="utf-8"), plan), [])
+        self.assertEqual(validate_lesson.collect_warnings(plan), [])
+        self.assertEqual(validate_lesson.validate_outline((assets / "outline-template.md").read_text(encoding="utf-8"), plan), [])
+        errors, warnings = validate_lesson.validate_units(assets / "units-template", plan)
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
 
     def test_project_consensus_example_is_valid_and_traceable(self):
         example_root = PLUGIN_ROOT / "examples" / "project-consensus"
@@ -113,7 +117,7 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_guide_leaking_criteria_is_rejected(self):
         plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template" / "s01.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         guide = guide_path.read_text(encoding="utf-8") + f"\n参考答案：{leaked}\n"
@@ -124,7 +128,7 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_guide_leak_check_ignores_cosmetic_rewording(self):
         plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template" / "s01.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         leaked = plan["sections"][0]["checkpoint"]["criteria"][0]["text"]
         # Insert punctuation and whitespace inside the criterion; a verbatim check would miss this.
@@ -137,7 +141,7 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_guide_leak_check_catches_partial_verbatim_copy(self):
         plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template" / "s01.md"
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         criterion = "学习者需要说明输入如何经过处理步骤转化为可观察的输出结果并解释边界条件"
         plan["sections"][0]["checkpoint"]["criteria"] = [{"id": "c1", "text": criterion, "layer": "mechanism"}]
@@ -151,7 +155,6 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_schema_11_rejects_bad_ids_layers_relations_and_criteria(self):
         plan = load_template()
-        self.assertEqual(plan["schema_version"], "1.1")
         plan["sections"][0]["concepts"][0]["id"] = "NoDot"
         plan["sections"][0]["concepts"][1]["layer"] = "vibes"
         plan["sections"][0]["concepts"][1]["domain_path"] = []
@@ -188,7 +191,7 @@ class LessonValidationTests(unittest.TestCase):
 
     def test_guide_leaking_principle_is_rejected_and_meaning_is_warned(self):
         plan = load_template()
-        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "teaching-guide-template.md"
+        guide_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template" / "s01.md"
         guide = guide_path.read_text(encoding="utf-8")
         self.assertEqual(validate_lesson.guide_warnings(guide, plan), [])
         leaked = guide + "\n" + plan["sections"][0]["principle"] + "\n" + plan["sections"][0]["meaning"] + "\n"
@@ -204,17 +207,84 @@ class LessonValidationTests(unittest.TestCase):
         self.assertEqual(validate_lesson.criteria_texts(None), [])
 
     def test_cognitive_load_warnings(self):
-        plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        section = plan["sections"][0]
-        section["concepts"] = [
-            {"name": f"概念{i}", "explanation": "占位解释"} for i in range(5)
-        ]
-
+        plan = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))  # 1.0: every concept counts
+        plan["sections"][0]["concepts"] = [{"name": f"概念{i}", "explanation": "占位解释"} for i in range(5)]
         warnings = validate_lesson.collect_warnings(plan)
-
         self.assertTrue(any("concepts" in warning for warning in warnings))
         self.assertEqual(validate_lesson.collect_warnings({"sections": []}), [])
+
+    def test_schema_12_role_aware_warnings_and_rules(self):
+        plan = load_template()
+        section = plan["sections"][0]
+        core = section["concepts"][0]
+        section["concepts"] = [dict(core, id=f"learning-design.c{i}", name=f"核心{i}", role="core") for i in range(5)] + [
+            dict(core, id=f"learning-design.s{i}", name=f"配角{i}", role="supporting") for i in range(7)
+        ] + [dict(core, id="learning-design.long", name="长列出", role="listed", explanation="机" * 250)]
+        plan["relations"] = []
+        warnings = validate_lesson.collect_warnings(plan)
+        self.assertTrue(any("5 core concepts" in w and "do not drop" in w for w in warnings), warnings)
+        self.assertTrue(any("7 supporting" in w for w in warnings), warnings)
+        self.assertTrue(any("'listed' but its explanation is long" in w for w in warnings), warnings)
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+
+        bad = load_template()
+        bad["mode"] = "sprint"
+        del bad["outline_confirmed_at"]
+        bad["sections"][0]["concepts"][0]["role"] = "hero"
+        bad["sections"][0]["concepts"][0]["check"] = {"prompt": "x", "hint": "y", "criteria": [{"id": "k", "text": "t", "layer": "fact"}]}
+        bad["deferred"] = [{"type": "section", "id": "s99", "reason": "r"}, {"type": "concept", "id": "learning-design.macro-map"}]
+        bad["coverage"] = [{"path": "a.md", "heading": "H", "disposition": "core"}, {"path": "a.md", "heading": "I", "disposition": "excluded"}]
+        errors = validate_lesson.validate_plan(bad)
+        joined = "\n".join(errors)
+        for needle in ("root.mode", "outline_confirmed_at", "concepts[0].role", "check is only allowed on supporting",
+                       "deferred[0].id 's99'", "deferred[1].reason", "coverage[0].section_id", "coverage[1].reason"):
+            self.assertIn(needle, joined, joined)
+
+        old = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))
+        old["mode"] = "full"
+        self.assertTrue(any("requires schema_version '1.2'" in e for e in validate_lesson.validate_plan(old)))
+
+    def test_coverage_against_source_headings(self):
+        plan = load_template()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "examples").mkdir()
+            (root / "examples" / "source.md").write_text("## Architecture\n\n## Course ordering\n\n## Appendix\n\n## Deployment notes\n", encoding="utf-8")
+            self.assertEqual(validate_lesson.validate_coverage_against_sources(plan, root), [])
+            (root / "examples" / "source.md").write_text("## Architecture\n\n## Interrupts and page faults\n", encoding="utf-8")
+            (root / "examples" / "source.adoc").write_text("= Spec\n\n== Timer interrupts\n", encoding="utf-8")
+            plan["coverage"].append({"path": "examples/source.adoc", "heading": "Spec", "disposition": "excluded", "reason": "标题页"})
+            errors = validate_lesson.validate_coverage_against_sources(plan, root)
+            self.assertTrue(any("Timer interrupts" in e for e in errors), errors)
+            self.assertTrue(any("Interrupts and page faults" in e for e in errors), errors)
+        self.assertEqual(validate_lesson.source_headings.__name__, "source_headings")
+
+    def test_outline_and_units_validation_catch_missing_and_leaks(self):
+        assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
+        plan = load_template()
+        outline = (assets / "outline-template.md").read_text(encoding="utf-8")
+        stripped = outline.replace("附录", "").replace("完整（full）", "").replace("mode: full", "mode: ")
+        errors = validate_lesson.validate_outline(stripped, plan)
+        self.assertTrue(any("does not list concept '附录'" in e for e in errors), errors)
+        self.assertTrue(any("learning mode" in e for e in errors), errors)
+        leaked = outline + "\n" + plan["sections"][0]["meaning"] + "\n" + plan["sections"][0]["concepts"][2]["check"]["criteria"][0]["text"]
+        errors = validate_lesson.validate_outline(leaked, plan)
+        self.assertTrue(any("rationale-layer meaning" in e for e in errors), errors)
+        self.assertTrue(any("supporting check criterion" in e for e in errors), errors)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            units = Path(temporary)
+            errors, _ = validate_lesson.validate_units(units, plan)
+            self.assertTrue(any("missing unit document units/s01.md" in e for e in errors))
+            text = (assets / "units-template" / "s01.md").read_text(encoding="utf-8")
+            (units / "s01.md").write_text(text.replace("问题链", "") + plan["sections"][0]["tradeoffs"][0], encoding="utf-8")
+            errors, warnings = validate_lesson.validate_units(units, plan)
+            self.assertTrue(any("does not mention concept '问题链'" in e for e in errors), errors)
+            self.assertTrue(any("rationale-layer tradeoff" in w for w in warnings), warnings)
+            plan["deferred"] = [{"type": "section", "id": "s01", "reason": "快速模式略过"}]
+            errors, warnings = validate_lesson.validate_units(units, plan)
+            self.assertEqual(errors, [])
+            self.assertTrue(any("deferred" in w for w in warnings))
 
 
 class LearningStateTests(unittest.TestCase):
@@ -306,14 +376,20 @@ class MrgExportTests(unittest.TestCase):
         plan = load_template()
         public, deep = mrg_export.export(plan)
 
-        self.assertEqual({n["id"] for n in public["nodes"]}, {"learning-design.system-boundary", "learning-design.macro-map"})
+        self.assertEqual({n["id"] for n in public["nodes"]},
+                         {"learning-design.system-boundary", "learning-design.macro-map", "learning-design.problem-chain", "learning-design.appendix"})
+        self.assertEqual({n["id"]: n["role"] for n in public["nodes"]}["learning-design.appendix"], "listed")
+        self.assertEqual(public["sections"][0]["core_concept_ids"], ["learning-design.system-boundary", "learning-design.macro-map"])
+        self.assertEqual(public["sections"][0]["supporting_concept_ids"], ["learning-design.problem-chain"])
+        self.assertEqual(deep["sections"][0]["supporting_checks"][0]["concept_id"], "learning-design.problem-chain")
         self.assertEqual([e["type"] for e in public["edges"]], ["depends_on"])
         self.assertEqual(deep["nodes"], [])
         self.assertEqual(deep["sections"][0]["principle"], plan["sections"][0]["principle"])
         self.assertEqual([c["id"] for c in deep["sections"][0]["criteria"]], ["c1", "c2", "c3"])
         public_text = json.dumps(public, ensure_ascii=False)
         for hidden in (plan["sections"][0]["principle"], plan["sections"][0]["meaning"], *plan["sections"][0]["tradeoffs"],
-                       *(c["text"] for c in plan["sections"][0]["checkpoint"]["criteria"])):
+                       *(c["text"] for c in plan["sections"][0]["checkpoint"]["criteria"]),
+                       *(c["text"] for c in plan["sections"][0]["concepts"][2]["check"]["criteria"])):
             self.assertNotIn(hidden, public_text)
         self.assertEqual(public["sections"][0]["concept_ids"], [n["id"] for n in public["nodes"]])
 
@@ -322,7 +398,7 @@ class MrgExportTests(unittest.TestCase):
         plan["sections"][0]["concepts"][1]["layer"] = "rationale"
         plan["relations"][0]["layer"] = "principle"
         public, deep = mrg_export.export(plan)
-        self.assertEqual([n["id"] for n in public["nodes"]], ["learning-design.system-boundary"])
+        self.assertEqual([n["id"] for n in public["nodes"]], ["learning-design.system-boundary", "learning-design.problem-chain", "learning-design.appendix"])
         self.assertEqual([n["id"] for n in deep["nodes"]], ["learning-design.macro-map"])
         self.assertEqual(public["edges"], [])
         self.assertEqual(len(deep["edges"]), 1)
@@ -377,7 +453,8 @@ class KnowledgeStoreTests(unittest.TestCase):
             result = comparator.compare(reference, "s01", extraction)
             diff = result["diff"]
 
-            self.assertEqual(diff["missing"], [])  # both section concepts mentioned (one via its name)
+            self.assertEqual(diff["missing"], [])  # both core concepts mentioned (one via its name)
+            self.assertEqual(diff["unmentioned_supporting"], ["learning-design.problem-chain"])
             self.assertEqual([c["id"] for c in diff["partial"]], ["learning-design.system-boundary"])
             kinds = sorted(c["kind"] for c in diff["conflict"])
             self.assertEqual(kinds, ["proposition", "relation"])
@@ -480,7 +557,8 @@ class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             store = self._store(Path(temporary))
             index = index_match.load_index(store)
-            self.assertEqual(set(index["concepts"]), {"learning-design.system-boundary", "learning-design.macro-map"})
+            self.assertEqual(set(index["concepts"]), {"learning-design.system-boundary", "learning-design.macro-map", "learning-design.problem-chain", "learning-design.appendix"})
+            self.assertEqual(index["concepts"]["learning-design.appendix"]["appearances"][0]["role"], "listed")
             self.assertEqual(index["alias_index"]["macro map"], "learning-design.macro-map")
 
             # second lesson reuses one id (appearance appended) and tries to claim an alias owned by another id
@@ -602,10 +680,16 @@ class EvalScoringTests(unittest.TestCase):
             pack.mkdir()
             assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
             (pack / "lesson-plan.json").write_text(TEMPLATE_PLAN.read_text(encoding="utf-8"), encoding="utf-8")
-            (pack / "teaching-guide.md").write_text((assets / "teaching-guide-template.md").read_text(encoding="utf-8"), encoding="utf-8")
+            (pack / "outline.md").write_text((assets / "outline-template.md").read_text(encoding="utf-8"), encoding="utf-8")
+            (pack / "units").mkdir()
+            (pack / "units" / "s01.md").write_text((assets / "units-template" / "s01.md").read_text(encoding="utf-8"), encoding="utf-8")
             metrics = score_pack.build_metrics(pack, None, None)
+            self.assertEqual(metrics["validator_errors"], 0, metrics["errors"])
             self.assertEqual(metrics["relations"], 1)
-            self.assertEqual(metrics["layers"], {"fact": 1, "mechanism": 1})
+            self.assertEqual(metrics["layers"], {"fact": 2, "mechanism": 2})
+            self.assertEqual(metrics["roles"], {"core": 2, "supporting": 1, "listed": 1})
+            self.assertEqual(metrics["coverage"], {"core": 1, "supporting": 1, "listed": 1, "excluded": 1})
+            self.assertEqual(metrics["units_present"], "1/1")
             self.assertIsNone(metrics["locator_hit_rate"])
             changed = dict(metrics, sections=metrics["sections"] + 1)
             lines = score_pack.diff_against({"build": metrics}, {"build": changed})
@@ -629,6 +713,81 @@ class EvalScoringTests(unittest.TestCase):
             self.assertEqual(t["conflicts_per_attempt"], 1.0)
             self.assertEqual(t["high_confidence_conflict_share"], 1.0)
             self.assertEqual(score_pack.teach_metrics(store, "missing"), {"attempts": 0})
+
+
+class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
+    def test_deferred_sections_are_skipped_in_progress(self):
+        plan = load_template()
+        template = plan["sections"][0]
+        plan["sections"] = [dict(template, id="s01", depends_on=[], new_problem="下一步"),
+                            dict(template, id="s02", depends_on=["s01"], new_problem="再下一步"),
+                            dict(template, id="s03", depends_on=["s02"])]
+        plan["mode"] = "fast"
+        plan["deferred"] = [{"type": "section", "id": "s02", "reason": "快速模式略过"}]
+        state = learning_state.create_state(plan)
+        self.assertEqual(state["mode"], "fast")
+        self.assertEqual([x["status"] for x in state["sections"]], ["pending", "deferred", "pending"])
+        learning_state.append_attempt(state, "s01", "a", "", "mastered", None)
+        self.assertEqual(state["current_section_id"], "s03")
+        with self.assertRaises(ValueError):
+            learning_state.append_attempt(state, "s02", "b", "", "mastered", None)
+        learning_state.append_attempt(state, "s03", "c", "", "mastered", None)
+        self.assertEqual(state["status"], "completed")
+        plan["deferred"] = [{"type": "section", "id": sid, "reason": "r"} for sid in ("s01", "s02", "s03")]
+        with self.assertRaises(ValueError):
+            learning_state.create_state(plan)
+
+    def test_lrg_rigor_and_supporting_kind(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            event = lrg_record.build_event(
+                lesson_id="sample-guided-lesson", section_id="s01", kind="supporting", attempt_number=1, response="r",
+                feedback="", verdict="mastered", confidence=None, criteria_met=["k1"], depth_reached="mechanism",
+                extraction=None, comparison=None, elapsed_seconds=None, rigor="fast",
+                target_concept_ids=["learning-design.problem-chain"],
+            )
+            self.assertEqual(event["rigor"], "fast")
+            self.assertEqual(event["evidence_tier"], "immediate")
+            self.assertEqual(event["target_concept_ids"], ["learning-design.problem-chain"])
+            with self.assertRaises(ValueError):
+                lrg_record.build_event(lesson_id="l", section_id="s", kind="supporting", attempt_number=1, response="", feedback="",
+                                       verdict="mastered", confidence=None, criteria_met=[], depth_reached=None,
+                                       extraction=None, comparison=None, elapsed_seconds=None)
+            with self.assertRaises(ValueError):
+                lrg_record.build_event(lesson_id="l", section_id="s", kind="checkpoint", attempt_number=1, response="", feedback="",
+                                       verdict="mastered", confidence=None, criteria_met=[], depth_reached=None,
+                                       extraction=None, comparison=None, elapsed_seconds=None, rigor="sloppy")
+            lrg_record.append_event(store, "sample-guided-lesson", event)
+            from datetime import datetime, timezone
+            state = learner_state_build.build(store, now=datetime.now(timezone.utc))
+            chain = state["concepts"]["learning-design.problem-chain"]
+            self.assertEqual(chain["rigor_max"], "fast")
+            self.assertEqual(chain["attempts"], 1)
+
+    def test_fast_rigor_downgrades_prerequisite_action(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            event = lrg_record.build_event(
+                lesson_id="sample-guided-lesson", section_id="s01", kind="review", attempt_number=1, response="r", feedback="",
+                verdict="mastered", confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
+                comparison=None, elapsed_seconds=None, rigor="fast",
+            )
+            event["at"] = "2026-01-20T10:00:00Z"
+            lrg_record.append_event(store, "sample-guided-lesson", event)
+            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc))
+            self.assertEqual(state["concepts"]["learning-design.macro-map"]["freshness"], "fresh")
+            plan = {"prerequisites": [{"id": "p01", "name": "macro map"}]}
+            decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
+            self.assertEqual(decisions[0]["freshness"], "stale")
+            self.assertEqual(decisions[0]["action"], "variant_then_diagnose")
+            self.assertEqual(decisions[0]["rigor_max"], "fast")
+            # a later full-rigor success restores full credit
+            event2 = dict(event, rigor="full", at="2026-01-21T10:00:00Z", attempt_number=2)
+            lrg_record.append_event(store, "sample-guided-lesson", event2)
+            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc))
+            decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
+            self.assertEqual(decisions[0]["action"], "variant")
 
 
 class PrerequisiteValidationTests(unittest.TestCase):

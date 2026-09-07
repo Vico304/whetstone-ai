@@ -48,5 +48,5 @@ python3 scripts/lrg_record.py append \
   --elapsed-seconds 240
 ```
 
-`--kind`：`checkpoint`（主问题与追问）/ `review`（resume 变式）/ `variant`（跨课前置替代题）/ `transfer`（迁移题、接缝题）/ `bridge`（前置桥接复测）/ `final`（课程结束整体重述）。`--elapsed-seconds` 记本节从提出主问题到判定的墙钟时间——这是判断结构化记录成本是否可承受的唯一指标，尽量填。日志只增不改；`lrg_record.py show` 只显示计数与层次，不显示回答。
+`--kind`：`checkpoint`（主问题与追问）/ `supporting`（supporting 概念的验收，需 `--concept <id>`，不加 `--progress`）/ `review`（resume 变式）/ `variant`（跨课前置替代题）/ `transfer`（迁移题、接缝题）/ `bridge`（前置桥接复测）/ `final`（课程结束整体重述）。`--elapsed-seconds` 记本节从提出主问题到判定的墙钟时间——这是判断结构化记录成本是否可承受的唯一指标，尽量填。`--rigor full|fast` 默认取进度文件的 `mode`。日志只增不改；`lrg_record.py show` 只显示计数与层次，不显示回答。
 

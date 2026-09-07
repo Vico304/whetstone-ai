@@ -4,6 +4,8 @@ teaching-guide 是宏观框架，不是全部深度。每节呈现 `solution` �
 
 > "这一节内部还有 {概念 A、概念 B} 等衍生概念。想先深入哪一个，还是直接回答本节问题？"
 
+{概念 A、概念 B} 取自本节 `listed` 概念（lesson-plan `role: listed`），不现场编。没有 listed 概念的节可以不问。
+
 学习者选择细化时：
 
 1. 生成 `zoom/<section-id>-guide.md`（契约见 [../lesson-contract.md](../lesson-contract.md)）：只覆盖本节内部的衍生概念与机制，比主讲义更详细、例子更多（每个概念至少两个例子，其中一个贴近材料语境，一个换情境）；涉及的概念用 `[[概念名]]` 链接，需要独立成篇的概念交给 clarify 技能生成概念笔记；

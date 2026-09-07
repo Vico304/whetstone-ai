@@ -11,7 +11,14 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
-SCHEMA_VERSIONS = {"1.0", "1.1"}
+SCHEMA_VERSIONS = {"1.0", "1.1", "1.2"}
+MODES = {"full", "fast"}
+ROLES = ("core", "supporting", "listed")
+DISPOSITIONS = {"core", "supporting", "listed", "appendix", "deferred", "excluded"}
+MAX_SUPPORTING_PER_SECTION = 6
+MAX_LISTED_EXPLANATION_CHARS = 200
+HEADING_MD = re.compile(r"^(#{1,2})\s+(.+?)\s*#*\s*$", re.MULTILINE)
+HEADING_ADOC = re.compile(r"^(={1,2})\s+(.+?)\s*$", re.MULTILINE)
 LAYERS = ("fact", "mechanism", "rationale", "principle")
 PUBLIC_LAYERS = {"fact", "mechanism"}
 RELATION_TYPES = {
@@ -81,6 +88,98 @@ def validate_concept_v11(concept: dict, location: str, errors: list[str], names_
         errors.append(f"{location}.aliases must be a list of non-empty strings when present")
 
 
+def validate_concept_v12(concept: dict, location: str, errors: list[str]) -> None:
+    if concept.get("role") not in ROLES:
+        errors.append(f"{location}.role must be one of {list(ROLES)}")
+    check = concept.get("check")
+    if check is not None:
+        if concept.get("role") != "supporting":
+            errors.append(f"{location}.check is only allowed on supporting concepts")
+        if not isinstance(check, dict):
+            errors.append(f"{location}.check must be an object")
+        else:
+            require_text(check, "prompt", f"{location}.check", errors)
+            require_text(check, "hint", f"{location}.check", errors)
+            validate_criteria(check, f"{location}.check", errors, "1.2")
+
+
+def validate_deferred(plan: dict, section_ids: set[str], concept_ids: set[str], errors: list[str]) -> set[str]:
+    """Returns the set of deferred section ids."""
+    deferred_sections: set[str] = set()
+    items = plan.get("deferred", [])
+    if not isinstance(items, list):
+        errors.append("root.deferred must be a list")
+        return deferred_sections
+    for index, item in enumerate(items):
+        location = f"deferred[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        require_text(item, "reason", location, errors)
+        kind, ident = item.get("type"), item.get("id")
+        if kind == "section":
+            if ident not in section_ids:
+                errors.append(f"{location}.id '{ident}' is not a section id")
+            else:
+                deferred_sections.add(ident)
+        elif kind == "concept":
+            if ident not in concept_ids:
+                errors.append(f"{location}.id '{ident}' is not a concept id in this lesson")
+        else:
+            errors.append(f"{location}.type must be 'section' or 'concept'")
+    return deferred_sections
+
+
+def validate_coverage(plan: dict, section_ids: set[str], errors: list[str], allow_empty: bool) -> None:
+    coverage = plan.get("coverage")
+    if not isinstance(coverage, list):
+        errors.append("root.coverage must be a list (schema 1.2)")
+        return
+    if not coverage and not allow_empty:
+        errors.append("root.coverage is empty; every source heading needs a disposition (or pass --allow-empty-coverage)")
+    for index, item in enumerate(coverage):
+        location = f"coverage[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        require_text(item, "path", location, errors)
+        require_text(item, "heading", location, errors)
+        disposition = item.get("disposition")
+        if disposition not in DISPOSITIONS:
+            errors.append(f"{location}.disposition must be one of {sorted(DISPOSITIONS)}")
+            continue
+        if disposition in {"core", "supporting", "listed", "appendix"} and item.get("section_id") not in section_ids:
+            errors.append(f"{location}.section_id must name a section for disposition '{disposition}'")
+        if disposition in {"deferred", "excluded"} and not nonempty(item.get("reason")):
+            errors.append(f"{location}.reason is required for disposition '{disposition}'")
+
+
+def source_headings(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    pattern = HEADING_ADOC if path.suffix.lower() in {".adoc", ".asciidoc"} else HEADING_MD
+    return [m.group(2).strip() for m in pattern.finditer(text)]
+
+
+def validate_coverage_against_sources(plan: dict, sources_root: Path) -> list[str]:
+    """Every level-1/2 heading of every text source referenced by the plan must appear in coverage[]."""
+    errors: list[str] = []
+    coverage = plan.get("coverage") if isinstance(plan.get("coverage"), list) else []
+    covered = {(item.get("path"), normalize_text(str(item.get("heading", "")))) for item in coverage if isinstance(item, dict)}
+    paths: set[str] = {item["path"] for item in coverage if isinstance(item, dict) and nonempty(item.get("path"))}
+    for section in plan.get("sections", []) or []:
+        for ref in (section.get("source_refs") or []) if isinstance(section, dict) else []:
+            if isinstance(ref, dict) and nonempty(ref.get("path")):
+                paths.add(ref["path"])
+    for rel in sorted(paths):
+        path = sources_root / rel
+        if not path.is_file() or path.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc", ".txt"}:
+            continue
+        for heading in source_headings(path):
+            if (rel, normalize_text(heading)) not in covered:
+                errors.append(f"coverage is missing heading '{heading}' of {rel}")
+    return errors
+
+
 def validate_criteria(checkpoint: dict, location: str, errors: list[str], version: str) -> None:
     criteria = checkpoint.get("criteria")
     if version == "1.0":
@@ -148,7 +247,7 @@ def criteria_texts(checkpoint: Any) -> list[str]:
     return texts
 
 
-def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str]:
+def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty_coverage: bool = False) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
         return ["lesson plan root must be an object"]
@@ -156,6 +255,13 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
         errors.append(f"schema_version must be one of {sorted(SCHEMA_VERSIONS)}")
     version = schema_version(plan)
     names_by_id: dict[str, str] = {}
+    if version == "1.2":
+        if plan.get("mode") not in MODES:
+            errors.append(f"root.mode must be one of {sorted(MODES)} (schema 1.2)")
+        if "outline_confirmed_at" not in plan:
+            errors.append("root.outline_confirmed_at must be present (null until the learner confirms the outline)")
+        elif plan["outline_confirmed_at"] is not None and not nonempty(plan["outline_confirmed_at"]):
+            errors.append("root.outline_confirmed_at must be null or an ISO timestamp")
     for key in ("lesson_id", "title", "learning_goal"):
         require_text(plan, key, "root", errors)
 
@@ -215,6 +321,8 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
                 require_text(concept, "explanation", concept_location, errors)
                 if version != "1.0":
                     validate_concept_v11(concept, concept_location, errors, names_by_id)
+                if version == "1.2":
+                    validate_concept_v12(concept, concept_location, errors)
 
         if "principle" in section and not nonempty(section.get("principle")):
             errors.append(f"{location}.principle must be a non-empty string when present")
@@ -233,6 +341,13 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
         validate_relations(plan, set(names_by_id), errors, manifest_paths)
     elif "relations" in plan:
         errors.append("root.relations requires schema_version '1.1'")
+    if version == "1.2":
+        validate_deferred(plan, seen, set(names_by_id), errors)
+        validate_coverage(plan, seen, errors, allow_empty_coverage)
+    else:
+        for key in ("mode", "coverage", "deferred"):
+            if key in plan:
+                errors.append(f"root.{key} requires schema_version '1.2'")
 
     final_challenge = plan.get("final_challenge")
     if not isinstance(final_challenge, dict):
@@ -260,16 +375,116 @@ def collect_warnings(plan: Any) -> list[str]:
             f"lesson has {len(sections)} sections (> {MAX_SECTIONS_PER_LESSON}); "
             "consider a skeleton pass with on-demand expansion"
         )
+    role_aware = schema_version(plan) == "1.2"
     for index, section in enumerate(sections):
         if not isinstance(section, dict):
             continue
         concepts = section.get("concepts")
-        if isinstance(concepts, list) and len(concepts) > MAX_CONCEPTS_PER_SECTION:
+        if not isinstance(concepts, list):
+            continue
+        if not role_aware:
+            if len(concepts) > MAX_CONCEPTS_PER_SECTION:
+                warnings.append(
+                    f"sections[{index}] introduces {len(concepts)} concepts "
+                    f"(> {MAX_CONCEPTS_PER_SECTION}); consider splitting the section"
+                )
+            continue
+        core = [c for c in concepts if isinstance(c, dict) and c.get("role") == "core"]
+        supporting = [c for c in concepts if isinstance(c, dict) and c.get("role") == "supporting"]
+        if len(core) > MAX_CONCEPTS_PER_SECTION:
             warnings.append(
-                f"sections[{index}] introduces {len(concepts)} concepts "
-                f"(> {MAX_CONCEPTS_PER_SECTION}); consider splitting the section"
+                f"sections[{index}] has {len(core)} core concepts (> {MAX_CONCEPTS_PER_SECTION}); "
+                "demote some to supporting or split the section — do not drop them"
             )
+        if len(supporting) > MAX_SUPPORTING_PER_SECTION:
+            warnings.append(f"sections[{index}] has {len(supporting)} supporting concepts (> {MAX_SUPPORTING_PER_SECTION})")
+        for c_index, concept in enumerate(concepts):
+            if isinstance(concept, dict) and concept.get("role") == "listed" and len(str(concept.get("explanation", ""))) > MAX_LISTED_EXPLANATION_CHARS:
+                warnings.append(
+                    f"sections[{index}].concepts[{c_index}] is 'listed' but its explanation is long "
+                    f"(> {MAX_LISTED_EXPLANATION_CHARS} chars); listed concepts get a one-line fact-layer definition only"
+                )
     return warnings
+
+
+def deferred_section_ids(plan: dict) -> set[str]:
+    return {item["id"] for item in (plan.get("deferred") or []) if isinstance(item, dict) and item.get("type") == "section"}
+
+
+def hidden_texts(section: dict) -> list[tuple[str, str]]:
+    """(label, text) pairs that must never appear in learner-facing documents of a 1.2 pack."""
+    pairs: list[tuple[str, str]] = []
+    for criterion in criteria_texts(section.get("checkpoint")):
+        pairs.append(("assessment criterion", criterion))
+    for concept in section.get("concepts") or []:
+        if isinstance(concept, dict):
+            for criterion in criteria_texts(concept.get("check")):
+                pairs.append(("supporting check criterion", criterion))
+    if nonempty(section.get("principle")):
+        pairs.append(("principle-layer content", section["principle"]))
+    if nonempty(section.get("meaning")):
+        pairs.append(("rationale-layer meaning", section["meaning"]))
+    for tradeoff in section.get("tradeoffs") or []:
+        if nonempty(tradeoff):
+            pairs.append(("rationale-layer tradeoff", tradeoff))
+    return pairs
+
+
+def validate_outline(outline: str, plan: dict) -> list[str]:
+    """outline.md must show the route and every concept, and hide everything above the public layer."""
+    errors: list[str] = []
+    normalized = normalize_text(outline)
+    if nonempty(plan.get("title")) and plan["title"] not in outline:
+        errors.append(f"outline does not contain title '{plan['title']}'")
+    mode = plan.get("mode")
+    if mode and mode not in outline and {"full": "完整", "fast": "快速"}.get(mode, "") not in outline:
+        errors.append("outline must state the learning mode")
+    for index, section in enumerate(plan.get("sections", []) or []):
+        if not isinstance(section, dict):
+            continue
+        if nonempty(section.get("title")) and section["title"] not in outline:
+            errors.append(f"outline does not contain section title '{section['title']}'")
+        for concept in section.get("concepts") or []:
+            if isinstance(concept, dict) and nonempty(concept.get("name")) and normalize_text(concept["name"]) not in normalized:
+                errors.append(f"outline does not list concept '{concept['name']}' of sections[{index}]")
+        for label, text in hidden_texts(section):
+            if criterion_leaked(text, normalized):
+                errors.append(f"outline leaks {label} from sections[{index}]")
+    return errors
+
+
+def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
+    """Each non-deferred section needs units/<id>.md with its title, checkpoint and every concept; no leaks."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    deferred = deferred_section_ids(plan)
+    for index, section in enumerate(plan.get("sections", []) or []):
+        if not isinstance(section, dict) or not nonempty(section.get("id")):
+            continue
+        path = units_dir / f"{section['id']}.md"
+        if section["id"] in deferred:
+            if path.exists():
+                warnings.append(f"units/{section['id']}.md exists although the section is deferred")
+            continue
+        if not path.is_file():
+            errors.append(f"missing unit document units/{section['id']}.md")
+            continue
+        text = path.read_text(encoding="utf-8")
+        normalized = normalize_text(text)
+        if nonempty(section.get("title")) and section["title"] not in text:
+            errors.append(f"units/{section['id']}.md does not contain its title")
+        if "轮到你" not in text and "Your turn" not in text and "Checkpoint" not in text:
+            errors.append(f"units/{section['id']}.md must visibly include the learner checkpoint")
+        for concept in section.get("concepts") or []:
+            if isinstance(concept, dict) and nonempty(concept.get("name")) and normalize_text(concept["name"]) not in normalized:
+                errors.append(f"units/{section['id']}.md does not mention concept '{concept['name']}'")
+        for label, text_hidden in hidden_texts(section):
+            if label.startswith("rationale-layer"):
+                if criterion_leaked(text_hidden, normalized):
+                    warnings.append(f"units/{section['id']}.md prints {label} verbatim; it should drive questions, not be shown")
+            elif criterion_leaked(text_hidden, normalized):
+                errors.append(f"units/{section['id']}.md leaks {label}")
+    return errors, warnings
 
 
 def manifest_paths(manifest: Any) -> set[str]:
@@ -361,8 +576,12 @@ def load_json(path: Path) -> Any:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lesson_plan", type=Path)
-    parser.add_argument("--guide", type=Path)
+    parser.add_argument("--guide", type=Path, help="teaching-guide.md (schema 1.0/1.1 packs)")
+    parser.add_argument("--outline", type=Path, help="outline.md (schema 1.2 packs)")
+    parser.add_argument("--units-dir", type=Path, help="units/ directory (schema 1.2 packs)")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--sources-root", type=Path, help="Check coverage[] against the headings of the actual source files")
+    parser.add_argument("--allow-empty-coverage", action="store_true")
     return parser.parse_args()
 
 
@@ -371,12 +590,20 @@ def main() -> int:
     try:
         plan = load_json(args.lesson_plan)
         paths = manifest_paths(load_json(args.manifest)) if args.manifest else None
-        errors = validate_plan(plan, paths)
+        errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage)
         warnings = collect_warnings(plan)
         if args.guide:
             guide = args.guide.read_text(encoding="utf-8")
             errors.extend(validate_guide(guide, plan))
             warnings.extend(guide_warnings(guide, plan))
+        if args.outline:
+            errors.extend(validate_outline(args.outline.read_text(encoding="utf-8"), plan))
+        if args.units_dir:
+            unit_errors, unit_warnings = validate_units(args.units_dir, plan)
+            errors.extend(unit_errors)
+            warnings.extend(unit_warnings)
+        if args.sources_root and schema_version(plan) == "1.2":
+            errors.extend(validate_coverage_against_sources(plan, args.sources_root))
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}")
         return 2

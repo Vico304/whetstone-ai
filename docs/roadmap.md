@@ -42,6 +42,10 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 **P0-6 eval 集** — ✅ 2026-09-05 完成（`plugin/evals/`：材料清单、`score_pack.py`、CI 冒烟）
 `plugin/evals/` 三份小材料；build 与 teach 指标见 spec B §6。P0-0 之后、P0-3 之前建好——之后每一步的提示词改动都要能在它上面看到变化。
 
+## P0.5 — 课程规划（spec C，来自首个外部使用反馈）— ✅ 2026-09-07 完成
+
+使用者用 CoVE 规范（长材料）反馈"核心概念抓得准，但关键细节没涉及"。诊断与决策见 [specs/course-planning.md](specs/course-planning.md)。落地：schema 1.2（`mode`、概念 `role`、`deferred[]`、`coverage[]`、supporting `check`）；`outline.md` 取代 `teaching-guide.md`，unit 正文按份独立生成到 `units/`；大纲确认为必经停顿（`protocol/outline.md`）；快速模式在 assess / feedback / finish 各有分支；LRG 事件带 `rigor`，快速证据跨课打折；校验器对照真实来源标题检查账本；`score_pack` 增加角色、账本、units 指标。
+
 ## P1 — 在 P0 有数据之后
 
 **导出与可视化**：`export_graph.py` → `exports/graph.json` 与 Obsidian 目录（学科路径 = 目录，frontmatter 带时效与掌握估计）。先用 Obsidian graph 看一周，再决定是否做单文件 HTML。
