@@ -777,6 +777,7 @@ AI 可以维护更完整的章节结构，但不要求学习者一次重建全�
 
 本文档是当前的项目共识基线。仓库中与之配套的文档：
 
+- [`user-guide.md`](user-guide.md)：面向使用者的操作手册与示例；
 - [`design.md`](design.md)：项目中心思想的最小完整表达，供快速理解全貌；
 - [`learning-layers.md`](learning-layers.md)：四层理解与不透明原则的理念阐述；
 - [`specs/knowledge-store.md`](specs/knowledge-store.md)：持久化知识库数据结构定稿（schema 1.1）；

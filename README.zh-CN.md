@@ -34,6 +34,7 @@
 
 | 路径 | 内容 |
 |---|---|
+| [`docs/user-guide.md`](docs/user-guide.md) | **使用手册**：安装、目录约定、一门课的完整流程与示例对话、知识库、排错 |
 | [`docs/design.md`](docs/design.md) | 中心思想速览，一页读完 |
 | [`docs/consensus.md`](docs/consensus.md) | 规范性基线（v2），规则冲突时的唯一权威 |
 | [`docs/learning-layers.md`](docs/learning-layers.md) | 四层理解与不透明原则：系统为什么隐瞒高层 |
@@ -47,6 +48,8 @@
 文档是这个仓库的一等公民。如果你在构建 AI 学习工具，[共识约束](docs/consensus.md)和[证据评审](docs/reviews/evidence-review.md)可能比代码更有参考价值。
 
 ## 安装
+
+完整的操作手册与示例见 [`docs/user-guide.md`](docs/user-guide.md)。
 
 同一份技能目录，三个宿主：
 

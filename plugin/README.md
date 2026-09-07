@@ -77,6 +77,8 @@ Whetstone 框架（见仓库 [`docs/design.md`](../docs/design.md) 与 [`docs/co
 
 ## 使用示例
 
+更细的操作手册（含大纲确认、逐节回合、验收、细化、resume、快速模式的示例对话与排错）见仓库 [`docs/user-guide.md`](../docs/user-guide.md)。
+
 安装后不需要每次重复完整提示词，给出材料和目标即可。
 
 Codex：
