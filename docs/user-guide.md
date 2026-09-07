@@ -61,7 +61,9 @@ cp -r plugin/skills/guide plugin/skills/outline plugin/skills/learn plugin/skill
 
 ### Codex / DeepSeek Harness
 
-Codex 通过 `.codex-plugin/plugin.json` 作为插件安装，调用 `$guide / $outline / $learn / $clarify`；DeepSeek Harness 把 `plugin/skills/*` 拷到 `~/.agents/skills/`，调用 `/guide / /outline / /learn / /clarify`。
+Codex 通过 `.codex-plugin/plugin.json` 作为插件安装，调用 `$guide / $outline / $learn / $clarify`。
+
+DeepSeek Harness（dsh）按技能目录安装：仓库根目录执行 `./install_skills.sh ~/.agents/skills`（全局）或 `./install_skills.sh <project>/.agents/skills`（项目级，需有 `.git`）。dsh 只识别技能根下的一级子目录，四个技能必须平铺在同一根下（guide / outline 会引用同级的 learn 目录）。重启 dsh 后在 `/` 命令面板的 Skills 组里能看到，调用 `/guide / /outline / /learn / /clarify`。启动方式：`npx @deepseek-ai/dsh web`（浏览器打开 http://127.0.0.1:3080，Node 需 ≥ 22.19 或 ≥ 24），首次在 Settings → Models 填 DeepSeek API key，并用 Choose workspace 选中你的工作目录。
 
 ### 检查
 

@@ -183,8 +183,8 @@ python3 package_plugin.py            # 生成 ../dist/whetstone.plugin
 **DeepSeek Harness**：
 
 ```bash
-cp -r plugin/skills/guide plugin/skills/outline plugin/skills/learn plugin/skills/clarify ~/.agents/skills/
-# 或项目级：复制到 <project>/.agents/skills/
+./install_skills.sh ~/.agents/skills            # 全局；或项目级：./install_skills.sh <project>/.agents/skills
+# 等价于把 plugin/skills/{guide,outline,learn,clarify} 复制过去；dsh 只识别一级子目录，重启后在 / 里找 Skills 组
 ```
 
 **Codex**：通过个人 marketplace 安装本目录。
