@@ -15,13 +15,13 @@ description: Generate, discuss or revise the outline of one Whetstone course —
 
 ## 执行
 
-按 `learn` 技能的 `references/stages/outline.md`（位置见下）：范围 → 抽概念并标角色 → 覆盖账本 → 校验 → 呈现 → 一个问题（模式 + 取舍）→ 写回 `mode`、`deferred[]`、`outline_confirmed_at` → 再校验。修改模式下同样以确认结束并刷新 `outline_confirmed_at`。
+按 `learn` 技能的 `references/stages/outline.md`（位置见下）：范围 → 抽概念并标角色 → 覆盖账本 → 校验 → 呈现 → 一个问题（模式 + 取舍）→ 写回 `mode`、`deferred[]`、`outline_confirmed_at` → 再校验。档案 `orientation=domain` 且这门课在计划里是骨架课时，改按同目录的 `stages/skeleton.md`：按文件的证据池、原理依赖图切 unit、每个概念的材料落点、每 unit 一道原理探测题、分支候选表；落点比例只展示不设阈值。修改模式下同样以确认结束并刷新 `outline_confirmed_at`。
 
 大纲确认后若 `units/` 已存在且受影响（unit 被拆并、概念角色变化），报告哪些 unit 文档需要重生成，交给 `learn`；本技能不重生成。
 
 ## 阶段协议的位置
 
-- Claude Code 插件安装：`${CLAUDE_PLUGIN_ROOT}/skills/learn/references/stages/outline.md`，契约 `${CLAUDE_PLUGIN_ROOT}/skills/learn/references/lesson-contract.md`，校验器 `${CLAUDE_PLUGIN_ROOT}/skills/learn/scripts/validate_lesson.py`；
+- Claude Code 插件安装：`${CLAUDE_PLUGIN_ROOT}/skills/learn/references/stages/outline.md`（骨架课：同目录 `skeleton.md`），契约 `${CLAUDE_PLUGIN_ROOT}/skills/learn/references/lesson-contract.md`，校验器 `${CLAUDE_PLUGIN_ROOT}/skills/learn/scripts/validate_lesson.py`；
 - 个人技能目录安装：`${CLAUDE_SKILL_DIR}/../learn/...`；
 - 其他宿主：与本技能同级的 `learn` 技能目录。
 

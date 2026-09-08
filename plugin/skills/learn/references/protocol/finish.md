@@ -11,5 +11,13 @@
 
 最终总结应区分"已经解释成功""提示后成功""仍待复习""材料本身不确定"。注意：本课程内的成功多为即时或短延迟证据；对"已稳定理解"的表述应保留这一限定，真正的稳定证据来自之后 `resume` 的变式检索表现。总结时分别报告：已稳定理解、仍需复习、材料或机器参考的不确定处，以及最值得继续追查的来源。
 
+**骨架课**（`shape: skeleton`）多一步——分支决策，在最终总结之后：
+
+1. 呈现 `branch_candidates[]` 表：每条的对应原理、材料路径、`work_relevance`，以及本课中相关概念的验收结果（已稳定 / 仍需复习）；
+2. 问学习者要深入哪些分支、按什么顺序，也可以选"不深入，结束"；
+3. 写回 `lesson-plan.json`：选中的 `status: chosen`，其余 `candidate`（保留以后再选）或学习者明确不要的 `declined`；
+4. 每个选中的分支追加到 `learning-plan.md`（一门普通课程：`shape: branch`、`parent_course` = 本课 `lesson_id`、材料 = 候选的路径，取向回到 material，逐标题账本照常），给出它的 `learn` 调用语句；**不在这里生成分支课的大纲**——那是分支课自己的阶段 4；
+5. 分支课开始时，`index_match.py prerequisites` 会把骨架课已记录的概念视作已有证据（知识库开启时）。
+
 开启知识库时：整体重述与迁移题的作答分别用 `lrg_record.py append --kind final` 与 `--kind transfer` 记录（它们是迁移级证据）；结束后运行 `learner_state_build.py build` 重建学习者状态。
 

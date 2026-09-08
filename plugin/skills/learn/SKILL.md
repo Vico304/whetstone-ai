@@ -70,7 +70,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 0. 缺什么补什么（启动时静默判断）
 
-读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
+读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认；档案 `orientation=domain` 且这门课是骨架课时改读 [stages/skeleton.md](references/stages/skeleton.md)）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
 
 ### 1. 建立来源范围
 
@@ -83,7 +83,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 2. 检查并补足前置知识
 
-根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](references/prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[references/protocol/probe.md](references/protocol/probe.md)）。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](references/prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题；
@@ -107,7 +107,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-产出 `lesson-plan.json`（schema `1.2`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/stages/outline.md](references/stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.2`；骨架课与分支课用 `1.3`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/stages/outline.md](references/stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ### 4. 生成教学包：按 unit 逐份生成
 
@@ -115,7 +115,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 - `outline.md`：路线图与全部概念清单（已生成，按确认结果更新）；
 - `units/<section-id>.md`：**每个非 deferred 的 unit 一份，每份是一次独立生成**——只带该 unit 的来源定位去读原文，长度预算按 unit 计，不受整包限制；宿主支持并行子代理时可并行生成；生成后逐份运行 `validate_lesson.py <plan> --units-dir units/`；
-- `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本；
+- `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本（骨架课：证据池、概念落点、探测题、分支候选）；骨架课的每份 unit 文档末尾列出"这个原理在你的材料里的落点"（来自 `anchor`），且只引用 `pool` 里的 A 级定位；
 - `sources.json`：多文件输入时的来源清单；
 - `prerequisite-plan.json` / `prerequisite-progress.json` / `prerequisite-guide.md`：前置阶段产物（条件生成）；
 - `learning-progress.json`：进入教学时用 `scripts/learning_state.py init` 创建（deferred 的 unit 自动标为 `deferred`，不计入完成）。
@@ -149,7 +149,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 7. 完成课程
 
-最后要求学习者脱离小节顺序重述整体问题链，并完成一个新情境迁移问题。总结时分别报告：已稳定理解、仍需复习、材料或机器参考的不确定处，以及最值得继续追查的来源。
+最后要求学习者脱离小节顺序重述整体问题链，并完成一个新情境迁移问题。总结时分别报告：已稳定理解、仍需复习、材料或机器参考的不确定处，以及最值得继续追查的来源。骨架课在总结之后多一步分支决策（[references/protocol/finish.md](references/protocol/finish.md)）：学习者从分支候选表里选要深入的部分，每个分支追加为一门普通课程。
 
 ## 完成标准
 

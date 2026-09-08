@@ -10,7 +10,7 @@
 ├── prerequisite-plan.json       # 运行前置检查时创建
 ├── prerequisite-progress.json   # 前置作答、来源与桥接复测
 ├── prerequisite-guide.md        # 实际暴露缺口时创建
-├── lesson-plan.json             # schema 1.2
+├── lesson-plan.json             # schema 1.2（骨架课 / 分支课：1.3）
 ├── outline.md                   # 路线图 + 全部概念 + 覆盖账本（取代 teaching-guide.md）
 ├── units/                       # 每个非 deferred 的 unit 一份，独立生成
 │   └── <section-id>.md
@@ -95,6 +95,18 @@ explicit | entailed | pedagogical_inference | external | unsupported
 - 顶层 `deferred[]`：`[{type: "section"|"concept", id, reason}]`。快速模式略过的 unit、学习者选择略过的 unit 都在这里；deferred 的 section 不生成 `units/<id>.md`，`learning_state.py init` 把它标为 `deferred`，不计入完成，之后可补。
 - 顶层 `coverage[]`：`[{path, heading, disposition, section_id?, reason?}]`，`disposition ∈ core | supporting | listed | appendix | deferred | excluded`。材料的每个一级/二级标题都必须有一行；`core/supporting/listed/appendix` 需要 `section_id`，`deferred/excluded` 需要 `reason`。`validate_lesson.py --sources-root <材料根>` 会对照真实文件的标题逐条检查。**这是"绝不静默遗漏"的确定性保证。**
 
+### 1.3 新增：课程形态、证据池、落点、探测、分支候选（规格 D）
+
+只有骨架课与分支课写 `1.3`；1.2 的全部规则继续适用。
+
+- `shape`：`linear`（缺省）| `skeleton`（骨架课）| `branch`（分支课）；`parent_course` 仅 `branch` 必需，指向骨架课的 `lesson_id`。
+- `coverage[]` 在骨架课里按**文件/目录**记录：`heading: "*"` 表示整个路径；disposition 新增 `pool`（证据池，骨架课可引用）与 `reserve`（留给分支课，`reason` 可选）；`*` 只允许配 `pool / reserve / excluded`。`--sources-root` 对 `*` 路径跳过逐标题检查。分支课与普通课仍逐标题。
+- `concepts[].anchor`（骨架课的 `core / supporting` 必需）：`{path, locator}`（`path` 须在某个 `pool` 行之下，`locator` 规则同 `source_refs`）、`"external"`（材料里没有，原理必需）或 `"no-anchor"`（没找到落点；警告，学习者决定）。校验器打印 **grounding** = 有 A 级落点 / 全部 core+supporting，只作 INFO，**不设阈值**。
+- `sections[].probe`（骨架课每节必需）：`{prompt, criteria[{id,text,layer}], hint?}`，原理层、无提示；`criteria` 与 checkpoint 一样不进任何面向学习者的文档。
+- 顶层 `branch_candidates[]`（骨架课必需，≥ 1）：`{id, title, concept_ids[], materials[], work_relevance?, status: candidate|chosen|declined}`；`materials` 须在 `pool` 或 `reserve` 之下（no-anchor 候选可为空）。`outline.md` 必须列出每个候选的 `title`。
+- 骨架课的 `source_refs` 与 `anchor` 只指向 `pool` 里的 A 级材料；`final_challenge` 与迁移题只用学习者的实际材料。
+- 不设概念数、unit 数、探测题数上限；`> 9 sections` 的提醒对骨架课关闭。示例：`assets/skeleton-example/`。
+
 ## `outline.md`（1.2，取代 teaching-guide.md）
 
 面向学习者的路线图，也是大纲确认阶段呈现的东西。必含：
@@ -106,7 +118,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 5. 覆盖账本摘要：材料各部分 → 去处，`excluded` 附理由；
 6. 使用说明：unit 文档在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred。
 
-校验器检查：标题、模式、每个 section 标题、每个概念名都出现；criteria、`check.criteria`、`principle`、`meaning`、`tradeoffs` 都不出现。模板见 `assets/outline-template.md`。
+校验器检查：标题、模式、每个 section 标题、每个概念名都出现；criteria、`check.criteria`、`principle`、`meaning`、`tradeoffs` 都不出现。模板见 `assets/outline-template.md`。 骨架课另需：落点比例、每个概念的落点或 external / no-anchor 标记、分支候选表（校验器检查候选标题）、`probe.criteria` 不出现；模板见 `assets/skeleton-example/outline.md`。
 
 ## `units/<section-id>.md`（1.2）
 

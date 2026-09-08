@@ -17,9 +17,9 @@ description: Whetstone's wizard. Every invocation first asks whether the learner
 
 阶段协议只在 `learn` 技能里维护一份，本技能按顺序执行其中前三个阶段（协议路径见下）：
 
-1. **目标与背景** → `learner-profile.md`（已有则增量更新，只问缺的或要改的）
+1. **目标与背景** → `learner-profile.md`（已有则增量更新，只问缺的或要改的；顺带定取向 `orientation`：学这批材料本身 `material`，还是先学领域骨架课再选分支 `domain`）
 2. **材料评估** → `materials-survey.md/json`（材料是目录、多路径或 > 30 KB 时；单个小文件跳过）
-3. **学习计划** → `learning-plan.md`，**逐门确认**
+3. **学习计划** → `learning-plan.md`，**逐门确认**（取向 domain：骨架课 + 分支候选表，分支不在此确认）
 
 到此结束：报告三个文件的路径、第一门课是哪门、它的调用语句。**不生成大纲，不 build，不教学**——大纲由 `outline` 或 `learn` 在那门课开始时做。
 
@@ -27,7 +27,7 @@ description: Whetstone's wizard. Every invocation first asks whether the learner
 
 ## 阶段协议的位置
 
-- Claude Code 插件安装：`${CLAUDE_PLUGIN_ROOT}/skills/learn/references/stages/`（`_index.md`、`profile.md`、`triage.md`、`plan.md`），扫描脚本 `${CLAUDE_PLUGIN_ROOT}/skills/learn/scripts/survey_materials.py`；
+- Claude Code 插件安装：`${CLAUDE_PLUGIN_ROOT}/skills/learn/references/stages/`（`_index.md`、`profile.md`、`triage.md`、`plan.md`；取向为 domain 时 triage/plan 里各有一节），扫描脚本 `${CLAUDE_PLUGIN_ROOT}/skills/learn/scripts/survey_materials.py`；
 - 个人技能目录安装：`${CLAUDE_SKILL_DIR}/../learn/references/stages/`；
 - 其他宿主：与本技能同级的 `learn` 技能目录。
 

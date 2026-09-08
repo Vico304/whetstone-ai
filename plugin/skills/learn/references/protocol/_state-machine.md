@@ -24,6 +24,7 @@ ASSESS
 | 当前状态 | 读取 |
 |---|---|
 | build：大纲生成后、unit 生成前 | [../stages/outline.md](../stages/outline.md) |
+| 骨架课：units 生成后、第一个 READY 前 | [probe.md](probe.md) |
 | READY | [ready.md](ready.md) |
 | PREDICT | [predict.md](predict.md) |
 | DEEPEN | [deepen.md](deepen.md) |
