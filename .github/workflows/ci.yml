@@ -29,6 +29,9 @@ jobs:
             --outline skills/learn/assets/outline-template.md \
             --units-dir skills/learn/assets/units-template
           python3 skills/learn/scripts/validate_lesson.py \
+            skills/learn/assets/skeleton-example/lesson-plan.json \
+            --outline skills/learn/assets/skeleton-example/outline.md
+          python3 skills/learn/scripts/validate_lesson.py \
             examples/project-consensus/lesson-plan.json \
             --guide examples/project-consensus/teaching-guide.md \
             --manifest examples/project-consensus/sources.json
