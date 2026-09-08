@@ -6,10 +6,10 @@
 
 ```bash
 python3 "<learn 技能目录>/scripts/survey_materials.py" <目录> \
-  --output <工作区>/materials-survey.json --markdown <工作区>/materials-survey.md
+  --output <工作区>/survey/materials-survey.json --markdown <工作区>/survey/materials-survey.md
 ```
 
-脚本只读目录、文件名、大小、日期和每份文本文档的前 4 KB（取标题与信号），不复制内容；敏感文件只报告跳过。多个路径分别跑。
+脚本只读目录、文件名、大小、日期和每份文本文档的前 4 KB（取标题与信号），不复制内容；敏感文件只报告跳过；自动跳过 `whetstone/`、`.agents/`、`.obsidian/` 等工作区与宿主目录。多个路径分别跑，输出命名 `materials-survey-<名>.*`，再写一份汇总 `materials-survey.md`，都放在 `<工作区>/survey/`。
 
 ## 四级
 

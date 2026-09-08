@@ -2,7 +2,7 @@
 
 ## 产物
 
-文件模式的标准教学包包含：
+文件模式的标准教学包位于学习工作区 `<材料根>/whetstone/courses/<lesson-id>/`（工作区布局见 SKILL.md）：
 
 ```text
 <lesson-id>/

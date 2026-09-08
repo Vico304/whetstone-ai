@@ -13,7 +13,7 @@
 ```bash
 python3 --version                                    # 需要 ≥ 3.9
 python3 "<learn 技能目录>/scripts/validate_lesson.py" --help > /dev/null && echo ok
-ls <工作区>/store/store.json 2>/dev/null             # 有 → 知识库已初始化
+ls <材料根>/whetstone/store/store.json 2>/dev/null   # 有 → 知识库已初始化
 ```
 
 **三个问题**（一条消息问完，学习者可以只答一部分）：
@@ -34,7 +34,7 @@ ls <工作区>/store/store.json 2>/dev/null             # 有 → 知识库已�
 给两条可粘贴的语句（路径填实）：
 
 ```text
-/whetstone:learn 学习 <材料路径>，知识库目录 <目录>，课程目录 <工作区>/courses/<名>/。
+/whetstone:learn 学习 <材料路径>，知识库目录 <目录>，课程目录 <材料根>/whetstone/courses/<名>/。
 我希望学完后能 <目标>。
 ```
 

@@ -1,7 +1,7 @@
 # 学习计划（learning-plan.md）
 
 > 扫描目录：`{{root}}`　日期：{{date}}　目的：{{①学上游 / ②巩固自己做过的 / ③接手别人的}}
-> 由 guide 生成、逐门确认后写入；学习者可随时修改。它不是课程包；每门课开始时由 outline 阶段生成该课的大纲。清单原始数据见 `materials-survey.json`。
+> 由 guide 生成、逐门确认后写入；学习者可随时修改。它不是课程包；每门课开始时由 outline 阶段生成该课的大纲。清单原始数据见 `survey/materials-survey.json`。
 
 ## 1. 结论
 
@@ -28,7 +28,7 @@
 - 调用：
 
   ```text
-  /whetstone:learn 学习 {{路径列表}}，知识库目录 {{store}}，课程目录 {{courses/xxx}}/。
+  /whetstone:learn 学习 {{路径列表}}，知识库目录 {{store}}，课程目录 {{whetstone/courses/xxx}}/。
   我希望学完后能 {{目标}}。
   ```
 
@@ -56,8 +56,8 @@
 
 | 课程 | 状态 | 课程目录 |
 |---|---|---|
-| 1 | 未开始 | `courses/{{id}}/` |
+| 1 | 未开始 | `whetstone/courses/{{id}}/` |
 
 ## 6. 下一步
 
-复制课程 1 的调用语句开课；想先看或改大纲就 `/whetstone:outline courses/{{id}}/`。
+复制课程 1 的调用语句开课；想先看或改大纲就 `/whetstone:outline whetstone/courses/{{id}}/`。
