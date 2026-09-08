@@ -8,7 +8,7 @@
     {
       "name": "whetstone",
       "source": "./plugin",
-      "description": "Whetstone: guide (profile, material triage, course-by-course plan), outline (confirmed course outline), learn (full flow: plan → outline → per-unit build → section-by-section tutoring), clarify (Obsidian concept notes).",
+      "description": "Whetstone：guide（档案、材料评估、逐门确认的计划）、outline（确认过的课程大纲）、learn（完整流程：规划 → 大纲 → 按 unit 生成 → 逐节教学）、clarify（Obsidian 概念笔记）。",
       "category": "education"
     }
   ]

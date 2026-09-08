@@ -52,36 +52,63 @@ Documentation is a first-class citizen here. If you build AI learning tools, the
 
 ## Install
 
-Full manual with examples: [`docs/user-guide.md`](docs/user-guide.md) (Chinese).
-
-One skill directory, three hosts:
+Full manual with examples: [`docs/user-guide.md`](docs/user-guide.md) (Chinese). One skill directory, four hosts:
 
 | Host | Install | Invoke |
 |---|---|---|
-| Codex | install `plugin/` as a plugin (ships `.codex-plugin/`) | `$guide` / `$outline` / `$learn` / `$clarify` |
-| Claude Code (CLI) | `claude --plugin-dir ./plugin`, or `claude plugin marketplace add . && claude plugin install whetstone@whetstone-ai` | `/whetstone:learn` |
-| Claude Desktop (Code tab) | install via the CLI above (shared config), or copy `plugin/skills/*` into `~/.claude/skills/` | `/learn` |
-| DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/learn` |
+| Claude Code (CLI) | `claude plugin marketplace add /path/to/whetstone-ai && claude plugin install whetstone@whetstone-ai` (or ad hoc: `claude --plugin-dir ./plugin`) | `/whetstone:learn` … |
+| Claude Desktop | build `../dist/whetstone.plugin` with `python3 package_plugin.py` and upload it in the plugin manager; or `./install_skills.sh ~/.claude/skills` | `/learn` … |
+| DeepSeek Harness | `./install_skills.sh ~/.agents/skills` (global) or `./install_skills.sh <project>/.agents/skills`; restart `npx @deepseek-ai/dsh web` | `/learn` … |
+| Codex | install `plugin/` as a plugin (ships `.codex-plugin/`) | `$learn` … |
 
-## Use
+Type `/` in a session and you should see `guide / outline / learn / clarify` (descriptions are in Chinese — the skills teach in Chinese). Everything the system writes goes under `whetstone/` inside your materials directory (profile, plan, survey, `courses/`, optional store); the materials themselves are never written to.
 
-`learn` is the full flow and fills in whatever planning is missing — a cross-course learner profile, a triage of a messy directory (repos, generated notes, logs; graded primary / authored / generated-intermediate / noise) and a course-by-course confirmed plan, then the course outline. `guide` runs just the planning part and always asks first whether you want a tour or a plan; `outline` shows or revises one course's outline. AI-generated intermediates are never sources.
+## The four skills
 
-Start a course:
+| Skill | What it does | When |
+|---|---|---|
+| **learn** | Main entry. Fills in whatever is missing (profile → material triage → course-by-course confirmed plan → this course's outline), then builds one document per unit, diagnoses prerequisites (skeleton courses run a principle probe instead) and tutors section by section | Start or resume a course |
+| **guide** | Wizard. Always asks first: tour or plan? Planning = learner profile + material triage (A primary / B authored-and-verified / C generated intermediate / D noise) + a plan confirmed course by course. Plans only; never builds | First time; a messy directory; changing goals or the plan |
+| **outline** | Generate, discuss or revise one course's outline (problem chain, every concept with its role, coverage ledger, mode); writes back after confirmation. No units, no teaching | "Show me the outline", "split section 3", "promote this concept to core", "switch to fast mode" |
+| **clarify** | Turns `[[wikilinks]]` you leave in the pack into source-grounded, example-rich concept notes (Obsidian-compatible) | You hit a concept you don't understand |
+
+Two orthogonal choices are made while planning: **mode** `full` (every unit: predict → reconstruct → follow-up) / `fast` (narrower scope, tolerated vagueness, discounted evidence); **orientation** `material` (learn these materials, coverage ledger heading by heading) / `domain` (first a *skeleton course* of basic principles with the materials as an evidence pool, then learner-chosen branches from a candidate table, each becoming an ordinary course).
+
+### Case 1: one spec, start directly (material orientation)
 
 ```text
-Use the learn skill to learn these materials:
-- /path/to/document.md
-- /path/to/repository
-
-I want to be able to explain the core design and apply it to new problems.
+/whetstone:learn learn src/threatmodel.adoc, course directory whetstone/courses/c2-threatmodel/.
+Afterwards I want to state the adversary model by category and map each threat to an architectural mechanism.
 ```
 
-It analyzes the material, diagnoses prerequisite gaps (one question at a time), researches cited supplements where needed, then generates and teaches the course section by section. To resume after a break, open a new session and say "resume my course" — progress lives in the lesson pack's JSON files.
+It reads the material → produces the outline and **stops** for your confirmation (mode; units to skip or deepen) → generates `units/s01.md …` one at a time → diagnoses prerequisites one question at a time → tutors. The coverage ledger is checked against every heading of the real source, so omissions fail validation — which is why details like page faults and timer interrupts in the CoVE spec no longer get squeezed into one line. To resume, open a new session and say "resume my course".
 
-Hit an unfamiliar concept? Write `[[concept-name]]` anywhere in the lesson pack, or drop it into `concepts/_inbox.md`, then invoke `clarify` (`$clarify` in Codex). It scans unresolved links and writes one source-grounded note per concept — what problem it solves, mechanism, two examples, boundaries and common misconceptions, cross-links to related concepts and back to the teaching guide. Open the lesson pack in Obsidian and the wikilinks and graph just work.
+### Case 2: a directory with 3 repositories and a dozen AI-generated documents (domain orientation)
 
-Section too shallow? Before answering its main question, say "deepen this section" — it generates a `zoom/` document covering the section's internal concepts in more detail, then returns you to the main question. Deepening prepares for the check; it never replaces it.
+```text
+/whetstone:guide
+→ Plan. Directory ~/Project/tee; I want to rebuild my understanding of confidential computing, not just learn Occlum.
+```
+
+The wizard records the profile (orientation = domain), surveys and grades the directory: upstream repos and official docs are the A-level evidence pool, your own verified design docs are B-level and reserved for branch courses, session summaries and handoffs are C-level and **never sources**, logs are D-level and excluded. The plan is one skeleton course plus a branch-candidate table. In the skeleton outline every concept carries its **anchor** in your materials (e.g. `occlum/docs/fs_overview.md · ## SEFS`); the validator prints the grounding ratio but sets no threshold — you judge whether it drifted. After confirmation a **probe round** runs (one no-hint principle question per unit; you decide whether passed units are skipped), and at the end you pick branches.
+
+### Case 3: just revise the outline
+
+```text
+/whetstone:outline whetstone/courses/c3-refarch/ split section 5 in two and promote "interrupt and exception delegation" to core
+```
+
+It re-validates, asks for confirmation again, and marks affected unit documents for regeneration on the next `learn`.
+
+### Case 4: an unfamiliar concept mid-course
+
+Write `[[G-stage page table]]` in any unit document, or drop it into `whetstone/courses/<id>/concepts/_inbox.md`, then `/whetstone:clarify`. Each concept gets a note: the problem it solves, mechanism, two examples, boundaries and misconceptions, links to related concepts and back to its unit. Open `whetstone/` in Obsidian and the wikilinks and graph just work.
+
+Section too shallow? Before answering its main question say "deepen this section" — it writes a `zoom/` document and returns you to the question. Deepening prepares for the check; it never replaces it.
+
+### Optional: the knowledge store
+
+Name a persistent directory in the profile and courses accumulate across time: a layered machine reference graph (MRG; upper layers never shown) and your append-only, invisible learner log (LRG). The next course replaces diagnosis with variant questions for concepts you already hold, fast-mode evidence is discounted, and past errors come back de-personalised as anonymous propositions for review. See [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md).
 
 Verify locally:
 

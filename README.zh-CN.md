@@ -44,42 +44,69 @@
 | [`docs/specs/domain-skeleton.md`](docs/specs/domain-skeleton.md) | 学习取向（material / domain）、以证据池为落点的骨架课、原理探测、学习者选择的分支（schema 1.3） |
 | [`docs/roadmap.md`](docs/roadmap.md) | 当前进度与下一步 |
 | [`docs/reviews/`](docs/reviews/) | 学习科学证据评审，带效应量与文献出处 |
-| [`plugin/`](plugin/) | 可运行的技能插件，同一份技能目录适配三个宿主 |
+| [`plugin/`](plugin/) | 可运行的技能插件，同一份技能目录适配四个宿主 |
 
 文档是这个仓库的一等公民。如果你在构建 AI 学习工具，[共识约束](docs/consensus.md)和[证据评审](docs/reviews/evidence-review.md)可能比代码更有参考价值。
 
 ## 安装
 
-完整的操作手册与示例见 [`docs/user-guide.md`](docs/user-guide.md)。
-
-同一份技能目录，三个宿主：
+完整的操作手册与示例见 [`docs/user-guide.md`](docs/user-guide.md)。同一份技能目录，四个宿主：
 
 | 宿主 | 安装 | 调用 |
 |---|---|---|
-| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$guide` / `$outline` / `$learn` / `$clarify` |
-| Claude Code（CLI） | `claude --plugin-dir ./plugin`，或 `claude plugin marketplace add . && claude plugin install whetstone@whetstone-ai` | `/whetstone:learn` |
-| Claude Desktop（Code 标签页） | 先在终端用上面的命令安装（共用配置），或把 `plugin/skills/*` 复制到 `~/.claude/skills/` | `/learn` |
-| DeepSeek Harness | `cp -r plugin/skills/* ~/.agents/skills/` | `/learn` |
+| Claude Code（终端 CLI） | `claude plugin marketplace add /path/to/whetstone-ai && claude plugin install whetstone@whetstone-ai`（或临时：`claude --plugin-dir ./plugin`） | `/whetstone:learn` 等 |
+| Claude Desktop | 用 `python3 package_plugin.py` 打出 `../dist/whetstone.plugin`，在插件管理器里上传；或 `./install_skills.sh ~/.claude/skills` | `/learn` 等 |
+| DeepSeek Harness | `./install_skills.sh ~/.agents/skills`（全局）或 `./install_skills.sh <项目>/.agents/skills`；重启 `npx @deepseek-ai/dsh web` | `/learn` 等 |
+| Codex | 把 `plugin/` 作为插件安装（含 `.codex-plugin/`） | `$learn` 等 |
 
-## 使用
+安装后在对话里输入 `/`，能看到 `guide / outline / learn / clarify` 四个技能（描述为中文）即可。系统写出的一切都放在材料根目录下的 `whetstone/`（档案、计划、材料清点、`courses/`、可选的知识库），你的材料目录本身不会被写入。
 
-`learn` 是完整流程，缺什么规划就补什么——跨课的学习者档案、混杂目录的材料评估（源码仓库、生成笔记、日志；定级为一手 / 自著已核实 / 生成中间物 / 噪声）、逐门确认的学习计划，再到本课大纲。`guide` 只做规划，每次都先问你想了解怎么用还是要规划；`outline` 单独查看或修改某门课的大纲。生成的中间文档永远不当来源。
+## 四个技能怎么用
 
-开始一门课：
+| 技能 | 做什么 | 什么时候用 |
+|---|---|---|
+| **learn** | 总入口：缺什么补什么（档案 → 材料评估 → 逐门确认计划 → 本课大纲），确认后按 unit 生成文档，前置诊断（骨架课改为原理探测），然后逐节教学 | 开一门课、继续一门课 |
+| **guide** | 向导：先问"想知道怎么用，还是规划学习？"；规划 = 学习者档案 + 材料评估（定级 A 一手 / B 自著已核实 / C 生成中间物 / D 噪声）+ 逐门确认的学习计划；只规划不建课 | 第一次用；材料太多太杂；想改目标或计划 |
+| **outline** | 生成、讨论、修改一门课的大纲（问题链、全部概念与角色、覆盖账本、模式），确认后写回；不生成 unit、不教学 | 想先看大纲；"把第 3 节拆开""这个概念升成 core""改成快速模式" |
+| **clarify** | 把学习包里你标了 `[[双链]]` 的概念写成有来源、多例子的笔记（Obsidian 兼容） | 学习中遇到不懂的概念 |
+
+两条正交的选择在规划阶段决定：**模式** `full`（每个 unit 预测 → 重建 → 追问）/ `fast`（缩范围、容忍模糊，证据打折）；**取向** `material`（学这批材料本身，按标题逐条覆盖）/ `domain`（先学一门只讲基本原理的骨架课，材料作证据池，学完从"分支候选表"选方向深入，每个分支再变成一门普通课）。
+
+### 案例 1：一份规范，直接开课（material 取向）
 
 ```text
-使用 learn 技能学习这些材料：
-- /path/to/document.md
-- /path/to/repository
-
-我希望学完后能够：解释核心设计，并应用到新问题。
+/whetstone:learn 学习 src/threatmodel.adoc，课程目录 whetstone/courses/c2-threatmodel/。
+我希望学完后能分类陈述敌手模型，并说出每类威胁对应哪个架构机制。
 ```
 
-它会先分析材料、诊断前置知识缺口（一次一题）、必要时联网补充，然后生成课程并逐节教学。中断后重开新会话说"继续我的课程"即可——进度存在学习包的 JSON 里。
+它读材料 → 出大纲并**停下**让你确认（模式、想略过或加深的 unit）→ 逐 unit 生成 `units/s01.md …` → 前置诊断（一次一题）→ 逐节教学。覆盖账本对照原文每个标题，遗漏会被校验器报错——这就是为什么 CoVE 规范里的 page fault 与时钟中断这类细节不再被"压成一行"。中断后新开会话说"继续我的课程"。
 
-遇到不懂的概念：在学习包任何文档里写 `[[概念名]]`，或丢进 `concepts/_inbox.md`，然后调用 `clarify`（Codex 里是 `$clarify`）。它会扫描所有未解决的链接，为每个概念生成一份笔记：解决什么问题、机制、两个例子、边界与常见误解、相关概念双链、回链到教学指南的对应小节。学习包目录用 Obsidian 打开，双链和关系图直接可用。
+### 案例 2：一个目录里有 3 个仓库 + 十几份 AI 生成的文档（domain 取向）
 
-某一节讲得太粗、想深入：在回答该节主问题前说"想先细化这节"，它会针对本节衍生概念生成一份 `zoom/` 文档，读完再回来答主问题——细化是准备，不替代检验。
+```text
+/whetstone:guide
+→ 规划。目录 ~/Project/tee；我想从头巩固可信计算，不只是学 Occlum。
+```
+
+向导先记档案（取向定为 domain），扫描目录并定级：上游仓库与官方 docs 是 A 级证据池，你自己写并核实过的方案是 B 级留给分支课，会话总结与交接文档是 C 级**永不作来源**，日志是 D 级排除。计划 = 一门骨架课 + 分支候选表。骨架课大纲里每个概念都标出它在你材料里的**落点**（如 `occlum/docs/fs_overview.md · ## SEFS`），校验器打印落点比例但不设阈值——漂不漂由你判断。确认后先做一轮**原理探测**（每 unit 一道无提示题，答对的 unit 由你决定跳不跳），学完在结课时选分支。
+
+### 案例 3：只改大纲
+
+```text
+/whetstone:outline whetstone/courses/c3-refarch/ 把第 5 节拆成两节，"中断与异常的委托路由"升成 core
+```
+
+改后重新校验、再确认一次；受影响的 unit 文档标为需重生成，下次 `learn` 处理。
+
+### 案例 4：学习中遇到不懂的概念
+
+在任何 unit 文档里写 `[[G-stage 页表]]`，或丢进 `whetstone/courses/<id>/concepts/_inbox.md`，然后 `/whetstone:clarify`。每个概念得到一份笔记：解决什么问题、机制、两个例子、边界与常见误解、相关概念双链、回链到对应 unit。用 Obsidian 打开 `whetstone/`，双链和关系图直接可用。
+
+某一节讲得太粗、想深入：在回答该节主问题前说"想先细化这节"，它生成一份 `zoom/` 文档，读完再回来答——细化是准备，不替代检验。
+
+### 可选：知识库
+
+在档案里指定一个持久目录，课程的机器参考图（MRG，分层，高层永不展示）与你的学习记录（LRG，只追加、不可见）会跨课累积：下一门课命中你已学过的概念时用变式题代替诊断，快速模式的证据跨课打折，复习时把旧错误去主体化为匿名命题。细节见 [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md)。
 
 本地验证：
 
