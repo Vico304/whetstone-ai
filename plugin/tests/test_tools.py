@@ -1031,3 +1031,108 @@ class ScanWikilinksTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SKELETON_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "lesson-plan.json"
+SKELETON_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "outline.md"
+
+
+def load_skeleton():
+    return json.loads(SKELETON_PLAN.read_text(encoding="utf-8"))
+
+
+class SkeletonCourseTests(unittest.TestCase):
+    """Schema 1.3 (spec D): shape, evidence pool, anchors, probes, branch candidates."""
+
+    def test_example_skeleton_validates_and_reports_grounding(self):
+        plan = load_skeleton()
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+        self.assertEqual(validate_lesson.validate_outline(SKELETON_OUTLINE.read_text(encoding="utf-8"), plan), [])
+        self.assertEqual(validate_lesson.plan_shape(plan), "skeleton")
+        self.assertEqual(validate_lesson.grounding(plan), {"anchored": 3, "external": 1, "no_anchor": 1, "total": 5})
+        warnings = validate_lesson.collect_warnings(plan)
+        self.assertTrue(any("no anchor" in w for w in warnings), warnings)
+        # no section-count advisory for skeleton courses: size follows the domain, not a cap
+        plan["sections"] = plan["sections"] * 6
+        self.assertFalse(any("sections (>" in w for w in validate_lesson.collect_warnings(plan)))
+
+    def test_skeleton_requirements_are_enforced(self):
+        plan = load_skeleton()
+        del plan["sections"][0]["probe"]
+        del plan["sections"][0]["concepts"][0]["anchor"]
+        plan["sections"][1]["concepts"][0]["anchor"] = {"path": "teeapp/src/ra", "locator": "verify"}  # reserve, not pool
+        plan["branch_candidates"][0]["concept_ids"].append("cs.tee.nonexistent")
+        plan["branch_candidates"][1]["materials"] = ["somewhere/else"]
+        plan["coverage"].append({"path": "occlum/README.md", "heading": "*", "disposition": "core", "section_id": "s01"})
+        errors = validate_lesson.validate_plan(plan)
+        for needle in ("sections[0].probe is required", "concepts[0].anchor is required",
+                       "not under any coverage row with disposition 'pool'", "unknown concept 'cs.tee.nonexistent'",
+                       "'somewhere/else' is not under any 'pool' or 'reserve'", "heading '*' (whole file) is only allowed"):
+            self.assertTrue(any(needle in e for e in errors), (needle, errors))
+
+    def test_skeleton_fields_are_rejected_elsewhere(self):
+        plan = load_skeleton()
+        plan["shape"] = "linear"
+        errors = validate_lesson.validate_plan(plan)
+        for needle in ("probe is only allowed in skeleton", "anchor is only allowed in skeleton",
+                       "branch_candidates is only allowed in skeleton", "disposition 'pool' is only allowed"):
+            self.assertTrue(any(needle in e for e in errors), (needle, errors))
+        plan = load_skeleton()
+        plan["shape"] = "branch"
+        errors = validate_lesson.validate_plan(plan)
+        self.assertTrue(any("parent_course must name the skeleton course" in e for e in errors), errors)
+        old = load_template()
+        old["shape"] = "skeleton"
+        self.assertTrue(any("requires schema_version '1.3'" in e for e in validate_lesson.validate_plan(old)))
+
+    def test_probe_criteria_never_leak_into_outline(self):
+        plan = load_skeleton()
+        outline = SKELETON_OUTLINE.read_text(encoding="utf-8")
+        leaked = outline + "\n" + plan["sections"][0]["probe"]["criteria"][0]["text"]
+        errors = validate_lesson.validate_outline(leaked, plan)
+        self.assertTrue(any("probe criterion" in e for e in errors), errors)
+        errors = validate_lesson.validate_outline(outline.replace("分支：项目里的远程证明链路", "x"), plan)
+        self.assertTrue(any("branch candidate" in e for e in errors), errors)
+
+    def test_wholesale_coverage_skips_heading_check(self):
+        plan = load_skeleton()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "occlum" / "docs").mkdir(parents=True)
+            (root / "occlum" / "docs" / "ra.md").write_text("## Remote attestation\n\n## Something uncovered\n", encoding="utf-8")
+            plan["sections"][1]["source_refs"][0]["path"] = "occlum/docs/ra.md"
+            self.assertEqual(validate_lesson.validate_coverage_against_sources(plan, root), [])
+            plan["coverage"][0]["heading"] = "Overview"  # no longer wholesale
+            plan["coverage"][0]["disposition"] = "excluded"
+            plan["coverage"][0]["reason"] = "x"
+            errors = validate_lesson.validate_coverage_against_sources(plan, root)
+            self.assertTrue(any("Something uncovered" in e for e in errors), errors)
+
+    def test_export_carries_anchors_and_branches(self):
+        public, deep = mrg_export.export(load_skeleton())
+        self.assertEqual(public["shape"], "skeleton")
+        self.assertEqual(public["grounding"]["anchored"], 3)
+        self.assertEqual([b["id"] for b in public["branch_candidates"]], ["b1", "b2"])
+        nodes = {n["id"]: n for n in public["nodes"]}
+        self.assertEqual(nodes["cs.tee.enclave"]["anchor"], "anchored")
+        self.assertTrue(any(r.get("note") == "skeleton anchor" for r in nodes["cs.tee.enclave"]["source_refs"]))
+        self.assertEqual(nodes["cs.tee.trust-root"]["anchor"], "external")
+        self.assertEqual(public["sections"][0]["probe_prompt"], load_skeleton()["sections"][0]["probe"]["prompt"])
+
+    def test_defer_after_probe_and_probe_kind(self):
+        state = learning_state.create_state(load_skeleton())
+        learning_state.defer_section(state, "s01", "原理探测通过，学习者选择跳过")
+        self.assertEqual(state["current_section_id"], "s02")
+        self.assertEqual(state["sections"][0]["status"], "deferred")
+        with self.assertRaises(ValueError):
+            learning_state.defer_section(state, "s01", "again")
+        learning_state.append_attempt(state, "s02", "r", "", "mastered", None)
+        with self.assertRaises(ValueError):
+            learning_state.defer_section(state, "s02", "has attempts")
+        self.assertEqual(state["status"], "completed")
+        event = lrg_record.build_event(
+            lesson_id="tee-skeleton-1", section_id="s01", kind="probe", attempt_number=1, response="r", feedback="",
+            verdict="mastered", confidence=None, criteria_met=["p1", "p2"], depth_reached="rationale",
+            extraction=None, comparison=None, elapsed_seconds=None,
+        )
+        self.assertEqual(event["evidence_tier"], "immediate")
