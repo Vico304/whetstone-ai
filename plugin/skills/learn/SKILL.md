@@ -115,7 +115,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 - `outline.md`：路线图与全部概念清单（已生成，按确认结果更新）；
 - `units/<section-id>.md`：**每个非 deferred 的 unit 一份，每份是一次独立生成**——只带该 unit 的来源定位去读原文，长度预算按 unit 计，不受整包限制；宿主支持并行子代理时可并行生成；生成后逐份运行 `validate_lesson.py <plan> --units-dir units/`；
-- `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本（骨架课：证据池、概念落点、探测题、分支候选）；骨架课的每份 unit 文档末尾列出"这个原理在你的材料里的落点"（来自 `anchor`），且只引用 `pool` 里的 A 级定位；
+- `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本（骨架课：证据池、概念落点、探测题、分支候选）；骨架课的每份 unit 文档末尾列出"这个原理在你的材料里的落点"（来自 `anchor`），且只引用 `pool` 里的 A 级定位；unit 文档的"轮到你"**原样放 `checkpoint.prompt`**，探测题 `probe.prompt` 不进 unit（校验器对两者都检查）；
 - `sources.json`：多文件输入时的来源清单；
 - `prerequisite-plan.json` / `prerequisite-progress.json` / `prerequisite-guide.md`：前置阶段产物（条件生成）；
 - `learning-progress.json`：进入教学时用 `scripts/learning_state.py init` 创建（deferred 的 unit 自动标为 `deferred`，不计入完成）。

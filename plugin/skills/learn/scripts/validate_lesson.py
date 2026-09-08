@@ -670,6 +670,12 @@ def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
             errors.append(f"units/{section['id']}.md does not contain its title")
         if "轮到你" not in text and "Your turn" not in text and "Checkpoint" not in text:
             errors.append(f"units/{section['id']}.md must visibly include the learner checkpoint")
+        checkpoint_prompt = (section.get("checkpoint") or {}).get("prompt") if isinstance(section.get("checkpoint"), dict) else None
+        if nonempty(checkpoint_prompt) and not criterion_leaked(checkpoint_prompt, normalized):
+            errors.append(f"units/{section['id']}.md does not contain its checkpoint.prompt (the visible question must be the checkpoint, not a rewrite)")
+        probe_prompt = (section.get("probe") or {}).get("prompt") if isinstance(section.get("probe"), dict) else None
+        if nonempty(probe_prompt) and criterion_leaked(probe_prompt, normalized):
+            errors.append(f"units/{section['id']}.md contains the probe question; probes are asked no-hint before teaching and never printed in unit documents")
         for concept in section.get("concepts") or []:
             if isinstance(concept, dict) and nonempty(concept.get("name")) and normalize_text(concept["name"]) not in normalized:
                 errors.append(f"units/{section['id']}.md does not mention concept '{concept['name']}'")
