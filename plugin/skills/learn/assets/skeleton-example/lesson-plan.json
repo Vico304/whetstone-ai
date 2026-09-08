@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.3",
+  "shape": "skeleton",
+  "parent_course": null,
+  "lesson_id": "tee-skeleton-1",
+  "title": "示例骨架课：可信执行环境的基本原理",
+  "learning_goal": "不看任何具体实现，能解释 TEE 为什么需要隔离、度量与远程证明三件事，以及它们如何互相依赖；学完后能判断自己的材料里哪一块对应哪个原理。",
+  "mode": "full",
+  "outline_confirmed_at": null,
+  "source_manifest": "sources.json",
+  "big_picture": {
+    "problem": "在一台由他人控制的机器上运行代码时，如何让远端相信代码没有被篡改、数据没有被窥视？",
+    "outcome": "能把隔离、度量、证明三条原理串成一条因果链，并指出每条原理在自己的代码库和文档里的落点。",
+    "system_map": ["硬件隔离出受保护区域", "加载时对受保护区域做度量", "把度量值连同硬件签名发给远端", "远端核对度量与签名后才交付密钥"]
+  },
+  "sections": [
+    {
+      "id": "s01",
+      "title": "隔离：为什么特权软件也不能看",
+      "depends_on": [],
+      "problem": "操作系统和虚拟机监控器拥有最高特权，任何依赖它们诚实的方案都会在它们被攻破时失效。",
+      "solution": "由硬件划出一块内存区域，特权软件也只能看到密文或被拒绝访问。",
+      "mechanism": "处理器在地址翻译和缓存路径上检查访问来源；区域外的访问被拒绝或只得到加密内容。",
+      "meaning": "信任根从软件栈下移到硬件，攻击面缩小到处理器与其固件。",
+      "tradeoffs": ["受保护区域内不能直接做系统调用", "侧信道不在威胁模型内"],
+      "principle": "把信任根放到攻击者改不了的层，而不是要求每一层都诚实。",
+      "new_problem": "区域是隔离了，可远端怎么知道里面装的是哪段代码？",
+      "concepts": [
+        {"id": "cs.tee.enclave", "name": "Enclave", "aliases": ["飞地", "受保护区域"], "layer": "mechanism", "domain_path": ["计算机科学", "可信计算"], "explanation": "硬件隔离出的执行区域，特权软件不能读写其内容", "role": "core",
+         "anchor": {"path": "occlum/docs", "locator": "## Overview / enclave"}},
+        {"id": "cs.tee.trust-root", "name": "信任根", "aliases": ["root of trust"], "layer": "mechanism", "domain_path": ["计算机科学", "可信计算"], "explanation": "整个信任链最底层、被假定不可篡改的部件", "role": "supporting",
+         "anchor": "external",
+         "check": {"prompt": "如果把信任根放在操作系统内核，隔离方案会在哪种情况下失效？", "criteria": [{"id": "k1", "text": "指出内核被攻破时假设不成立", "layer": "mechanism"}], "hint": "想一想谁能修改内核。"}},
+        {"id": "cs.tee.side-channel", "name": "侧信道", "aliases": [], "layer": "fact", "domain_path": ["计算机科学", "安全"], "explanation": "通过时间、缓存等间接信息泄露秘密的通道", "role": "listed"}
+      ],
+      "source_refs": [{"path": "occlum/docs", "locator": "## Overview", "support": "explicit", "note": "LibOS 在 enclave 内运行的总体说明"}],
+      "probe": {"prompt": "不看材料：为什么只靠操作系统的权限检查不足以保护一段代码的数据？硬件隔离改变了什么？", "criteria": [{"id": "p1", "text": "指出特权软件本身可能被攻破", "layer": "rationale"}, {"id": "p2", "text": "说明信任根下移到硬件", "layer": "mechanism"}]},
+      "checkpoint": {"prompt": "解释 enclave 内的内存对操作系统为什么是不可见的，以及这一点依赖什么假设。", "criteria": [{"id": "c1", "text": "说明访问检查发生在硬件路径上", "layer": "mechanism"}, {"id": "c2", "text": "指出假设是处理器与固件可信", "layer": "rationale"}], "hint": "从地址翻译的位置想起。"}
+    },
+    {
+      "id": "s02",
+      "title": "度量与证明：让远端相信里面装的是什么",
+      "depends_on": ["s01"],
+      "problem": "隔离保证了外面看不见里面，但远端仍不知道里面运行的是不是它期望的代码。",
+      "solution": "加载时由硬件对区域内容做哈希（度量），再用只有硬件持有的密钥对度量签名，交给远端核对。",
+      "mechanism": "度量值由加载顺序与内容决定；签名密钥由硬件派生；远端用厂商证书链验证签名，再比对度量值。",
+      "meaning": "'我是谁'不再由软件自述，而由硬件替它作证。",
+      "tradeoffs": ["度量只能证明启动时的状态", "证书链依赖厂商基础设施"],
+      "principle": "把'身份'定义为可复现的内容哈希，而不是名字。",
+      "new_problem": null,
+      "concepts": [
+        {"id": "cs.tee.measurement", "name": "度量", "aliases": ["measurement", "MRENCLAVE"], "layer": "mechanism", "domain_path": ["计算机科学", "可信计算"], "explanation": "对受保护区域内容做的哈希，作为其身份", "role": "core",
+         "anchor": {"path": "occlum/docs", "locator": "## Remote attestation / MRENCLAVE"}},
+        {"id": "cs.tee.remote-attestation", "name": "远程证明", "aliases": ["RA", "attestation"], "layer": "mechanism", "domain_path": ["计算机科学", "可信计算"], "explanation": "把度量与硬件签名交给远端核对的过程", "role": "core",
+         "anchor": {"path": "occlum/docs", "locator": "## Remote attestation"}},
+        {"id": "cs.tee.quote", "name": "Quote", "aliases": [], "layer": "fact", "domain_path": ["计算机科学", "可信计算"], "explanation": "带硬件签名的度量报告", "role": "supporting",
+         "anchor": "no-anchor",
+         "check": {"prompt": "Quote 里必须包含什么，远端才能既验证来源又验证内容？", "criteria": [{"id": "k1", "text": "指出度量值与硬件签名两部分", "layer": "mechanism"}], "hint": "分'谁签的'和'签了什么'。"}}
+      ],
+      "source_refs": [{"path": "occlum/docs", "locator": "## Remote attestation", "support": "explicit", "note": "RA 流程"}],
+      "probe": {"prompt": "不看材料：远端只拿到一段哈希值，凭什么相信它来自真实硬件而不是伪造的？", "criteria": [{"id": "p1", "text": "指出需要硬件持有的密钥签名", "layer": "mechanism"}, {"id": "p2", "text": "指出签名需经厂商证书链验证", "layer": "mechanism"}]},
+      "checkpoint": {"prompt": "把隔离、度量、证明串成一条因果链：每一步为什么需要前一步？", "criteria": [{"id": "c1", "text": "说明度量依赖隔离保证内容不被改", "layer": "mechanism"}, {"id": "c2", "text": "说明证明依赖度量提供身份", "layer": "mechanism"}], "hint": "从'远端最终想知道什么'倒推。"}
+    }
+  ],
+  "relations": [
+    {"id": "r1", "from": "cs.tee.enclave", "to": "cs.tee.measurement", "type": "enables", "layer": "mechanism", "source_refs": [{"path": "occlum/docs", "locator": "## Remote attestation", "support": "entailed", "note": "度量的对象是 enclave 内容"}]},
+    {"id": "r2", "from": "cs.tee.measurement", "to": "cs.tee.remote-attestation", "type": "prerequisite_for", "layer": "mechanism", "source_refs": [{"path": "occlum/docs", "locator": "## Remote attestation", "support": "pedagogical_inference", "note": "教学顺序"}]}
+  ],
+  "deferred": [],
+  "coverage": [
+    {"path": "occlum/docs", "heading": "*", "disposition": "pool"},
+    {"path": "occlum/src/libos", "heading": "*", "disposition": "pool"},
+    {"path": "teeapp/src/ra", "heading": "*", "disposition": "reserve", "reason": "留给分支课：实际项目的 RA 链路"},
+    {"path": "文档/会话交接-0903.md", "heading": "*", "disposition": "excluded", "reason": "C 级生成中间物，只作出题背景"}
+  ],
+  "branch_candidates": [
+    {"id": "b1", "title": "分支：项目里的远程证明链路", "concept_ids": ["cs.tee.remote-attestation", "cs.tee.measurement"], "materials": ["teeapp/src/ra"], "work_relevance": "你负责的 RA 服务端校验逻辑", "status": "candidate"},
+    {"id": "b2", "title": "分支：LibOS 如何在 enclave 里提供系统调用", "concept_ids": ["cs.tee.enclave"], "materials": ["occlum/src/libos"], "status": "candidate"}
+  ],
+  "final_challenge": {
+    "prompt": "用你自己的项目为例，说明如果去掉远程证明这一步，哪些安全保证会失效、哪些仍然成立。",
+    "criteria": ["区分隔离保证与证明保证", "指出密钥交付依赖证明", "落到自己材料中的具体模块"]
+  },
+  "uncertainties": ["Quote 的具体字段在不同 TEE 上不同，骨架课不展开"]
+}

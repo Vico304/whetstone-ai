@@ -11,10 +11,15 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
-SCHEMA_VERSIONS = {"1.0", "1.1", "1.2"}
+SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3"}
+ROLE_AWARE_VERSIONS = {"1.2", "1.3"}  # course-planning (spec C) fields
+SHAPES = {"linear", "skeleton", "branch"}
+ANCHOR_MARKERS = {"external", "no-anchor"}
+BRANCH_STATUSES = {"candidate", "chosen", "declined"}
 MODES = {"full", "fast"}
 ROLES = ("core", "supporting", "listed")
-DISPOSITIONS = {"core", "supporting", "listed", "appendix", "deferred", "excluded"}
+DISPOSITIONS = {"core", "supporting", "listed", "appendix", "deferred", "excluded", "pool", "reserve"}
+FILE_LEVEL_DISPOSITIONS = {"pool", "reserve", "excluded"}  # may use heading "*" (skeleton courses)
 MAX_SUPPORTING_PER_SECTION = 6
 MAX_LISTED_EXPLANATION_CHARS = 200
 HEADING_MD = re.compile(r"^(#{1,2})\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -51,6 +56,37 @@ def require_text_list(container: dict, key: str, location: str, errors: list[str
 def schema_version(plan: dict) -> str:
     version = plan.get("schema_version")
     return version if version in SCHEMA_VERSIONS else "1.0"
+
+
+def plan_shape(plan: dict) -> str:
+    """1.3 course shape; older plans and plans without the field are linear."""
+    shape = plan.get("shape") if isinstance(plan, dict) else None
+    return shape if shape in SHAPES else "linear"
+
+
+def under_path(path: str, roots: set[str]) -> bool:
+    """True when `path` equals one of `roots` or lies below a root directory."""
+    path = path.strip("/")
+    for root in roots:
+        root = root.strip("/")
+        if root in {"", "."} or path == root or path.startswith(root + "/"):
+            return True
+    return False
+
+
+def wholesale_paths(plan: dict) -> set[str]:
+    """Coverage rows with heading "*" cover the whole file or directory."""
+    return {
+        item["path"] for item in (plan.get("coverage") or []) if isinstance(plan.get("coverage"), list)
+        if isinstance(item, dict) and nonempty(item.get("path")) and item.get("heading") == "*"
+    }
+
+
+def pool_paths(plan: dict) -> set[str]:
+    return {
+        item["path"] for item in (plan.get("coverage") or []) if isinstance(plan.get("coverage"), list)
+        if isinstance(item, dict) and nonempty(item.get("path")) and item.get("disposition") == "pool"
+    }
 
 
 def validate_source_refs(refs: Any, location: str, errors: list[str], manifest_paths: set[str] | None) -> None:
@@ -138,6 +174,7 @@ def validate_deferred(plan: dict, section_ids: set[str], concept_ids: set[str], 
 
 
 def validate_coverage(plan: dict, section_ids: set[str], errors: list[str], allow_empty: bool) -> None:
+    shape = plan_shape(plan)
     coverage = plan.get("coverage")
     if not isinstance(coverage, list):
         errors.append("root.coverage must be a list (schema 1.2)")
@@ -155,6 +192,10 @@ def validate_coverage(plan: dict, section_ids: set[str], errors: list[str], allo
         if disposition not in DISPOSITIONS:
             errors.append(f"{location}.disposition must be one of {sorted(DISPOSITIONS)}")
             continue
+        if disposition in {"pool", "reserve"} and shape != "skeleton":
+            errors.append(f"{location}.disposition '{disposition}' is only allowed in skeleton courses (schema 1.3, shape = skeleton)")
+        if item.get("heading") == "*" and disposition not in FILE_LEVEL_DISPOSITIONS:
+            errors.append(f"{location}.heading '*' (whole file) is only allowed for {sorted(FILE_LEVEL_DISPOSITIONS)}")
         if disposition in {"core", "supporting", "listed", "appendix"} and item.get("section_id") not in section_ids:
             errors.append(f"{location}.section_id must name a section for disposition '{disposition}'")
         if disposition in {"deferred", "excluded"} and not nonempty(item.get("reason")):
@@ -177,7 +218,10 @@ def validate_coverage_against_sources(plan: dict, sources_root: Path) -> list[st
         for ref in (section.get("source_refs") or []) if isinstance(section, dict) else []:
             if isinstance(ref, dict) and nonempty(ref.get("path")):
                 paths.add(ref["path"])
+    wholesale = wholesale_paths(plan)
     for rel in sorted(paths):
+        if under_path(rel, wholesale):
+            continue  # whole file/directory has a disposition (pool / reserve / excluded)
         path = sources_root / rel
         if not path.is_file() or path.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc", ".txt"}:
             continue
@@ -185,6 +229,130 @@ def validate_coverage_against_sources(plan: dict, sources_root: Path) -> list[st
             if (rel, normalize_text(heading)) not in covered:
                 errors.append(f"coverage is missing heading '{heading}' of {rel}")
     return errors
+
+
+def validate_anchor(concept: dict, location: str, pools: set[str], errors: list[str]) -> None:
+    anchor = concept.get("anchor")
+    if anchor is None:
+        errors.append(f"{location}.anchor is required for core/supporting concepts of a skeleton course "
+                      "({path, locator} in the evidence pool, or \"external\" / \"no-anchor\")")
+        return
+    if isinstance(anchor, str):
+        if anchor not in ANCHOR_MARKERS:
+            errors.append(f"{location}.anchor must be an object or one of {sorted(ANCHOR_MARKERS)}")
+        return
+    if not isinstance(anchor, dict):
+        errors.append(f"{location}.anchor must be an object or one of {sorted(ANCHOR_MARKERS)}")
+        return
+    require_text(anchor, "path", f"{location}.anchor", errors)
+    require_text(anchor, "locator", f"{location}.anchor", errors)
+    if nonempty(anchor.get("path")) and not is_url(anchor["path"]) and not under_path(anchor["path"], pools):
+        errors.append(f"{location}.anchor.path '{anchor['path']}' is not under any coverage row with disposition 'pool'")
+
+
+def validate_branch_candidates(plan: dict, concept_ids: set[str], errors: list[str]) -> None:
+    items = plan.get("branch_candidates")
+    if not isinstance(items, list) or not items:
+        errors.append("root.branch_candidates must be a non-empty list in a skeleton course")
+        return
+    material_roots = {
+        item["path"] for item in (plan.get("coverage") or [])
+        if isinstance(item, dict) and nonempty(item.get("path")) and item.get("disposition") in {"pool", "reserve"}
+    }
+    seen: set[str] = set()
+    for index, item in enumerate(items):
+        location = f"branch_candidates[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        require_text(item, "id", location, errors)
+        require_text(item, "title", location, errors)
+        if nonempty(item.get("id")):
+            if item["id"] in seen:
+                errors.append(f"{location}.id duplicates '{item['id']}'")
+            seen.add(item["id"])
+        ids = item.get("concept_ids")
+        if not isinstance(ids, list) or not ids or not all(nonempty(c) for c in ids):
+            errors.append(f"{location}.concept_ids must be a non-empty list of concept ids")
+        else:
+            for cid in ids:
+                if cid not in concept_ids:
+                    errors.append(f"{location}.concept_ids references unknown concept '{cid}'")
+        materials = item.get("materials")
+        if not isinstance(materials, list) or not all(nonempty(m) for m in materials):
+            errors.append(f"{location}.materials must be a list of paths (empty allowed for no-anchor candidates)")
+        else:
+            for material in materials:
+                if not under_path(material, material_roots):
+                    errors.append(f"{location}.materials '{material}' is not under any 'pool' or 'reserve' coverage row")
+        if item.get("status") not in BRANCH_STATUSES:
+            errors.append(f"{location}.status must be one of {sorted(BRANCH_STATUSES)}")
+        if "work_relevance" in item and not nonempty(item.get("work_relevance")):
+            errors.append(f"{location}.work_relevance must be a non-empty string when present")
+
+
+def validate_v13(plan: dict, concept_ids: set[str], errors: list[str]) -> None:
+    """Schema 1.3: shape, parent_course, per-section probes, concept anchors, branch candidates."""
+    shape = plan.get("shape", "linear")
+    if shape not in SHAPES:
+        errors.append(f"root.shape must be one of {sorted(SHAPES)} (schema 1.3)")
+        shape = "linear"
+    parent = plan.get("parent_course")
+    if shape == "branch" and not nonempty(parent):
+        errors.append("root.parent_course must name the skeleton course when shape = branch")
+    if shape != "branch" and parent is not None:
+        errors.append("root.parent_course is only allowed when shape = branch")
+    pools = pool_paths(plan)
+    for index, section in enumerate(plan.get("sections") or []):
+        if not isinstance(section, dict):
+            continue
+        location = f"sections[{index}]"
+        probe = section.get("probe")
+        if shape == "skeleton":
+            if not isinstance(probe, dict):
+                errors.append(f"{location}.probe is required in a skeleton course (principle-level, no-hint question)")
+            else:
+                require_text(probe, "prompt", f"{location}.probe", errors)
+                validate_criteria(probe, f"{location}.probe", errors, "1.3")
+                if "hint" in probe and not nonempty(probe.get("hint")):
+                    errors.append(f"{location}.probe.hint must be a non-empty string when present")
+        elif probe is not None:
+            errors.append(f"{location}.probe is only allowed in skeleton courses")
+        for c_index, concept in enumerate(section.get("concepts") or []):
+            if not isinstance(concept, dict):
+                continue
+            c_location = f"{location}.concepts[{c_index}]"
+            if shape == "skeleton" and concept.get("role") in {"core", "supporting"}:
+                validate_anchor(concept, c_location, pools, errors)
+            elif "anchor" in concept and shape != "skeleton":
+                errors.append(f"{c_location}.anchor is only allowed in skeleton courses")
+    if shape == "skeleton":
+        validate_branch_candidates(plan, concept_ids, errors)
+    elif "branch_candidates" in plan:
+        errors.append("root.branch_candidates is only allowed in skeleton courses")
+
+
+def grounding(plan: dict) -> dict:
+    """Anchored / external / no-anchor counts over core+supporting concepts (skeleton courses)."""
+    counts = {"anchored": 0, "external": 0, "no_anchor": 0, "total": 0}
+    seen: set[str] = set()
+    for section in plan.get("sections") or []:
+        for concept in (section.get("concepts") or []) if isinstance(section, dict) else []:
+            if not isinstance(concept, dict) or concept.get("role") not in {"core", "supporting"}:
+                continue
+            key = concept.get("id") or concept.get("name")
+            if key in seen:
+                continue
+            seen.add(key)
+            counts["total"] += 1
+            anchor = concept.get("anchor")
+            if isinstance(anchor, dict):
+                counts["anchored"] += 1
+            elif anchor == "external":
+                counts["external"] += 1
+            else:
+                counts["no_anchor"] += 1
+    return counts
 
 
 def validate_criteria(checkpoint: dict, location: str, errors: list[str], version: str) -> None:
@@ -262,7 +430,7 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         errors.append(f"schema_version must be one of {sorted(SCHEMA_VERSIONS)}")
     version = schema_version(plan)
     names_by_id: dict[str, str] = {}
-    if version == "1.2":
+    if version in ROLE_AWARE_VERSIONS:
         if plan.get("mode") not in MODES:
             errors.append(f"root.mode must be one of {sorted(MODES)} (schema 1.2)")
         if "outline_confirmed_at" not in plan:
@@ -328,7 +496,7 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
                 require_text(concept, "explanation", concept_location, errors)
                 if version != "1.0":
                     validate_concept_v11(concept, concept_location, errors, names_by_id)
-                if version == "1.2":
+                if version in ROLE_AWARE_VERSIONS:
                     validate_concept_v12(concept, concept_location, errors)
 
         if "principle" in section and not nonempty(section.get("principle")):
@@ -348,13 +516,19 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         validate_relations(plan, set(names_by_id), errors, manifest_paths)
     elif "relations" in plan:
         errors.append("root.relations requires schema_version '1.1'")
-    if version == "1.2":
+    if version in ROLE_AWARE_VERSIONS:
         validate_deferred(plan, seen, set(names_by_id), errors)
         validate_coverage(plan, seen, errors, allow_empty_coverage)
     else:
         for key in ("mode", "coverage", "deferred"):
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.2'")
+    if version == "1.3":
+        validate_v13(plan, set(names_by_id), errors)
+    else:
+        for key in ("shape", "parent_course", "branch_candidates"):
+            if key in plan:
+                errors.append(f"root.{key} requires schema_version '1.3'")
 
     final_challenge = plan.get("final_challenge")
     if not isinstance(final_challenge, dict):
@@ -377,12 +551,13 @@ def collect_warnings(plan: Any) -> list[str]:
     sections = plan.get("sections")
     if not isinstance(sections, list):
         return warnings
-    if len(sections) > MAX_SECTIONS_PER_LESSON:
+    if len(sections) > MAX_SECTIONS_PER_LESSON and plan_shape(plan) != "skeleton":
         warnings.append(
             f"lesson has {len(sections)} sections (> {MAX_SECTIONS_PER_LESSON}); "
             "consider a skeleton pass with on-demand expansion"
         )
-    role_aware = schema_version(plan) == "1.2"
+    role_aware = schema_version(plan) in ROLE_AWARE_VERSIONS
+    skeleton = plan_shape(plan) == "skeleton"
     confirmed = plan.get("outline_confirmed_at")
     if role_aware and isinstance(confirmed, str) and re.search(r"T00:00(:00)?(\.0+)?(Z|[+-]\d\d:\d\d)?$", confirmed):
         warnings.append("outline_confirmed_at looks like a placeholder (midnight); record the real time, e.g. `date -u +%FT%TZ`")
@@ -411,6 +586,8 @@ def collect_warnings(plan: Any) -> list[str]:
         for c_index, concept in enumerate(concepts):
             if isinstance(concept, dict) and concept.get("role") == "supporting" and not isinstance(concept.get("check"), dict):
                 warnings.append(f"sections[{index}].concepts[{c_index}] is 'supporting' but has no check question; the learner cannot ask to verify it")
+            if skeleton and isinstance(concept, dict) and concept.get("anchor") == "no-anchor":
+                warnings.append(f"sections[{index}].concepts[{c_index}] has no anchor in the learner's materials; the learner decides whether to keep it as general background or drop it")
             if isinstance(concept, dict) and concept.get("role") == "listed" and len(str(concept.get("explanation", ""))) > MAX_LISTED_EXPLANATION_CHARS:
                 warnings.append(
                     f"sections[{index}].concepts[{c_index}] is 'listed' but its explanation is long "
@@ -428,6 +605,8 @@ def hidden_texts(section: dict) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for criterion in criteria_texts(section.get("checkpoint")):
         pairs.append(("assessment criterion", criterion))
+    for criterion in criteria_texts(section.get("probe")):
+        pairs.append(("probe criterion", criterion))
     for concept in section.get("concepts") or []:
         if isinstance(concept, dict):
             for criterion in criteria_texts(concept.get("check")):
@@ -462,6 +641,10 @@ def validate_outline(outline: str, plan: dict) -> list[str]:
         for label, text in hidden_texts(section):
             if criterion_leaked(text, normalized):
                 errors.append(f"outline leaks {label} from sections[{index}]")
+    if plan_shape(plan) == "skeleton":
+        for item in plan.get("branch_candidates") or []:
+            if isinstance(item, dict) and nonempty(item.get("title")) and normalize_text(item["title"]) not in normalized:
+                errors.append(f"outline does not list branch candidate '{item['title']}'")
     return errors
 
 
@@ -589,8 +772,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lesson_plan", type=Path)
     parser.add_argument("--guide", type=Path, help="teaching-guide.md (schema 1.0/1.1 packs)")
-    parser.add_argument("--outline", type=Path, help="outline.md (schema 1.2 packs)")
-    parser.add_argument("--units-dir", type=Path, help="units/ directory (schema 1.2 packs)")
+    parser.add_argument("--outline", type=Path, help="outline.md (schema 1.2+ packs)")
+    parser.add_argument("--units-dir", type=Path, help="units/ directory (schema 1.2+ packs)")
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--sources-root", type=Path, help="Check coverage[] against the headings of the actual source files")
     parser.add_argument("--allow-empty-coverage", action="store_true")
@@ -614,8 +797,12 @@ def main() -> int:
             unit_errors, unit_warnings = validate_units(args.units_dir, plan)
             errors.extend(unit_errors)
             warnings.extend(unit_warnings)
-        if args.sources_root and schema_version(plan) == "1.2":
+        if args.sources_root and schema_version(plan) in ROLE_AWARE_VERSIONS:
             errors.extend(validate_coverage_against_sources(plan, args.sources_root))
+        if plan_shape(plan) == "skeleton":
+            g = grounding(plan)
+            print(f"INFO: grounding {g['anchored']}/{g['total']} core+supporting concepts anchored in the evidence pool "
+                  f"({g['external']} external, {g['no_anchor']} no-anchor) — no threshold; the learner judges")
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}")
         return 2

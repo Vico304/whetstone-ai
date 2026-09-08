@@ -182,6 +182,40 @@ def command_record(args: argparse.Namespace) -> int:
     return 0
 
 
+def defer_section(state: dict, section_id: str, reason: str) -> None:
+    """Mark a not-yet-started section deferred (probe passed, or the learner chose to skip).
+
+    Only pending sections can be deferred here; a section with attempts keeps its
+    evidence and must be skipped through a recorded verdict instead.
+    """
+    if not reason.strip():
+        raise ValueError("a reason is required to defer a section")
+    section = find_section(state, section_id)
+    if section.get("status") == "deferred":
+        raise ValueError(f"section {section_id} is already deferred")
+    if section.get("attempts"):
+        raise ValueError(f"section {section_id} already has attempts; record a verdict instead of deferring it")
+    now = utc_now()
+    section["status"] = "deferred"
+    section["deferred_reason"] = reason.strip()
+    state.setdefault("events", []).append({"at": now, "type": "section_deferred", "section_id": section_id, "reason": reason.strip()})
+    was_completed = state.get("status") == "completed"
+    recompute_position(state, section_id)
+    if state["status"] == "completed" and not was_completed:
+        state["events"].append({"at": now, "type": "lesson_completed"})
+    state["updated_at"] = now
+
+
+def command_defer(args: argparse.Namespace) -> int:
+    state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("progress state root must be an object")
+    defer_section(state, args.section_id, args.reason)
+    atomic_write(args.state, state)
+    print(f"OK: deferred {args.section_id} ({args.reason}); current section is now {state.get('current_section_id')}")
+    return 0
+
+
 def command_show(args: argparse.Namespace) -> int:
     state = read_json(args.state)
     if args.json:
@@ -232,6 +266,12 @@ def parse_args() -> argparse.Namespace:
         "does not move the current position backwards",
     )
     record_parser.set_defaults(handler=command_record)
+
+    defer_parser = subparsers.add_parser("defer", help="Defer a pending section (probe passed / learner chose to skip)")
+    defer_parser.add_argument("--state", type=Path, required=True)
+    defer_parser.add_argument("--section-id", required=True)
+    defer_parser.add_argument("--reason", required=True, help="Why it is skipped, e.g. '原理探测通过，学习者选择跳过'")
+    defer_parser.set_defaults(handler=command_defer)
 
     show_parser = subparsers.add_parser("show", help="Show current progress")
     show_parser.add_argument("--state", type=Path, required=True)

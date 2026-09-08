@@ -90,6 +90,16 @@ def build_nodes(plan: dict) -> dict[str, dict]:
                         node["aliases"].append(alias)
             if section["id"] not in node["section_ids"]:
                 node["section_ids"].append(section["id"])
+            anchor = concept.get("anchor")
+            if isinstance(anchor, dict):
+                ref = {"path": anchor.get("path"), "locator": anchor.get("locator"),
+                       "support": "external" if validate_lesson.is_url(anchor.get("path")) else "explicit",
+                       "note": "skeleton anchor"}
+                if ref not in node["source_refs"]:
+                    node["source_refs"].append(ref)
+                node["anchor"] = "anchored"
+            elif isinstance(anchor, str):
+                node["anchor"] = anchor
             for ref in section_refs:
                 if ref not in node["source_refs"]:
                     node["source_refs"].append(ref)
@@ -133,6 +143,7 @@ def section_skeleton(plan: dict) -> list[dict]:
                 "supporting_concept_ids": [concept_id(plan, c) for c in section.get("concepts", []) if c.get("role") == "supporting"],
                 "listed_concept_ids": [concept_id(plan, c) for c in section.get("concepts", []) if c.get("role") == "listed"],
                 "checkpoint_prompt": (section.get("checkpoint") or {}).get("prompt"),
+                "probe_prompt": (section.get("probe") or {}).get("prompt"),
             }
         )
     return skeleton
@@ -173,10 +184,14 @@ def export(plan: dict) -> tuple[dict, dict]:
     nodes = build_nodes(plan)
     edges = build_edges(plan)
     base = {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "lesson_id": plan.get("lesson_id"),
         "title": plan.get("title"),
         "mode": plan.get("mode", "full"),
+        "shape": validate_lesson.plan_shape(plan),
+        "parent_course": plan.get("parent_course"),
+        "branch_candidates": [dict(item) for item in (plan.get("branch_candidates") or []) if isinstance(item, dict)],
+        "grounding": validate_lesson.grounding(plan) if validate_lesson.plan_shape(plan) == "skeleton" else None,
         "source_schema_version": validate_lesson.schema_version(plan),
         "generated_at": utc_now(),
     }
