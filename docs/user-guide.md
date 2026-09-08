@@ -73,25 +73,29 @@ cd plugin && python3 -m unittest discover -s tests   # 应全部通过
 
 ## 3. 目录约定
 
-建议把材料、课程、知识库放在同一个工作区（Cowork 模式下就是连接的文件夹）：
+系统写出的一切都放在材料根目录下的 `whetstone/`（学习工作区）；你的材料目录本身不会被写入任何文件。想放别处就在调用语句里说"学习工作区 <路径>"。
 
 ```text
-Learning System/
-├── whetstone-ai/            # 本仓库
-├── materials/               # 你要学的材料（md / adoc / txt / 代码目录）
-├── courses/
-│   └── tee-basics/          # 每门课一个目录（学习包）
-│       ├── outline.md       # 路线图 + 全部概念 + 覆盖账本 ← 你会读的
-│       ├── units/s01.md …   # 每个 unit 的正文 ← 你会读的
-│       ├── lesson-plan.json # 机器计划（含隐藏的评估标准）
-│       ├── sources.json
-│       ├── learning-progress.json   # 进度（不要打开）
-│       ├── zoom/            # 按需细化文档
-│       └── concepts/        # clarify 生成的概念笔记（Obsidian 双链）
-└── store/                   # 知识库（可选，跨课持久；不要打开 lrg/ 与 *.deep.json）
+<材料根>/                     # 例如 ~/Project/tee（Cowork 模式下就是连接的文件夹）
+├── occlum/ 文档/ …           # 你要学的材料，原样不动
+└── whetstone/                # 学习工作区：可以整个搬走、备份、用 Obsidian 打开
+    ├── learner-profile.md    # 跨课档案 ← 你会读、会改
+    ├── learning-plan.md      # 课程序列 ← 你会读
+    ├── survey/               # 材料清点 materials-survey.md/json（多路径时 -<名>）
+    ├── courses/
+    │   └── tee-basics/       # 每门课一个目录（学习包）
+    │       ├── outline.md    # 路线图 + 全部概念 + 覆盖账本 ← 你会读的
+    │       ├── units/s01.md …# 每个 unit 的正文 ← 你会读的
+    │       ├── lesson-plan.json  # 机器计划（含隐藏的评估标准）
+    │       ├── sources.json
+    │       ├── learning-progress.json   # 进度（不要打开）
+    │       ├── zoom/         # 按需细化文档
+    │       └── concepts/     # clarify 生成的概念笔记（Obsidian 双链）
+    ├── store/                # 知识库（可选，跨课持久；不要打开 lrg/ 与 *.deep.json）
+    └── scripts/              # 仅 Cowork 模式：复制来的脚本
 ```
 
-用 Obsidian 打开 `courses/` 或整个工作区，`[[概念]]` 双链和关系图直接可用。
+课程里的所有路径（覆盖账本、来源、落点）都相对材料根，所以校验时 `--sources-root <材料根>`。旧布局（档案和 `courses/` 直接放在材料根）仍能识别，但新产物会写进 `whetstone/`；想迁移，把 `learner-profile.md`、`learning-plan.md`、`materials-survey*`、`courses/` 移进 `whetstone/`（清点文件放 `survey/`）即可，课程包内容无需改动。
 
 ## 4. 一门课的完整流程
 
@@ -124,7 +128,7 @@ Learning System/
 
 ```text
 /whetstone:learn 学习 /Users/me/Learning System/materials/cove-ch4-attestation.adoc，
-知识库目录 /Users/me/Learning System/store，
+知识库目录 /Users/me/Learning System/whetstone/store，
 课程目录 /Users/me/Learning System/courses/cove-attestation/。
 我希望学完后能解释远程证明为什么需要信任链，并能判断一个新方案的信任根在哪。
 ```
@@ -157,7 +161,7 @@ Learning System/
 ### 4.5 中断与继续
 
 ```text
-继续我的课程，课程目录 /Users/me/Learning System/courses/cove-attestation/，知识库 /Users/me/Learning System/store
+继续我的课程，课程目录 /Users/me/Learning System/courses/cove-attestation/，知识库 /Users/me/Learning System/whetstone/store
 ```
 
 它先出一道**变式题**（换情境考已完成节的同一机制），或从你过去的错误主张里取一条以匿名形式让你批判，然后回到未完成的 unit。
@@ -168,7 +172,7 @@ Learning System/
 
 ### 5.1 大纲确认
 
-> **模型**：大纲已生成：`courses/cove-attestation/outline.md`。
+> **模型**：大纲已生成：`whetstone/courses/cove-attestation/outline.md`。
 > 推断的目标：解释远程证明为什么需要信任链，并能判断新方案的信任根在哪。共 5 个 unit：
 > 1. 为什么 host 说的话不能信 → 用硬件根信任签名的测量
 > 2. 测量什么、何时冻结 → measured pages 与 finalize
@@ -238,7 +242,7 @@ Learning System/
 
 ### 5.7 继续课程（resume）
 
-> **你**：继续我的课程，课程目录 …/courses/cove-attestation/，知识库 …/store
+> **你**：继续我的课程，课程目录 …/courses/cove-attestation/，知识库 …/whetstone/store
 
 > **模型**：先做一道检验：**有一种说法是"zero pages 可以在任何时候添加，因为它们不参与测量"。这个说法哪里有问题？**
 
@@ -296,13 +300,13 @@ python3 $S/store_init.py init --store store --domain-root 计算机科学
 
 ```bash
 S=whetstone-ai/plugin/skills/learn/scripts
-python3 $S/store_init.py register --store store --lesson-plan courses/x/lesson-plan.json
-python3 $S/mrg_export.py courses/x/lesson-plan.json --store store --manifest courses/x/sources.json
+python3 $S/store_init.py register --store store --lesson-plan whetstone/courses/x/lesson-plan.json
+python3 $S/mrg_export.py whetstone/courses/x/lesson-plan.json --store store --manifest whetstone/courses/x/sources.json
 python3 $S/index_match.py register --store store --lesson-id x
-python3 $S/index_match.py prerequisites --store store --prerequisite-plan courses/x/prerequisite-plan.json
+python3 $S/index_match.py prerequisites --store store --prerequisite-plan whetstone/courses/x/prerequisite-plan.json
 python3 $S/learner_state_build.py build --store store
 python3 $S/learner_state_build.py show --store store
-python3 $S/review_pool.py --store store --lesson-id x --progress courses/x/learning-progress.json
+python3 $S/review_pool.py --store store --lesson-id x --progress whetstone/courses/x/learning-progress.json
 python3 $S/store_init.py show --store store
 ```
 
@@ -311,7 +315,7 @@ python3 $S/store_init.py show --store store
 | 技能 | 何时用 | 产出 |
 |---|---|---|
 | `guide` | 每次都先问"怎么用 / 规划"。第一次用；或想（重新）定目标与背景；或手里是一个混杂目录、不确定该学哪部分 | `learner-profile.md`（跨课的背景与目标）、`materials-survey.md/json`、`learning-plan.md`（课程序列，逐门确认，每门带调用语句） |
-| `outline` | 想看、改或重做某门课的大纲 | `courses/<id>/outline.md` + `lesson-plan.json`（确认后写回） |
+| `outline` | 想看、改或重做某门课的大纲 | `whetstone/courses/<id>/outline.md` + `lesson-plan.json`（确认后写回） |
 | `learn` | 总入口：开课、教学、继续。缺档案 / 计划 / 大纲时自动补，等价于依次跑 guide → outline 再 build | 学习包（outline、units、lesson-plan、进度）；开启知识库时写 store |
 | `clarify` | 遇到不懂的概念，写了 `[[概念]]` 之后 | `concepts/<概念>.md`，Obsidian 双链 |
 
@@ -329,7 +333,7 @@ python3 $S/store_init.py show --store store
 
 > **模型**：先一轮背景与目标（写进 `learner-profile.md`）：为什么学、相关经验、学完要能做什么、默认深度和要不要知识库？
 
-> **你**：巩固自己做的 MySQL-in-Occlum + mTLS 工作；Occlum 和 SGX 有半年经验；要能解释为什么这样设计并能排障；完整；知识库 /Users/me/Learning System/store
+> **你**：巩固自己做的 MySQL-in-Occlum + mTLS 工作；Occlum 和 SGX 有半年经验；要能解释为什么这样设计并能排障；完整；知识库 /Users/me/Learning System/whetstone/store
 
 > **模型**：扫描完成（`materials-survey.md`）：14 个顶层条目，3 GB——4 个上游仓库（`occlum` 416 MB，有 docs；`trustflow-teeapps`；`trustflow-capsule-manager` 513 KB；`teeapp-sgx-rwa-release` 是发布树，与 `trustflow-teeapps-rwa` 重叠）；`文档/` 12 份，4 份带会话/汇报信号；顶层 6 份进展汇报与交接；`data/` 2 GB 日志：排除。
 > 目的是巩固自己的工作，所以你的方案是课程材料、上游源码作证据；`文档/2_…需求与评估.md` 和 `…mTLS_精简实施方案.md` 是你写的还是会话生成的？
@@ -341,7 +345,7 @@ python3 $S/store_init.py show --store store
 
 > **你**：接受。后面的都接受。
 
-> **模型**：写入 `learning-plan.md`，三门均已确认，第一门是课程 1。调用语句：`/whetstone:learn 学习 …，课程目录 courses/capsule-manager-keys/`。想先看大纲：`/whetstone:outline courses/capsule-manager-keys/`。
+> **模型**：写入 `learning-plan.md`，三门均已确认，第一门是课程 1。调用语句：`/whetstone:learn 学习 …，课程目录 whetstone/courses/capsule-manager-keys/`。想先看大纲：`/whetstone:outline whetstone/courses/capsule-manager-keys/`。
 
 向导到此结束，不开课。
 
@@ -379,11 +383,11 @@ python3 $S/store_init.py show --store store
 
 > **你**：① 然后 ③。
 
-> **模型**：写入 `learning-plan.md` 两门分支课（`shape: branch`，父课程 tee-skeleton-1）。分支课 ① 的调用语句：`/whetstone:learn 学习 teeapp/src/ra，课程目录 courses/ra-chain/`——它回到逐标题账本，骨架课记录的概念在前置判断里视作已有证据。
+> **模型**：写入 `learning-plan.md` 两门分支课（`shape: branch`，父课程 tee-skeleton-1）。分支课 ① 的调用语句：`/whetstone:learn 学习 teeapp/src/ra，课程目录 whetstone/courses/ra-chain/`——它回到逐标题账本，骨架课记录的概念在前置判断里视作已有证据。
 
 ### 7.2 只改大纲
 
-> **你**：/whetstone:outline courses/capsule-manager-keys/ 把第 3 节拆成两节，"证书轮换"升成 core
+> **你**：/whetstone:outline whetstone/courses/capsule-manager-keys/ 把第 3 节拆成两节，"证书轮换"升成 core
 
 > **模型**：改后大纲：第 3 节拆为「密钥派发」与「证书轮换」，core 概念各 3 个，账本已更新，校验通过。确认模式仍为完整？
 
@@ -423,7 +427,7 @@ python3 $S/store_init.py show --store store
 三节之后：
 
 ```bash
-python3 whetstone-ai/plugin/evals/score_pack.py courses/x --sources-root . --store store
+python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store store
 ```
 
 看三个数：`locator_hit_rate`（引文定位是否真的能在材料里找到）、`median_checkpoint_elapsed_s`（每节交互时间——结构化记录的成本，阈值 +30%）、`depths`（你的回答到达了哪些层）。`--baseline` 可与上次结果逐项比较。每节的用时由模型在提问前后各跑一次 `date +%s` 计算，不是估的。
@@ -450,21 +454,21 @@ python3 whetstone-ai/plugin/evals/score_pack.py courses/x --sources-root . --sto
 
 ```bash
 # 校验学习包（1.2）
-python3 $S/validate_lesson.py courses/x/lesson-plan.json --outline courses/x/outline.md \
-  --units-dir courses/x/units --manifest courses/x/sources.json --sources-root .
+python3 $S/validate_lesson.py whetstone/courses/x/lesson-plan.json --outline whetstone/courses/x/outline.md \
+  --units-dir whetstone/courses/x/units --manifest whetstone/courses/x/sources.json --sources-root .
 # 校验旧包（1.0/1.1）
-python3 $S/validate_lesson.py courses/old/lesson-plan.json --guide courses/old/teaching-guide.md
+python3 $S/validate_lesson.py whetstone/courses/old/lesson-plan.json --guide whetstone/courses/old/teaching-guide.md
 # 进度
-python3 $S/learning_state.py init --lesson-plan courses/x/lesson-plan.json --output courses/x/learning-progress.json
-python3 $S/learning_state.py show --state courses/x/learning-progress.json
-python3 $S/learning_state.py defer --state courses/x/learning-progress.json --section-id s01 --reason "原理探测通过，学习者选择跳过"   # 骨架课
+python3 $S/learning_state.py init --lesson-plan whetstone/courses/x/lesson-plan.json --output whetstone/courses/x/learning-progress.json
+python3 $S/learning_state.py show --state whetstone/courses/x/learning-progress.json
+python3 $S/learning_state.py defer --state whetstone/courses/x/learning-progress.json --section-id s01 --reason "原理探测通过，学习者选择跳过"   # 骨架课
 # 记一次作答（知识库模式）
 python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint \
   --response-file /tmp/r.txt --feedback-file /tmp/f.txt --verdict partial --confidence 4 \
   --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
-  --progress courses/x/learning-progress.json --elapsed-seconds 240
+  --progress whetstone/courses/x/learning-progress.json --elapsed-seconds 240
 # 概念笔记扫描
-python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py courses/x
+python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone/courses/x
 # 打包插件
 python3 whetstone-ai/package_plugin.py
 ```

@@ -9,7 +9,7 @@ description: Generate, discuss or revise the outline of one Whetstone course —
 
 ## 输入
 
-- 课程目录（`courses/<id>/`）；不存在时按 `learning-plan.md` 里该课的条目（材料子集、目标）新建；
+- 课程目录（`whetstone/courses/<id>/`）；不存在时按 `learning-plan.md` 里该课的条目（材料子集、目标）新建；
 - 已有 `outline.md` + `lesson-plan.json` 时进入**修改模式**：读现有内容，只改学习者要改的部分，保留其余；
 - 读 `learner-profile.md` 取默认深度与知识库设置。
 

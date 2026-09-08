@@ -21,7 +21,9 @@ from pathlib import Path
 
 
 IGNORED_DIRS = {".git", ".hg", ".svn", "node_modules", "target", "build", "dist", "out", "__pycache__",
-                ".venv", "venv", ".idea", ".vscode", ".obsidian", "bazel-bin", "bazel-out", "coverage"}
+                ".venv", "venv", ".idea", ".vscode", ".obsidian", "bazel-bin", "bazel-out", "coverage",
+                # the learning workspace and host/agent config dirs are never materials
+                "whetstone", ".whetstone", ".agents", ".claude", ".codex"}
 DOC_EXT = {".md", ".markdown", ".adoc", ".asciidoc", ".rst", ".txt", ".tex", ".pdf", ".docx", ".epub"}
 CODE_EXT = {".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".go", ".py", ".java", ".kt", ".js", ".ts", ".tsx",
             ".jsx", ".rb", ".php", ".swift", ".sh", ".bazel", ".bzl", ".cmake", ".mk", ".s", ".asm"}

@@ -15,9 +15,27 @@ description: Whetstone's main entry point — the full flow from planning to tut
 - Claude Code 以个人/项目技能安装（`~/.claude/skills/learn/` 或 `<project>/.claude/skills/learn/`，Claude Desktop 的 Code 标签页也用这条）：技能目录为 `${CLAUDE_SKILL_DIR}`，例如 `python3 "${CLAUDE_SKILL_DIR}/scripts/validate_lesson.py" ...`；
 - DeepSeek Harness / 直接放入 `~/.agents/skills/` 或 `.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身；
 - Codex：按宿主提供的技能路径解析；
-- Claude Desktop 聊天（Cowork）模式：插件在云端容器、材料与课程在本地连接文件夹，脚本必须在本地运行——把本技能的 `scripts/` 复制到工作区 `.whetstone/scripts/` 后从那里执行（一次即可，重装插件后重新复制）；`sources.json` 的路径写相对工作区的路径。
+- Claude Desktop 聊天（Cowork）模式：插件在云端容器、材料与课程在本地连接文件夹，脚本必须在本地运行——把本技能的 `scripts/` 复制到学习工作区 `whetstone/scripts/` 后从那里执行（一次即可，重装插件后重新复制）。
 
-shell 的当前工作目录通常是用户项目目录而非技能目录，不要以相对路径直接执行脚本。课程产物（教学包目录）仍写入用户的可写工作区，与技能目录无关。
+shell 的当前工作目录通常是用户项目目录而非技能目录，不要以相对路径直接执行脚本。
+
+## 学习工作区布局
+
+系统写出的**一切**都放在一个目录里，默认是材料根目录下的 `whetstone/`（学习者在调用语句里另指路径时用那个）。材料根目录本身不写入任何文件：
+
+```text
+<材料根>/
+├── （你的材料：仓库、文档…）
+└── whetstone/                 # 学习工作区
+    ├── learner-profile.md     # 跨课档案（阶段 1）
+    ├── learning-plan.md       # 课程序列（阶段 3）
+    ├── survey/                # 阶段 2 的清点：materials-survey.md/json（多路径时 materials-survey-<名>.*）
+    ├── courses/<id>/          # 每门课一个教学包
+    ├── store/                 # 知识库默认位置（学习者可另指）
+    └── scripts/               # 仅 Cowork 模式：复制来的脚本
+```
+
+所有 `coverage[].path`、`source_refs.path`、`anchor.path`、`sources.json` 里的路径都相对**材料根**（校验时 `--sources-root <材料根>`），与工作区在哪无关。启动时按 `whetstone/learner-profile.md` 判断阶段；旧布局（档案、`courses/`、`materials-survey.*` 直接放在材料根）仍被识别，不强制迁移，但新产物一律写进 `whetstone/`。
 
 ## 信任与范围边界
 
@@ -70,7 +88,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 0. 缺什么补什么（启动时静默判断）
 
-读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认；档案 `orientation=domain` 且这门课是骨架课时改读 [stages/skeleton.md](references/stages/skeleton.md)）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
+读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `whetstone/learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认；档案 `orientation=domain` 且这门课是骨架课时改读 [stages/skeleton.md](references/stages/skeleton.md)）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
 
 ### 1. 建立来源范围
 

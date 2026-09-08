@@ -33,4 +33,4 @@
 ## 四、当前计划
 
 - 学习计划：`learning-plan.md`（由 guide 维护）
-- 当前课程：{{courses/<id>}}
+- 当前课程：{{whetstone/courses/<id>}}
