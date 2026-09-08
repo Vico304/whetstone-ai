@@ -43,6 +43,7 @@ Two things the system deliberately withholds:
 | [`docs/specs/knowledge-store.md`](docs/specs/knowledge-store.md) | Persistent store spec: MRG / LRG / concept index / learner state / exports (schema 1.1) |
 | [`docs/specs/protocol-architecture.md`](docs/specs/protocol-architecture.md) | Staged protocol loading, build pipeline, model tiering, eval set |
 | [`docs/specs/course-planning.md`](docs/specs/course-planning.md) | Outline-first build, per-unit documents, full/fast mode, concept roles, coverage ledger (schema 1.2) |
+| [`docs/specs/domain-skeleton.md`](docs/specs/domain-skeleton.md) | Learning orientation (material / domain), skeleton courses grounded in an evidence pool, principle probes, learner-chosen branches (schema 1.3) |
 | [`docs/roadmap.md`](docs/roadmap.md) | Current coverage and next milestone |
 | [`docs/reviews/`](docs/reviews/) | Learning-science evidence review, with effect sizes and sources |
 | [`plugin/`](plugin/) | Working skills plugin; one skill directory, three hosts |

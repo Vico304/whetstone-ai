@@ -1,6 +1,6 @@
 {
   "name": "whetstone",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Plan, outline and tutor source-grounded courses: learner profile, material triage, course-by-course plan, confirmed outlines, per-unit documents, section-by-section active reconstruction with an append-only learner log.",
   "author": {
     "name": "Vico304"
