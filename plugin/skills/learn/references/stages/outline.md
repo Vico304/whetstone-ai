@@ -25,7 +25,7 @@
 
 学习者回答后：
 
-- 写回 `lesson-plan.json`：`mode`、`deferred[]`（略过的 unit 用 `type: section`，理由写"学习者选择略过"或快速模式默认）、`outline_confirmed_at`；升级的概念改 `role`；
+- 写回 `lesson-plan.json`：`mode`、`deferred[]`（略过的 unit 用 `type: section`，理由写"学习者选择略过"或快速模式默认）、`outline_confirmed_at`（**用 `date -u +%FT%TZ` 取真实时间**，不要写 00:00:00 占位；校验器会警告）；升级的概念改 `role`；
 - 快速模式默认略过：非主线的 unit（大纲里标为可略过的）、以及所有 `listed` 概念保持 listed；不擅自略过 core unit；
 - 更新 `outline.md` 的模式与状态列，重新校验；
 - **确认前不得生成任何 `units/<id>.md`。**

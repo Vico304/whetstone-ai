@@ -68,7 +68,7 @@
 - `tradeoffs`：边界、代价或失败方式数组；
 - `new_problem`：该方案暴露并引向下一节的问题；末节可为 `null`；
 - `concepts`：`name` 与面向学习者的 `explanation`；**1.1 另需** `id`、`layer`、`domain_path`，可选 `aliases`；
-- `source_refs`：`path`、`locator`、`support` 与简短 `note`；
+- `source_refs`：`path`、`locator`、`support` 与简短 `note`。**`locator` 以可机器核对的定位开头**——文档用标题原文（`## Hello World`），代码用符号名（`create_report`）——之后再加描述（`## Flow / ra_config_template.json 的 verify_mr_enclave`）；评测用它的第一段在原文里查找命中率。外部网页用 URL 作 `path`，`support` 必须是 `external`，不进 `sources.json`；
 - `checkpoint.prompt`、隐藏评估用 `criteria` 和渐进提示 `hint`；**1.1 中 `criteria` 是对象数组** `{id, text, layer}`，`id` 节内唯一（如 `c1`、`c2`），供 `criteria_met` 引用；
 - **1.1 可选** `principle`：本节体现的可迁移设计思想（`principle` 层，只进高层文件，永不进讲义）。
 
@@ -91,7 +91,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 ### 1.2 新增：概念角色、supporting 验收、deferred、覆盖账本
 
 - `concepts[].role`：`core`（进主问题与 criteria，每节 ≤ 4，超过 warning——**降级而不是删除**）/ `supporting`（会讲，作为 core 的配角，≤ 6 warning）/ `listed`（只列名 + 一句事实层定义 + 定位，不讲机制，无上限；`explanation` 超过 200 字 warning）。
-- `concepts[].check`（仅 `supporting`）：`{prompt, criteria[{id,text,layer}], hint}`，学习者要求"验收 X"时使用；criteria 与主 checkpoint 一样不进任何面向学习者的文档。
+- `concepts[].check`（仅 `supporting`）：`{prompt, criteria[{id,text,layer}], hint}`，学习者要求"验收 X"时使用；**每个 supporting 概念都要写**（缺失时校验器警告）；criteria 与主 checkpoint 一样不进任何面向学习者的文档。
 - 顶层 `deferred[]`：`[{type: "section"|"concept", id, reason}]`。快速模式略过的 unit、学习者选择略过的 unit 都在这里；deferred 的 section 不生成 `units/<id>.md`，`learning_state.py init` 把它标为 `deferred`，不计入完成，之后可补。
 - 顶层 `coverage[]`：`[{path, heading, disposition, section_id?, reason?}]`，`disposition ∈ core | supporting | listed | appendix | deferred | excluded`。材料的每个一级/二级标题都必须有一行；`core/supporting/listed/appendix` 需要 `section_id`，`deferred/excluded` 需要 `reason`。`validate_lesson.py --sources-root <材料根>` 会对照真实文件的标题逐条检查。**这是"绝不静默遗漏"的确定性保证。**
 

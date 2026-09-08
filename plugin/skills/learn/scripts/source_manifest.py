@@ -176,7 +176,7 @@ def build_manifest(inputs: list[Path], base: Path, max_text_bytes: int, max_hash
     return {
         "schema_version": "1.0",
         "generated_at": utc_now(),
-        "base_path": base.resolve().as_posix(),
+        "base_path": "." if base.resolve() == Path.cwd().resolve() else base.as_posix(),
         "roots": [portable_path(path, base) for path in inputs],
         "files": entries,
         "problems": problems,

@@ -245,6 +245,23 @@ class LessonValidationTests(unittest.TestCase):
         old["mode"] = "full"
         self.assertTrue(any("requires schema_version '1.2'" in e for e in validate_lesson.validate_plan(old)))
 
+    def test_external_url_refs_bypass_manifest_and_need_external_support(self):
+        plan = load_template()
+        plan["sections"][0]["source_refs"].append({"path": "https://example.com/spec", "locator": "§3", "support": "external", "note": "上游说明"})
+        self.assertEqual(validate_lesson.validate_plan(plan, {"examples/source.md"}), [])
+        plan["sections"][0]["source_refs"][-1]["support"] = "explicit"
+        errors = validate_lesson.validate_plan(plan, {"examples/source.md"})
+        self.assertTrue(any("URL path must carry support 'external'" in e for e in errors), errors)
+
+    def test_supporting_without_check_and_placeholder_confirmation_warn(self):
+        plan = load_template()
+        del plan["sections"][0]["concepts"][2]["check"]
+        plan["outline_confirmed_at"] = "2026-09-07T00:00:00+08:00"
+        warnings = validate_lesson.collect_warnings(plan)
+        self.assertTrue(any("has no check question" in w for w in warnings), warnings)
+        self.assertTrue(any("placeholder" in w for w in warnings), warnings)
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+
     def test_coverage_against_source_headings(self):
         plan = load_template()
         with tempfile.TemporaryDirectory() as temporary:
@@ -689,6 +706,8 @@ class EvalScoringTests(unittest.TestCase):
             self.assertEqual(metrics["relations"], 1)
             self.assertEqual(metrics["layers"], {"fact": 2, "mechanism": 2})
             self.assertEqual(metrics["roles"], {"core": 2, "supporting": 1, "listed": 1})
+            self.assertEqual(metrics["max_core_per_section"], 2)
+            self.assertEqual(metrics["max_concepts_per_section"], 4)
             self.assertEqual(metrics["coverage"], {"core": 1, "supporting": 1, "listed": 1, "excluded": 1})
             self.assertEqual(metrics["units_present"], "1/1")
             self.assertIsNone(metrics["locator_hit_rate"])

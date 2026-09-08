@@ -79,6 +79,8 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
 
     sections = plan.get("sections", []) if isinstance(plan.get("sections"), list) else []
     concepts_per_section = [len(s.get("concepts", []) or []) for s in sections if isinstance(s, dict)]
+    core_per_section = [sum(1 for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("role", "core") == "core")
+                        for s in sections if isinstance(s, dict)]
     refs = [r for s in sections if isinstance(s, dict) for r in (s.get("source_refs") or []) if isinstance(r, dict)]
     refs += [r for rel in (plan.get("relations") or []) if isinstance(rel, dict) for r in (rel.get("source_refs") or []) if isinstance(r, dict)]
     support = Counter(r.get("support") for r in refs)
@@ -93,7 +95,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     if sources_root is not None:
         for ref in refs:
             path, locator = ref.get("path"), ref.get("locator")
-            if not isinstance(path, str) or not isinstance(locator, str):
+            if not isinstance(path, str) or not isinstance(locator, str) or path.startswith(("http://", "https://")):
                 continue
             if path not in file_cache:
                 candidate = sources_root / path
@@ -109,6 +111,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
         "validator_warnings": len(warnings),
         "sections": len(sections),
         "max_concepts_per_section": max(concepts_per_section, default=0),
+        "max_core_per_section": max(core_per_section, default=0),
         "mean_concepts_per_section": round(statistics.mean(concepts_per_section), 2) if concepts_per_section else 0,
         "source_refs": len(refs),
         "support": dict(support),
@@ -209,7 +212,7 @@ def main() -> int:
         return 1
 
     b = result["build"]
-    print(f"{args.pack}: schema {b['schema_version']}, {b['sections']} sections, max {b['max_concepts_per_section']} concepts/section, "
+    print(f"{args.pack}: schema {b['schema_version']}, {b['sections']} sections, max {b['max_core_per_section']} core ({b['max_concepts_per_section']} total) concepts/section, "
           f"{b['relations']} relations, {b['validator_errors']} errors / {b['validator_warnings']} warnings, "
           f"locator hit {b['locator_hit_rate']}, unsupported {b['unsupported_ratio']}")
     if "teach" in result and result["teach"].get("attempts"):
