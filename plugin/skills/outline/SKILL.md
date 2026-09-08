@@ -1,6 +1,6 @@
 ---
 name: outline
-description: Generate, discuss or revise the outline of one Whetstone course — the problem chain of units, every concept with its role (core / supporting / listed / deferred), the coverage ledger and the learning mode — and write it back to outline.md and lesson-plan.json after the learner confirms. Use when the learner wants to see, change or redo a course outline ("看看大纲", "把第 3 节拆开", "这个概念升成 core", "改成快速模式"), or to prepare an outline before building. Does not generate unit documents or teach.
+description: 生成、讨论或修改一门 Whetstone 课程的大纲——unit 的问题链、全部概念及其角色（core / supporting / listed / deferred）、覆盖账本、学习模式；骨架课另含证据池、概念落点、探测题与分支候选。学习者确认后写回 outline.md 与 lesson-plan.json。用于"看看大纲""把第 3 节拆开""这个概念升成 core""改成快速模式"，或在 build 前先出大纲。不生成 unit 文档、不教学。
 ---
 
 # Outline：课程大纲

@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Whetstone's main entry point — the full flow from planning to tutoring. Fills in whatever is missing (learner profile, material triage, course-by-course learning plan, confirmed course outline), then generates one document per unit, diagnoses prerequisites, and tutors section by section with prediction, own-words reconstruction, confidence rating, targeted follow-ups and an append-only learner log. Use to learn from provided documents, codebases or conversation records, or to resume a course; not for generic summaries or quizzes.
+description: Whetstone 的总入口——从规划到教学的完整流程。缺什么补什么：学习者档案、材料评估、逐门确认的学习计划、确认过的课程大纲（材料取向按标题覆盖；领域取向先学骨架课再选分支），然后按 unit 逐份生成文档、诊断前置或做原理探测，再逐节教学：先预测、用自己的话重建、自评信心、针对性追问，学习记录只追加。用于学习给定的文档、代码库或会话记录，或继续一门课；不用于泛泛的总结或测验。
 ---
 
 # Guided Learning Tutor

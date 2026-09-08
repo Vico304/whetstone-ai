@@ -1,8 +1,8 @@
-# Guided Learning Tutor
+# Whetstone 插件
 
 一个跨宿主的学习技能插件。它读取用户明确提供的文档、代码库或会话记录，把材料改写成"问题 → 方案 → 新问题"的教学文档，然后逐节要求学习者解释并给予证据约束的反馈。
 
-同一份技能目录同时适配三个宿主：
+同一份技能目录同时适配四个宿主（Claude Desktop 用打包的 `.plugin` 或 `~/.claude/skills`）：
 
 | 宿主 | 安装方式 | 调用方式（guide / outline / learn / clarify） |
 |---|---|---|

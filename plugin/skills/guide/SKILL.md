@@ -1,6 +1,6 @@
 ---
 name: guide
-description: Whetstone's wizard. Every invocation first asks whether the learner wants to know how to use the system or wants to plan their study; planning runs the shared stages — learner profile (situation, background, end capabilities, preferences), material triage of a directory (repos, documents, AI-generated intermediates, noise, graded A/B/C/D), and a course-by-course confirmed learning plan — and can be re-run at any time to revise background, goals or the plan. Use when the learner asks how to start, wants to (re)plan what to learn, or is unsure whether a messy directory of materials is suitable. Does not build or teach a course.
+description: Whetstone 的向导。每次调用先问：想了解怎么用，还是要规划之后的学习？规划走共享阶段——学习者档案（情境、背景、终点能力、取向 material/domain、偏好）、混杂目录的材料评估（仓库、文档、AI 生成的中间文档、噪声，定级 A/B/C/D）、逐门确认的学习计划（领域取向：骨架课 + 分支候选表）；可随时重跑以修改背景、目标或计划。用于"怎么开始""重新规划学什么""这堆材料能不能学"。不建课、不教学。
 ---
 
 # Guide：向导

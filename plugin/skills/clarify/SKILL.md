@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: Maintain an Obsidian-compatible concept-note directory for a guided-learning lesson pack. Scan inbox lists and unresolved [[wikilinks]] left by the learner, then write one source-grounded, example-rich note per unclear concept, cross-linked with the teaching guide and other notes. Use when the learner has marked concepts they do not understand and asks to expand them.
+description: 维护学习包的概念笔记目录（Obsidian 兼容）。扫描 concepts/_inbox.md 与学习者留下的未解决 [[wikilink]]，为每个不懂的概念写一份有来源、多例子的笔记，并与 unit 文档和其他笔记双向链接。用于学习者标记了不理解的概念并要求展开时。
 ---
 
 # Clarify：概念笔记维护
