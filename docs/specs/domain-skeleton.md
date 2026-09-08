@@ -62,7 +62,7 @@
 
 - `branch_candidates[].status` 改为 `chosen`，其余 `candidate` / `declined`；
 - 在 `learning-plan.md` 追加一门课（`shape: branch`，`parent_course` 指向骨架课 id，材料 = 候选的路径），走普通的阶段 4 → 5；
-- 分支课的 `lesson-plan.json` 可以用 `parent_course` 让 `index_match.py prerequisites` 把骨架概念视作已有证据（骨架课记录在知识库里时）。
+- 知识库开启时，骨架课记录的概念证据会被分支课的 `index_match.py prerequisites` 按概念 id 自然命中（跨课注册表已有此能力，不需要新字段）；`parent_course` 只用于导航与导出，不参与判定。
 
 学习者也可以选择"不深入，结束"。
 
