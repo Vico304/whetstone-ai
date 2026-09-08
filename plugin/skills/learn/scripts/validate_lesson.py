@@ -66,8 +66,15 @@ def validate_source_refs(refs: Any, location: str, errors: list[str], manifest_p
             require_text(ref, key, ref_location, errors)
         if ref.get("support") not in SUPPORT_TYPES:
             errors.append(f"{ref_location}.support must be one of {sorted(SUPPORT_TYPES)}")
-        if manifest_paths is not None and nonempty(ref.get("path")) and ref["path"] not in manifest_paths:
-            errors.append(f"{ref_location}.path '{ref['path']}' is absent from the source manifest")
+        path = ref.get("path")
+        if is_url(path) and ref.get("support") != "external":
+            errors.append(f"{ref_location}: a URL path must carry support 'external'")
+        if manifest_paths is not None and nonempty(path) and not is_url(path) and path not in manifest_paths:
+            errors.append(f"{ref_location}.path '{path}' is absent from the source manifest")
+
+
+def is_url(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(("http://", "https://"))
 
 
 def validate_concept_v11(concept: dict, location: str, errors: list[str], names_by_id: dict[str, str]) -> None:
@@ -376,6 +383,9 @@ def collect_warnings(plan: Any) -> list[str]:
             "consider a skeleton pass with on-demand expansion"
         )
     role_aware = schema_version(plan) == "1.2"
+    confirmed = plan.get("outline_confirmed_at")
+    if role_aware and isinstance(confirmed, str) and re.search(r"T00:00(:00)?(\.0+)?(Z|[+-]\d\d:\d\d)?$", confirmed):
+        warnings.append("outline_confirmed_at looks like a placeholder (midnight); record the real time, e.g. `date -u +%FT%TZ`")
     for index, section in enumerate(sections):
         if not isinstance(section, dict):
             continue
@@ -399,6 +409,8 @@ def collect_warnings(plan: Any) -> list[str]:
         if len(supporting) > MAX_SUPPORTING_PER_SECTION:
             warnings.append(f"sections[{index}] has {len(supporting)} supporting concepts (> {MAX_SUPPORTING_PER_SECTION})")
         for c_index, concept in enumerate(concepts):
+            if isinstance(concept, dict) and concept.get("role") == "supporting" and not isinstance(concept.get("check"), dict):
+                warnings.append(f"sections[{index}].concepts[{c_index}] is 'supporting' but has no check question; the learner cannot ask to verify it")
             if isinstance(concept, dict) and concept.get("role") == "listed" and len(str(concept.get("explanation", ""))) > MAX_LISTED_EXPLANATION_CHARS:
                 warnings.append(
                     f"sections[{index}].concepts[{c_index}] is 'listed' but its explanation is long "

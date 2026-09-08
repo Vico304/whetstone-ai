@@ -4,7 +4,7 @@
   "title": "示例：从总体问题理解系统设计",
   "learning_goal": "能解释每个方案为何出现，以及它如何引出下一步",
   "mode": "full",
-  "outline_confirmed_at": "2026-09-06T00:00:00Z",
+  "outline_confirmed_at": "2026-09-06T09:41:17Z",
   "source_manifest": null,
   "big_picture": {
     "problem": "如何把分散输入转成可以理解和验证的结果",
