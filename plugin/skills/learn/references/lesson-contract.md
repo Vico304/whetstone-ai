@@ -122,7 +122,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 
 ## `units/<section-id>.md`（1.2）
 
-每个非 deferred 的 unit 一份，**独立生成**（只带本 unit 的来源定位读原文）。必含：当前问题、解决方案、工作机制、它引出的新问题、**本节概念**（core / supporting / listed 三块可见；supporting 各有一段"在本节机制里的位置"；listed 只有名 + 一句 + 定位，不讲机制）、来源、"轮到你"检查点。不含 `meaning / tradeoffs / principle / criteria`。校验器检查：文件存在（非 deferred）、标题、检查点、本节每个概念名；criteria / principle 泄漏为错误，meaning / tradeoffs 逐字出现为 warning。模板见 `assets/units-template/s01.md`。
+每个非 deferred 的 unit 一份，**独立生成**（只带本 unit 的来源定位读原文）。必含：当前问题、解决方案、工作机制、它引出的新问题、**本节概念**（core / supporting / listed 三块可见；supporting 各有一段"在本节机制里的位置"；listed 只有名 + 一句 + 定位，不讲机制）、来源、"轮到你"检查点。不含 `meaning / tradeoffs / principle / criteria`。校验器检查：文件存在（非 deferred）、标题、检查点（**必须含 `checkpoint.prompt` 原文**）、本节每个概念名；criteria / principle 泄漏为错误，骨架课 `probe.prompt` 出现在 unit 里为错误（探测题在教学前无提示作答，不得预先出现在文档里），meaning / tradeoffs 逐字出现为 warning。模板见 `assets/units-template/s01.md`。
 
 ## `teaching-guide.md`（1.0 / 1.1 旧课程）
 

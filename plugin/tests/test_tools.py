@@ -1136,3 +1136,20 @@ class SkeletonCourseTests(unittest.TestCase):
             extraction=None, comparison=None, elapsed_seconds=None,
         )
         self.assertEqual(event["evidence_tier"], "immediate")
+
+    def test_unit_must_show_checkpoint_not_probe(self):
+        plan = load_skeleton()
+        section = plan["sections"][0]
+        body = "# " + section["title"] + "\n\n" + "\n".join(f"- {c['name']}" for c in section["concepts"]) + "\n\n## 轮到你解释\n\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            units = Path(temporary)
+            (units / "s01.md").write_text(body + section["probe"]["prompt"] + "\n", encoding="utf-8")
+            (units / "s02.md").write_text("# " + plan["sections"][1]["title"] + "\n## 轮到你\n" + plan["sections"][1]["checkpoint"]["prompt"] + "\n"
+                                          + "\n".join(c["name"] for c in plan["sections"][1]["concepts"]), encoding="utf-8")
+            errors, _ = validate_lesson.validate_units(units, plan)
+            self.assertTrue(any("s01.md contains the probe question" in e for e in errors), errors)
+            self.assertTrue(any("s01.md does not contain its checkpoint.prompt" in e for e in errors), errors)
+            self.assertFalse(any("s02.md" in e for e in errors), errors)
+            (units / "s01.md").write_text(body + section["checkpoint"]["prompt"] + "\n", encoding="utf-8")
+            errors, _ = validate_lesson.validate_units(units, plan)
+            self.assertEqual(errors, [])
