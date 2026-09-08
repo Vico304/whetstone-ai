@@ -345,6 +345,42 @@ python3 $S/store_init.py show --store store
 
 向导到此结束，不开课。
 
+### 7.1a 材料太多太杂、想先巩固领域本身：domain 取向与骨架课
+
+如果你的目标不是"学这批材料"而是"从头把这个领域的基本原理巩固一遍，再决定深入哪块"，在向导第一步把取向定为 `domain`（规格：`docs/specs/domain-skeleton.md`）。区别：
+
+| | material（默认） | domain |
+|---|---|---|
+| 覆盖账本 | 按标题逐条，每部分都要有去处 | 按文件/目录：`pool`（证据池）/ `reserve`（留给分支）/ `excluded` |
+| 第一门课 | 材料的一个子集 | **骨架课**：只讲基本原理，规模由原理依赖图决定，不设上限 |
+| 前置诊断 | `prerequisite/` 协议 | 每个 unit 一道**原理探测**，答对可跳过该 unit（由你确认） |
+| 相关性 | 天然的 | 两张表：每个概念在你材料里的**落点**（比例只展示、无阈值）+ **分支候选**（原理 → 你的模块 → 实际工作） |
+| 之后 | 下一门课 | 结课时从候选里选分支，每个分支变成一门普通课 |
+
+> **你**：/whetstone:guide → 规划。目录 ~/Project/tee；我想从头巩固可信计算，不只是学 Occlum。
+
+> **模型**：取向记为 domain。……扫描同前。证据池：`occlum/docs`、`occlum/src/libos`；留给分支：`teeapp/src/ra`、`trustflow-capsule-manager/…`；不用：会话交接、日志。计划：骨架课「可信执行环境的基本原理」+ 4 个分支候选（现在不确认）。骨架课接受？
+
+> **你**：接受。
+
+> **模型**（outline 阶段）：骨架课大纲 —— 原理依赖图切成 7 个 unit（隔离 → 度量 → 证明 → 密封 → 密钥交付 → LibOS 系统调用 → 侧信道边界）。**落点比例 11/14**：2 个 external（信任根、证书链），1 个 no-anchor（Quote 格式）。分支候选 4 条，其中「项目里的远程证明链路」对应你负责的 RA 校验。骨架讲的是通用原理，和教科书重合是正常的；漂不漂你看这两张表判断。模式？no-anchor 的 Quote 留不留？
+
+> **你**：完整；Quote 留着当通识。
+
+> **模型**：确认，生成 7 份 unit。先做**原理探测**：unit 1——不看材料：为什么只靠操作系统的权限检查不足以保护一段代码的数据？……（7 题后）unit 1、2 探测通过，跳过还是照学？
+
+> **你**：跳过 1，2 照学。
+
+> **模型**：unit 1 记为 deferred（原理探测通过）。进入 unit 2 READY……
+
+结课时：
+
+> **模型**：整体重述与迁移题（用你的 `teeapp/src/ra` 出的）完成。分支候选：① 项目里的远程证明链路（远程证明、度量 → 你的 RA 校验）② LibOS 系统调用 ③ Capsule Manager 密钥分发 ④ SEFS。深入哪些、什么顺序？
+
+> **你**：① 然后 ③。
+
+> **模型**：写入 `learning-plan.md` 两门分支课（`shape: branch`，父课程 tee-skeleton-1）。分支课 ① 的调用语句：`/whetstone:learn 学习 teeapp/src/ra，课程目录 courses/ra-chain/`——它回到逐标题账本，骨架课记录的概念在前置判断里视作已有证据。
+
 ### 7.2 只改大纲
 
 > **你**：/whetstone:outline courses/capsule-manager-keys/ 把第 3 节拆成两节，"证书轮换"升成 core
@@ -421,6 +457,7 @@ python3 $S/validate_lesson.py courses/old/lesson-plan.json --guide courses/old/t
 # 进度
 python3 $S/learning_state.py init --lesson-plan courses/x/lesson-plan.json --output courses/x/learning-progress.json
 python3 $S/learning_state.py show --state courses/x/learning-progress.json
+python3 $S/learning_state.py defer --state courses/x/learning-progress.json --section-id s01 --reason "原理探测通过，学习者选择跳过"   # 骨架课
 # 记一次作答（知识库模式）
 python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint \
   --response-file /tmp/r.txt --feedback-file /tmp/f.txt --verdict partial --confidence 4 \

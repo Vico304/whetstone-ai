@@ -1,7 +1,7 @@
 # 设计定稿 C：课程规划——大纲、按 unit 生成、模式、概念角色
 
 > 文档性质：规范性设计定稿（schema 1.2）。回答"复杂材料如何规划课程、如何避免静默遗漏"。
-> 状态：已定稿（2026-09-06）；2026-09-07 按实现（提交 `b009f22`，schema 1.2）校正字段名与流程，并加入规划管线分层（§11）。实现与本文档不一致处以脚本为准并回改本文档。
+> 状态：已定稿（2026-09-06）；2026-09-07 按实现（提交 `b009f22`，schema 1.2）校正字段名与流程，并加入规划管线分层（§11）。实现与本文档不一致处以脚本为准并回改本文档。2026-09-08 起由 [domain-skeleton.md](domain-skeleton.md)（规格 D，schema 1.3）增补取向轴：本文的数字（unit 数、概念数）一律视为建议值，只有 `core ≤ 4` 是校验器警告。
 > 上位文档：[consensus.md](../consensus.md)；相关：[knowledge-store.md](knowledge-store.md)、[protocol-architecture.md](protocol-architecture.md)、[../learning-layers.md](../learning-layers.md)。
 > 触发：使用者用 0.2.0 学 RISC-V CoVE 规范的反馈——"核心概念抓取准确，但长材料里 page fault、时钟中断等关键细节没涉及"。根因不是抽取，是规划：一次性生成、不可协商、没有覆盖账本。
 

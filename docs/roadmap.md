@@ -50,6 +50,10 @@ v1 的核心机制是 MRG / LRG 对称比较；它从未运行，且交互成本
 
 用户提议并批准：`learn` 是总入口、缺什么补什么；`guide`（每次先问"怎么用 / 规划"：目标与背景 → 材料评估 → 逐门确认的学习计划）与 `outline`（单门课大纲的生成 / 讨论 / 修改）是可重入的阶段入口；`brief` 并入 `guide`。阶段协议只在 `learn/references/stages/` 维护一份。三层产物寿命不同：`learner-profile.md`（跨课）、`learning-plan.md`（一组课）、`courses/<id>/outline.md`（一门课）。`survey_materials.py` 清点混杂目录（起因：用户的 `~/Project/tee`：4 仓库 + 12 份生成文档 + 2 GB 日志）。
 
+## P0.7 — 学习取向与骨架课（spec D，2026-09-08）— ✅ 完成
+
+起因：用户在 `~/Project/tee`（多仓库 + 生成文档）上实测后指出，材料太多太杂时"既要分析又要保证概念全覆盖"拖垮效果，而他真正要的是"先巩固领域基本原理，再选分支深入到实际工作"。决策见 [specs/domain-skeleton.md](specs/domain-skeleton.md)：取向 `material | domain` 是与模式正交的轴，不是第三种模式、不是新技能；**不设任何量化上限**（骨架规模由原理依赖图决定，唯一保留 `core ≤ 4 / unit` 警告）；骨架可以教科书化，相关性靠概念落点（grounding，只展示无阈值）与分支候选表保证。落地：schema 1.3（`shape`、按文件的 `pool / reserve`、`anchor`、`probe`、`branch_candidates`）；`stages/skeleton.md`、`protocol/probe.md`、finish 分支决策；`lrg_record --kind probe`、`learning_state defer`；示例包 `assets/skeleton-example/`；7 个测试。待验证：在 tee 目录上真实跑一门骨架课，看 grounding 比例与探测跳过率。
+
 ## P1 — 在 P0 有数据之后
 
 **导出与可视化**：`export_graph.py` → `exports/graph.json` 与 Obsidian 目录（学科路径 = 目录，frontmatter 带时效与掌握估计）。先用 Obsidian graph 看一周，再决定是否做单文件 HTML。

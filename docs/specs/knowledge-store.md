@@ -2,7 +2,7 @@
 
 > 文档性质：规范性设计定稿（schema 1.1）。实现前的权威描述；实现落地后，以脚本与校验器为准，本文档同步修订。
 > 状态：§2–§6、§10 已实现（2026-09-05，P0）；§7 质疑通道与 §9 可视化导出待实现（P1）。实现与本文档不一致处以脚本为准并回改本文档。
-> 上位文档：[consensus.md](../consensus.md)（冲突时以共识为准）；理念背景见 [learning-layers.md](../learning-layers.md)。课程规划层（大纲、unit 文档、模式、概念角色、覆盖账本）见 [course-planning.md](course-planning.md)，它把 lesson-plan 升到 1.2。
+> 上位文档：[consensus.md](../consensus.md)（冲突时以共识为准）；理念背景见 [learning-layers.md](../learning-layers.md)。课程规划层（大纲、unit 文档、模式、概念角色、覆盖账本）见 [course-planning.md](course-planning.md)，它把 lesson-plan 升到 1.2。取向与骨架课见 [domain-skeleton.md](domain-skeleton.md)（lesson-plan 1.3；MRG 导出带 `shape`、概念级 `anchor` 来源、`branch_candidates`，LRG 新增 `probe` 事件）。
 
 ---
 

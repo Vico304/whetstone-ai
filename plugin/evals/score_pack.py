@@ -64,7 +64,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     if outline:
         errors += validate_lesson.validate_outline(outline, plan)
     units_present = None
-    if validate_lesson.schema_version(plan) == "1.2":
+    if validate_lesson.schema_version(plan) in validate_lesson.ROLE_AWARE_VERSIONS:
         if units_dir.is_dir():
             unit_errors, unit_warnings = validate_lesson.validate_units(units_dir, plan)
             errors += unit_errors
