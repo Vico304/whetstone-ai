@@ -679,6 +679,8 @@ def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
         for concept in section.get("concepts") or []:
             if isinstance(concept, dict) and nonempty(concept.get("name")) and normalize_text(concept["name"]) not in normalized:
                 errors.append(f"units/{section['id']}.md does not mention concept '{concept['name']}'")
+        if "想验收" in text or "说“验收" in text or '说"验收' in text:
+            warnings.append(f"units/{section['id']}.md carries a '验收 X' reminder next to a supporting concept; that instruction belongs in outline.md only")
         for label, text_hidden in hidden_texts(section):
             if label.startswith("rationale-layer"):
                 if criterion_leaked(text_hidden, normalized):
