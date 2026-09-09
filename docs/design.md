@@ -144,7 +144,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify） |
 | `evals/score_pack.py` | 给一个课程目录打分：校验错误、概念数、support 分布、locator 命中率、角色与覆盖表指标、每节耗时与 `depth_reached` |
 
-**四个宿主，一份技能目录。** Claude Code 插件、Claude Desktop（`.plugin` 包或 `~/.claude/skills`）、Codex、DeepSeek Harness。技能内路径按 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}` 或技能目录本身解析；Claude Desktop 聊天模式下插件在云端、文件在本地，脚本复制到 `whetstone/scripts/` 本地执行。同一协议在不同模型上的遵循差异本身是数据：Claude 的 locator 命中率 0.145、DeepSeek 0.647（两次真实建课，2026-09-08），由此定下"标题原文或符号名开头"的定位约定。
+**五个宿主，一份技能目录。** Claude Code 插件、Claude Desktop（`.plugin` 包或 `~/.claude/skills`）、Codex、DeepSeek Harness、pi（根目录 `package.json` 的 `pi.skills`）。技能内路径按 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、pi 给出的 `<location>` 或技能目录本身解析；Claude Desktop 聊天模式下插件在云端、文件在本地，脚本复制到 `whetstone/scripts/` 本地执行。同一协议在不同模型上的遵循差异本身是数据：Claude 的 locator 命中率 0.145、DeepSeek 0.647（两次真实建课，2026-09-08），由此定下"标题原文或符号名开头"的定位约定。
 
 **测试与评测。** 61 个单元测试；CI 跑测试、校验模板与示例包、知识库全链路冒烟。`plugin/evals/` 固定三份材料，`score_pack.py` 打分；提示词改动要能在同一组材料上看到指标变化。纯标准库 Python，无服务端。
 

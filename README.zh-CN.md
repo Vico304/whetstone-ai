@@ -11,7 +11,7 @@
 
 ## 这是什么
 
-一个装在 Claude Code、Claude Desktop、Codex 或 DeepSeek Harness 里的学习工具。你给它一本书、一份文档或一个代码库，它把材料重排成一条"问题 → 方案 → 新问题"的路径，然后一节一节地要求你：
+一个装在 Claude Code、Claude Desktop、Codex、DeepSeek Harness 或 pi 里的学习工具。你给它一本书、一份文档或一个代码库，它把材料重排成一条"问题 → 方案 → 新问题"的路径，然后一节一节地要求你：
 
 - 读到方案之前先预测："你觉得该怎么解决？"
 - 读完合上材料，用自己的话讲这一节的概念和机制；
@@ -30,13 +30,14 @@
 
 ## 安装
 
-同一份技能目录，四个环境：
+同一份技能目录，五个环境：
 
 | 环境 | 安装 | 调用 |
 |---|---|---|
 | Claude Code | `claude plugin marketplace add /path/to/whetstone-ai && claude plugin install whetstone@whetstone-ai`；或临时 `claude --plugin-dir ./plugin` | `/whetstone:learn` 等 |
 | Claude Desktop | `python3 package_plugin.py` 生成 `../dist/whetstone.plugin`，在插件管理器上传；或 `./install_skills.sh ~/.claude/skills` | `/learn` 等 |
 | DeepSeek Harness | `./install_skills.sh ~/.agents/skills`，重启 `npx @deepseek-ai/dsh web` | `/learn` 等 |
+| pi | `pi install git:github.com/Vico304/whetstone-ai`（或本地 `pi install /path/to/whetstone-ai`、`./install_skills.sh ~/.pi/agent/skills`） | `/skill:learn` 等 |
 | Codex | 把 `plugin/` 作为插件安装 | `$learn` 等 |
 
 装好后在对话里输入 `/`，看到 `guide / outline / learn / clarify` 四个技能即可。系统写出的一切都放在材料目录下的 `whetstone/` 里，你的材料本身不会被改动。

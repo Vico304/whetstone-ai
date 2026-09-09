@@ -3,6 +3,7 @@
 #   DeepSeek Harness (dsh):  ./install_skills.sh ~/.agents/skills          (global)
 #                            ./install_skills.sh <project>/.agents/skills  (project; needs .git)
 #   Claude Code personal:    ./install_skills.sh ~/.claude/skills
+#   pi:                      ./install_skills.sh ~/.pi/agent/skills     (or: pi install /path/to/whetstone-ai)
 # Add --link to symlink instead of copy (handy while developing; not every host follows symlinks).
 set -e
 TARGET="${1:?usage: install_skills.sh <skills-dir> [--link]}"
@@ -19,4 +20,4 @@ for skill in guide outline learn clarify; do
   fi
   echo "installed $skill -> $TARGET/$skill"
 done
-echo "Restart the host so it rediscovers skills; then type / and look for guide, outline, learn, clarify."
+echo "Restart the host so it rediscovers skills; then type / and look for guide, outline, learn, clarify (pi: /skill:learn)."

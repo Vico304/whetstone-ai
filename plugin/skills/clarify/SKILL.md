@@ -7,7 +7,7 @@ description: 维护学习包的概念笔记目录（Obsidian 兼容）。扫描 
 
 学习者在学习包的任何文档里用 `[[概念名]]` 标记不理解的概念，或把概念列进 `concepts/_inbox.md`，然后调用本技能。技能为每个未解决的概念生成一份有来源、多例子的概念笔记，并用 Obsidian 双链把笔记、教学文档和其他概念互相连接。
 
-调用方式：Codex 中 `$clarify`；Claude Code 中 `/whetstone:clarify` 或自然语言触发；DeepSeek Harness 中 `/clarify`。
+调用方式：Codex 中 `$clarify`；Claude Code 中 `/whetstone:clarify` 或自然语言触发；DeepSeek Harness 中 `/clarify`；pi 中 `/skill:clarify`。
 
 ## 路径解析约定
 
@@ -15,7 +15,8 @@ description: 维护学习包的概念笔记目录（Obsidian 兼容）。扫描 
 
 - Claude Code（插件安装）：技能目录为 `${CLAUDE_PLUGIN_ROOT}/skills/clarify`；
 - Claude Code 以个人/项目技能安装（`~/.claude/skills/clarify/`）：技能目录为 `${CLAUDE_SKILL_DIR}`；
-- DeepSeek Harness / 直接放入 `~/.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身。
+- DeepSeek Harness / 直接放入 `~/.agents/skills/` 的环境：技能目录即被安装的 skill 目录本身；
+- pi：系统提示里 `<location>` 给出本 SKILL.md 的绝对路径，技能目录就是它所在的目录。
 
 shell 的 cwd 通常是用户项目目录，不要以相对路径直接执行脚本。概念笔记写入学习包的 `concepts/` 目录，与技能目录无关。
 

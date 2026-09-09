@@ -13,7 +13,7 @@ This is the short English version. The full documentation is in Chinese: **[中�
 
 ## What it is
 
-A learning tool that runs inside Claude Code, Claude Desktop, Codex or DeepSeek Harness. Give it a book, a document or a codebase; it rearranges the material into a `problem → solution → new problem` path and then, section by section, makes you:
+A learning tool that runs inside Claude Code, Claude Desktop, Codex, DeepSeek Harness or pi. Give it a book, a document or a codebase; it rearranges the material into a `problem → solution → new problem` path and then, section by section, makes you:
 
 - predict the solution before reading it;
 - close the material and explain the section in your own words;
@@ -30,13 +30,14 @@ Two things it deliberately withholds:
 
 ## Install
 
-One skill directory, four hosts:
+One skill directory, five hosts:
 
 | Host | Install | Invoke |
 |---|---|---|
 | Claude Code | `claude plugin marketplace add /path/to/whetstone-ai && claude plugin install whetstone@whetstone-ai`, or ad hoc `claude --plugin-dir ./plugin` | `/whetstone:learn` … |
 | Claude Desktop | `python3 package_plugin.py` builds `../dist/whetstone.plugin`; upload it in the plugin manager. Or `./install_skills.sh ~/.claude/skills` | `/learn` … |
 | DeepSeek Harness | `./install_skills.sh ~/.agents/skills`, then restart `npx @deepseek-ai/dsh web` | `/learn` … |
+| pi | `pi install git:github.com/Vico304/whetstone-ai` (or a local checkout: `pi install /path/to/whetstone-ai`, or `./install_skills.sh ~/.pi/agent/skills`) | `/skill:learn` … |
 | Codex | install `plugin/` as a plugin | `$learn` … |
 
 Type `/` and you should see `guide / outline / learn / clarify`. Everything the tool writes goes under `whetstone/` inside your materials directory; the materials themselves are never modified.
