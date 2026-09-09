@@ -1,6 +1,6 @@
 # Whetstone 设计
 
-本文说明系统为什么这样设计，以及每个设计落在代码的哪里。文件格式见 [specs/](specs/)，学习科学依据见 [reviews/evidence-review.md](reviews/evidence-review.md)，用语对照见 [glossary.md](glossary.md)。本文只描述已实现的行为。
+本文说明系统为什么这样设计，以及每个设计落在代码的哪里。文件格式见 [specs/](specs/)，学习科学依据见 [evidence.md](evidence.md)，用语对照见 [glossary.md](glossary.md)。本文只描述已实现的行为。
 
 ## 1. 问题
 
@@ -161,4 +161,4 @@ ASSESS ├ mastered → 简短巩固，下一节
 
 ## 10. 状态
 
-规划管线与建课在 Claude Desktop 和 DeepSeek Harness 上各跑过多次；逐节教学在日常使用中。知识库模式有单元测试和 CI 冒烟，但没有在一门真实课程上留下过学习记录；骨架课在 DeepSeek 上建过一次，探测轮未跑。未经验证的假设列在 [reviews/evidence-review.md](reviews/evidence-review.md)。
+规划管线与建课在 Claude Desktop 和 DeepSeek Harness 上各跑过多次；逐节教学在日常使用中。知识库模式有单元测试和 CI 冒烟，但没有在一门真实课程上留下过学习记录；骨架课在 DeepSeek 上建过一次，探测轮未跑。未经验证的假设列在 [evidence.md](evidence.md)。

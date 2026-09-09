@@ -21,7 +21,7 @@ A learning tool that runs inside Claude Code, Claude Desktop, Codex or DeepSeek 
 - answer a follow-up aimed at the weakest point of your actual answer;
 - on your next session, answer a variant question first to check what survived.
 
-Decades of learning science point the same way: methods that make learning *feel* easy mostly hurt long-term retention; methods that make recall *harder* mostly strengthen it. Retrieval practice g ≈ 0.5–0.6, self-explanation g ≈ 0.55, rereading near zero (sources in [`docs/reviews/evidence-review.md`](docs/reviews/evidence-review.md)). This tool sits on the effortful side.
+Decades of learning science point the same way: methods that make learning *feel* easy mostly hurt long-term retention; methods that make recall *harder* mostly strengthen it. Retrieval practice g ≈ 0.5–0.6, self-explanation g ≈ 0.55, rereading near zero (sources in [`docs/evidence.md`](docs/evidence.md)). This tool sits on the effortful side.
 
 Two things it deliberately withholds:
 
