@@ -11,8 +11,9 @@
 开场变式题之外（或代替之），可以从学习者过去的错误主张里取一条做复习：
 
 ```bash
-python3 scripts/learner_state_build.py build --store <知识库目录>
-python3 scripts/review_pool.py --store <知识库目录> --lesson-id <lesson-id> --progress path/to/learning-progress.json
+python3 scripts/learner_state_build.py build --store whetstone/store
+python3 scripts/review_pool.py --store whetstone/store --lesson-id <lesson-id> --progress path/to/learning-progress.json
+# 想把别的工作区里学过的错误主张也拿来复习：--home 代替 --store（读学习者主目录，一次）
 ```
 
 `review_pool.py` 只读派生状态，返回的每条 `claim` 是抽取时已去主体化的命题（不含"你说""我认为"，不引用原句）。呈现方式固定为匿名主张：

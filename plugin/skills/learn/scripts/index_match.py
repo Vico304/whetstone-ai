@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 import unicodedata
 from pathlib import Path
@@ -63,6 +64,26 @@ def load_learner_state(store: Path) -> dict:
     if not path.is_file():
         return {}
     return json.loads(path.read_text(encoding="utf-8")).get("concepts", {})
+
+
+def default_home() -> Path:
+    env = os.environ.get("WHETSTONE_HOME")
+    return Path(env).expanduser() if env else Path.home() / ".whetstone"
+
+
+def registry_root(args: argparse.Namespace) -> Path:
+    """Where recall/prerequisites read from: the learner home (--home, aggregate of every pushed
+    workspace) or a single local store (--store). The home has the same index.json / learner-state.json
+    layout, so the readers below do not care which one they get."""
+    if getattr(args, "home", None) is not None:
+        home = Path(args.home).expanduser() if args.home else default_home()
+        if not (home / "home.json").is_file():
+            raise ValueError(f"no learner home at {home} (nothing pushed yet; run store_sync.py push, or use --store)")
+        return home
+    if args.store is None:
+        raise ValueError("give --store <local store> or --home [learner home]")
+    store_init.load_store(args.store)
+    return args.store
 
 
 def recall(index: dict, candidates: list[dict], learner_state: dict | None = None) -> list[dict]:
@@ -145,11 +166,11 @@ def register_nodes(index: dict, nodes: list[dict], lesson_id: str) -> dict:
 
 
 def command_recall(args: argparse.Namespace) -> int:
-    store_init.load_store(args.store)
+    root = registry_root(args)
     candidates = json.loads(args.candidates.read_text(encoding="utf-8"))
     if not isinstance(candidates, list):
         raise ValueError("candidates file must contain a JSON list")
-    results = recall(load_index(args.store), candidates, load_learner_state(args.store))
+    results = recall(load_index(root), candidates, load_learner_state(root))
     print(json.dumps({"results": results}, ensure_ascii=False, indent=2))
     return 0
 
@@ -195,9 +216,9 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
 
 
 def command_prerequisites(args: argparse.Namespace) -> int:
-    store_init.load_store(args.store)
+    root = registry_root(args)
     plan = json.loads(args.prerequisite_plan.read_text(encoding="utf-8"))
-    decisions = prerequisite_plan_lookup(load_index(args.store), plan, load_learner_state(args.store))
+    decisions = prerequisite_plan_lookup(load_index(root), plan, load_learner_state(root))
     print(json.dumps({"decisions": decisions}, ensure_ascii=False, indent=2))
     return 0
 
@@ -223,7 +244,7 @@ def command_register(args: argparse.Namespace) -> int:
 
 
 def command_show(args: argparse.Namespace) -> int:
-    index = load_index(args.store)
+    index = load_index(registry_root(args))
     print(f"concepts: {len(index['concepts'])}  aliases: {len(index['alias_index'])}")
     for cid, entry in sorted(index["concepts"].items()):
         path = "/".join(entry.get("domain_path") or [])
@@ -236,11 +257,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     r = sub.add_parser("recall", help="Find existing ids for candidate concepts")
-    r.add_argument("--store", type=Path, required=True)
+    r.add_argument("--store", type=Path, help="a local store")
+    r.add_argument("--home", nargs="?", const="", help="the learner home (aggregate of every pushed workspace); default $WHETSTONE_HOME or ~/.whetstone")
     r.add_argument("--candidates", type=Path, required=True, help='JSON list of {"name", "aliases": [], "domain_path": []}')
     r.set_defaults(handler=command_recall)
     q = sub.add_parser("prerequisites", help="Decide variant-vs-diagnose for each prerequisite in a plan")
-    q.add_argument("--store", type=Path, required=True)
+    q.add_argument("--store", type=Path, help="a local store")
+    q.add_argument("--home", nargs="?", const="", help="the learner home; default $WHETSTONE_HOME or ~/.whetstone")
     q.add_argument("--prerequisite-plan", type=Path, required=True)
     q.set_defaults(handler=command_prerequisites)
     g = sub.add_parser("register", help="Register a lesson's exported MRG nodes")
@@ -248,7 +271,8 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--lesson-id", required=True)
     g.set_defaults(handler=command_register)
     s = sub.add_parser("show", help="List the registry")
-    s.add_argument("--store", type=Path, required=True)
+    s.add_argument("--store", type=Path)
+    s.add_argument("--home", nargs="?", const="")
     s.set_defaults(handler=command_show)
     return parser.parse_args()
 

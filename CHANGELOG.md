@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 知识库改为本地优先：每个材料目录的库固定在 `whetstone/store/`，每次作答只写工作区内，宿主不再逐节弹权限；跨目录的记忆放到 `~/.whetstone/`（`WHETSTONE_HOME` 可改），由结课时 `store_sync.py push` 把本目录的索引与掌握状态快照汇总过去，主目录里没有原始回答。`index_match.py` / `review_pool.py` 加 `--home` 读汇总；档案的 `knowledge_store` 改为 on/off。起因：库在工作区之外时每一节都要申请一次写权限。
 - 适配 pi：根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`，`pi install git:github.com/Vico304/whetstone-ai` 或本地路径即可安装；`install_skills.sh` 也可装到 `~/.pi/agent/skills`。SKILL.md 的路径约定加入 pi 的 `<location>`；调用 `/skill:learn` 等。
 
 ## 1.0.0 — 2026-09-09

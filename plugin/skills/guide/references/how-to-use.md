@@ -27,7 +27,7 @@ ls <材料根>/whetstone/store/store.json 2>/dev/null   # 有 → 知识库已�
 - 材料是**一个目录或多条路径** → 转"规划"（先目标与背景，再扫描、切计划）；
 - 材料是**单个文件**：≤ 30 KB 直接给 `learn` 调用语句；更大则转"规划"按标题切；
 - **还没有材料** → 说明适合的材料类型（教材一章、规范一章、代码库的一个子系统），不推荐具体书目，结束。
-- 要知识库 → `python3 "<learn 技能目录>/scripts/store_init.py" init --store <目录> --domain-root <学科>`。
+- 要知识库 → `python3 "<learn 技能目录>/scripts/store_init.py" init --store <材料根>/whetstone/store --domain-root <学科>`；跨工作区的记忆在 `~/.whetstone/`，由每门课结课时 `store_sync.py push` 汇总，不用手动建。
 
 ## 交付
 

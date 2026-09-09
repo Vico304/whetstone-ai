@@ -29,6 +29,7 @@ def _load(name: str):
 
 
 store_init = _load("store_init")
+index_match = _load("index_match")
 
 
 def load_state(store: Path) -> dict:
@@ -73,15 +74,25 @@ def pool(state: dict, lesson_id: str | None, concept_ids: list[str] | None, sect
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--store", type=Path, required=True)
+    parser.add_argument("--store", type=Path, help="a local store (this workspace)")
+    parser.add_argument("--home", nargs="?", const="",
+                        help="the learner home instead (aggregate of every pushed workspace); default $WHETSTONE_HOME or ~/.whetstone")
     parser.add_argument("--lesson-id", help="Only propositions recorded in this lesson")
     parser.add_argument("--concept", action="append", help="Only these concept ids; repeatable")
     parser.add_argument("--progress", type=Path, help="learning-progress.json: restrict to completed sections (resume opener)")
     parser.add_argument("--limit", type=int, default=5)
     args = parser.parse_args()
     try:
-        store_init.load_store(args.store)
-        state = load_state(args.store)
+        if args.home is not None:
+            root = Path(args.home).expanduser() if args.home else index_match.default_home()
+            if not (root / "home.json").is_file():
+                raise ValueError(f"no learner home at {root} (nothing pushed yet; run store_sync.py push, or use --store)")
+        elif args.store is not None:
+            store_init.load_store(args.store)
+            root = args.store
+        else:
+            raise ValueError("give --store <local store> or --home [learner home]")
+        state = load_state(root)
         items = pool(state, args.lesson_id, args.concept, completed_sections(args.progress), args.limit)
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

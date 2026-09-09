@@ -64,7 +64,7 @@ claude plugin install whetstone@whetstone-ai
 ## 4. 一门课的流程
 
 ```text
-/whetstone:learn 材料 + 目标 [+ 知识库目录]
+/whetstone:learn 材料 + 目标 [+ 开知识库]
     ↓  没有档案 → 问一轮背景与目标；材料是目录或太大 → 清点、切成计划、逐门确认（也可单独 /whetstone:guide）
     ↓  本课大纲：问题链 + 全部概念 + 覆盖表（也可单独 /whetstone:outline）
     ★  停下：你确认模式（完整 / 快速）和取舍
@@ -81,18 +81,17 @@ claude plugin install whetstone@whetstone-ai
 
 ```text
 /whetstone:learn 学习 /Users/me/materials/cove-ch4-attestation.adoc，
-课程目录 /Users/me/materials/whetstone/courses/cove-attestation/，
-知识库 /Users/me/materials/whetstone/store。
+课程目录 /Users/me/materials/whetstone/courses/cove-attestation/，开知识库。
 我希望学完后能解释远程证明为什么需要信任链，并能判断一个新方案的信任根在哪。
 ```
 
-不给知识库目录就是单课模式。
+不说开知识库就是单课模式。
 
 **确认大纲。** 它停下来，给你 `outline.md` 的路径和摘要，只问一件事：模式，以及想略过或加深的节。回答示例：`完整，就这样`；`快速，略过 4 和 6`；`完整；把"DICE 层级"升成核心概念；第 3 节我熟，略过`；`你定`（等于完整、不略过）。这是你唯一需要"规划"的时刻。
 
 **逐节学。** 每节五步，一次只推进一步：预测（只给"当前问题"，说个方向，不判分）→ 揭示（方案与机制，对照你的预测评一句；这时可以要求先细化本节）→ 报 1–5 的把握并用自己的话回答主问题 → 追问（针对最弱的一点，边界、反例、因果、删除、对比之一，最多两层）→ 记录，下一节。想验收某个辅助概念，任何时候说"验收 X"。
 
-**中断与继续。** 新会话说"继续我的课程"并给出课程目录（和知识库目录）。它先出一道变式题——换情境考已学过的同一机制——或从你过去的错误说法里取一条以匿名形式让你批判，再回到未完成的节。
+**中断与继续。** 新会话说"继续我的课程"并给出课程目录。它先出一道变式题——换情境考已学过的同一机制——或从你过去的错误说法里取一条以匿名形式让你批判，再回到未完成的节。
 
 ## 5. 示例
 
@@ -163,7 +162,7 @@ claude plugin install whetstone@whetstone-ai
 
 ### 5.6 继续课程
 
-> **你**：继续我的课程，课程目录 …/courses/cove-attestation/，知识库 …/whetstone/store
+> **你**：继续我的课程，课程目录 …/whetstone/courses/cove-attestation/
 
 > **模型**：先做一道检验：**有一种说法是"zero pages 可以在任何时候添加，因为它们不参与测量"。这个说法哪里有问题？**
 
@@ -195,7 +194,7 @@ claude plugin install whetstone@whetstone-ai
 
 > **模型**：先一轮背景与目标：为什么学、相关经验、学完要能做什么、默认深度、要不要知识库？
 
-> **你**：巩固自己做的 MySQL-in-Occlum + mTLS 工作；Occlum 和 SGX 有半年经验；要能解释为什么这样设计并能排障；完整；知识库 /Users/me/Project/tee/whetstone/store
+> **你**：巩固自己做的 MySQL-in-Occlum + mTLS 工作；Occlum 和 SGX 有半年经验；要能解释为什么这样设计并能排障；完整；开知识库
 
 > **模型**：扫描完成（`survey/materials-survey.md`）：14 个顶层条目，3 GB——4 个上游仓库、`文档/` 12 份（4 份带会话或汇报的痕迹）、顶层 6 份进展汇报与交接、`data/` 2 GB 日志（排除）。目的是巩固自己的工作，所以你的方案是课程材料、上游源码作证据。`文档/2_…需求与评估.md` 和 `…mTLS_精简实施方案.md` 是你写的，还是会话生成的？
 
@@ -257,32 +256,33 @@ claude plugin install whetstone@whetstone-ai
 
 ## 8. 知识库
 
-在档案里或开课语句里指定一个目录即开启；不指定，一切与单课模式相同。开启后：
+在档案里写 `knowledge_store=on`，或开课时说一句"开知识库"即开启；不开，一切与单课模式相同。库分两层：这个材料目录自己的 `whetstone/store/`（每次作答写这里，在工作区里面，宿主不会弹权限），和你的主目录 `~/.whetstone/`（所有材料目录的汇总，结课时推一次，可能被问一次权限）。开启后：
 
 - 建课时把课程的参考图导出到 `store/mrg/`，事实与机制一份、后两层另一份；
 - 教学时把你每次作答只追加到 `store/lrg/`：原文、模型的读取、与参考图的差异、判定、回答到了哪一层、把握、用时；
 - 维护跨课的概念索引 `store/concepts/index.json` 和派生的掌握状态 `store/learner-state.json`：每个概念的证据强弱、有效期、到达过的层、错误说法；
-- 新课的前置检查先查索引：学过且仍有效的概念出一道变式题代替检查；过期的先变式题、答错再检查；复习时旧的错误说法以匿名形式回来。
+- 新课的前置检查先查你主目录里的汇总索引：学过且仍有效的概念出一道变式题代替检查；过期的先变式题、答错再检查；复习时旧的错误说法以匿名形式回来。
+- 结课时 `store_sync.py push` 把这个目录的索引和掌握状态快照推进 `~/.whetstone/`，主目录里只有派生状态，没有你的任何原始回答。
 
 首次：
 
 ```bash
 S=whetstone-ai/plugin/skills/learn/scripts
-python3 $S/store_init.py init --store store --domain-root 计算机科学
+python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科学
 ```
 
-之后开课时给出 `store` 的绝对路径，模型自己运行登记、导出、追加、重建。
+之后模型自己运行登记、导出、追加、重建、推送。换一个材料目录学新东西时再 `init` 一次它自己的 `whetstone/store`，主目录会自动把两边接起来。想换主目录位置就设环境变量 `WHETSTONE_HOME`。
 
 | 可以看 | 不要看，规则靠你自己守 |
 |---|---|
 | `outline.md`、`units/`、`zoom/`、`concepts/` | `learning-progress.json`（你的原始回答） |
-| `store/mrg/<课程>.json` | `store/mrg/*.deep.json`（后两层，看了就变成背诵材料） |
-| `store/concepts/index.json`、`store/learner-state.json` | `store/lrg/*.jsonl`（作答日志） |
+| `whetstone/store/mrg/<课程>.json` | `whetstone/store/mrg/*.deep.json`（后两层，看了就变成背诵材料） |
+| `whetstone/store/concepts/index.json`、`learner-state.json`、`~/.whetstone/` 整个目录 | `whetstone/store/lrg/*.jsonl`（作答日志） |
 
-看进度：`python3 $S/lrg_record.py show --store store --lesson-id <课程>`，只显示计数、判定和层，不显示回答。三节之后可以打分：
+看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨目录的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：
 
 ```bash
-python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store store
+python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store
 ```
 
 看三个数：来源定位的命中率、每节用时的中位数（模型在提问前后各运行一次 `date +%s`，不是估的）、你的回答到达过哪些层。`--baseline` 可与上次结果逐项比较。

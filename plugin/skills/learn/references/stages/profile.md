@@ -15,7 +15,7 @@
 
 按 [../../assets/learner-profile-template.md](../../assets/learner-profile-template.md) 写 `whetstone/learner-profile.md`（目录不存在就创建）。档案是背景说明，不是学习材料：不进 `sources.json`，不进课程内容。
 
-开启知识库且 `store.json` 存在时，在 `store.json` 记录 `learner_profile` 的路径（不复制内容）。
+开启知识库时本地库固定在 `whetstone/store/`（`store.json` 不存在就 `store_init.py init`），在 `store.json` 记录 `learner_profile` 的路径（不复制内容）。
 
 ## 交还
 

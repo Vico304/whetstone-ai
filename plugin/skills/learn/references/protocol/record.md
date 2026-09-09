@@ -35,11 +35,11 @@ python3 scripts/learning_state.py record \
 
 ## 开启知识库时
 
-用 `lrg_record.py append` 代替 `learning_state.py record`：它运行比较器、把事件追加到 `<store>/lrg/<lesson-id>.jsonl`，并通过 `--progress` 同步 `learning-progress.json`（同样遵守 `--review` 语义，用 `--kind review`）：
+用 `lrg_record.py append` 代替 `learning_state.py record`：它运行比较器、把事件追加到本工作区 `whetstone/store/lrg/<lesson-id>.jsonl`（只写工作区内，不弹权限），并通过 `--progress` 同步 `learning-progress.json`（同样遵守 `--review` 语义，用 `--kind review`）：
 
 ```bash
 python3 scripts/lrg_record.py append \
-  --store <知识库目录> --lesson-id <lesson-id> --section-id s01 \
+  --store whetstone/store --lesson-id <lesson-id> --section-id s01 \
   --kind checkpoint \
   --response-file path/to/raw-response.txt --feedback-file path/to/feedback.txt \
   --verdict partial --confidence 4 --criteria-met c1,c3 --depth mechanism \
