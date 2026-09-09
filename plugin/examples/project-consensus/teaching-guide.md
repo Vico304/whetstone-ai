@@ -1,7 +1,7 @@
 ---
 lesson_id: weave-consensus-core
 title: whetstone核心共识：为什么深度学习系统需要证据、双轨重建与差异诊断
-source: docs/consensus.md
+source: plugin/examples/project-consensus/source/consensus.md
 ---
 
 # whetstone核心共识：为什么深度学习系统需要证据、双轨重建与差异诊断

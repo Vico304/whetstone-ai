@@ -3,17 +3,17 @@
   "generated_at": "2026-08-21T07:37:22.305974Z",
   "base_path": ".",
   "roots": [
-    "docs/consensus.md"
+    "plugin/examples/project-consensus/source/consensus.md"
   ],
   "files": [
     {
-      "path": "docs/consensus.md",
+      "path": "plugin/examples/project-consensus/source/consensus.md",
       "kind": "document",
       "status": "included",
-      "bytes": 27786,
+      "bytes": 28218,
       "modified_at": "2026-08-19T07:28:23.711449Z",
       "text_candidate": true,
-      "sha256": "66ab73e002bb4e2c38d3e9c0e77f96817794ddbb911d1941e6c8e19614a1b9ff"
+      "sha256": "82bec80af6bf8f1933fb352481e9e89daeb899cb9ed210124e41af49dcba24fd"
     }
   ],
   "problems": [],

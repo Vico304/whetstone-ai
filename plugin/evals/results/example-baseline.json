@@ -1,11 +1,12 @@
 {
-  "pack": "examples/project-consensus",
+  "pack": "plugin/examples/project-consensus",
   "build": {
     "schema_version": "1.0",
     "validator_errors": 0,
     "validator_warnings": 0,
     "sections": 8,
     "max_concepts_per_section": 3,
+    "max_core_per_section": 3,
     "mean_concepts_per_section": 3,
     "source_refs": 18,
     "support": {
@@ -27,9 +28,14 @@
       3,
       3
     ],
-    "guide_chars": 8718,
+    "mode": null,
+    "roles": {},
+    "coverage": {},
+    "deferred": 0,
+    "units_present": null,
+    "guide_chars": 8754,
     "locator_checked": 18,
-    "locator_hit_rate": 0.667,
+    "locator_hit_rate": 0.944,
     "errors": [],
     "warnings": []
   }
