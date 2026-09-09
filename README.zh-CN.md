@@ -19,7 +19,7 @@
 - 追问针对你回答里最弱的一点，不照抄题库；
 - 下次继续时，先用一道换了情境的题检查上次学的还在不在。
 
-学习科学几十年的结论是：让学习**感觉**轻松的方法大多损害长期记忆，让回忆**变费力**的方法大多增强它。主动回忆的元分析效应量约 0.5–0.6，自我解释约 0.55，重读接近零（出处见 [`docs/reviews/evidence-review.md`](docs/reviews/evidence-review.md)）。这个工具站在费力的一边。
+学习科学几十年的结论是：让学习**感觉**轻松的方法大多损害长期记忆，让回忆**变费力**的方法大多增强它。主动回忆的元分析效应量约 0.5–0.6，自我解释约 0.55，重读接近零（出处见 [`docs/evidence.md`](docs/evidence.md)）。这个工具站在费力的一边。
 
 反馈有依据：课程里每一条说法都记着它来自材料的哪个位置，指出你的错误时会给出位置。
 
@@ -86,8 +86,9 @@ cd plugin && python3 -m unittest discover -s tests
 | [`docs/guide.md`](docs/guide.md) | 使用手册 |
 | [`docs/design.md`](docs/design.md) | 设计 |
 | [`docs/specs/`](docs/specs/) | 课程文件、知识库与教学协议的格式说明 |
-| [`docs/reviews/evidence-review.md`](docs/reviews/evidence-review.md) | 学习科学依据与开放问题 |
+| [`docs/evidence.md`](docs/evidence.md) | 学习科学依据与开放问题 |
 | [`docs/glossary.md`](docs/glossary.md) | 术语表与写作规则 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 更新记录 |
 | [`plugin/`](plugin/) | 可运行的技能插件 |
 
 ## 许可证

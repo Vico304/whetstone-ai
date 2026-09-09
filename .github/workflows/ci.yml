@@ -58,3 +58,22 @@ jobs:
           python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
           python3 -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
           python3 -m json.tool plugin/.codex-plugin/plugin.json > /dev/null
+      - name: Markdown links resolve
+        working-directory: .
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          skip = ("plugin/examples/", "plugin/evals/materials/", "plugin/skills/", "whetstone/")
+          bad = []
+          for md in pathlib.Path(".").rglob("*.md"):
+              rel = md.as_posix()
+              if rel.startswith(skip) or "/.git/" in rel:
+                  continue
+              for target in re.findall(r"\]\(([^)\s#]+)(?:#[^)]*)?\)", md.read_text(encoding="utf-8")):
+                  if target.startswith(("http://", "https://", "mailto:")):
+                      continue
+                  if not (md.parent / target).exists():
+                      bad.append(f"{rel}: {target}")
+          print("\n".join(bad) or "all markdown links resolve")
+          sys.exit(1 if bad else 0)
+          PY
