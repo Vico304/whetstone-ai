@@ -5,7 +5,7 @@ A .plugin is a zip whose root contains .claude-plugin/plugin.json. Usage:
 
     python3 package_plugin.py [--output ../dist/whetstone.plugin]
 
-Includes: .claude-plugin/, .codex-plugin/, skills/, docs/, README.md.
+Includes: .claude-plugin/, .codex-plugin/, skills/.
 Excludes: tests/, evals/, examples/, __pycache__, learning packs, dotfiles.
 """
 
@@ -17,7 +17,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent / "plugin"
-INCLUDE_TOP = {".claude-plugin", ".codex-plugin", "skills", "docs", "README.md"}
+INCLUDE_TOP = {".claude-plugin", ".codex-plugin", "skills"}
 SKIP_DIRS = {"__pycache__", "learning-packs"}
 SKIP_FILES = {".DS_Store", ".gitignore"}
 

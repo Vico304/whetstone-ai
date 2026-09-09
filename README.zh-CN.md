@@ -61,7 +61,7 @@
 
 它读材料，出大纲，**停下**让你确认；然后逐节生成讲义，检查前置知识（一次一题），开始教学。材料的每个标题都要在大纲里有去处，遗漏会被校验器报错。中断后新开会话说"继续我的课程"。
 
-更多场景（一个目录里有几个仓库和一堆 AI 生成的文档、只改大纲、学习中遇到不懂的概念）见[使用手册](docs/user-guide.md)。
+更多场景（一个目录里有几个仓库和一堆 AI 生成的文档、只改大纲、学习中遇到不懂的概念）见[使用手册](docs/guide.md)。
 
 ## 可选：知识库
 
@@ -83,7 +83,7 @@ cd plugin && python3 -m unittest discover -s tests
 
 | 路径 | 内容 |
 |---|---|
-| [`docs/user-guide.md`](docs/user-guide.md) | 使用手册 |
+| [`docs/guide.md`](docs/guide.md) | 使用手册 |
 | [`docs/design.md`](docs/design.md) | 设计 |
 | [`docs/specs/`](docs/specs/) | 课程文件、知识库与教学协议的格式说明 |
 | [`docs/reviews/evidence-review.md`](docs/reviews/evidence-review.md) | 学习科学依据与开放问题 |
