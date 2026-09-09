@@ -1,0 +1,135 @@
+# 课程文件：`lesson-plan.json`、`outline.md`、`units/`
+
+一门课在 `whetstone/courses/<lesson-id>/` 下的文件，以及 `lesson-plan.json` 的字段与校验规则。规则的实现是 `plugin/skills/learn/scripts/validate_lesson.py`，模板在 `plugin/skills/learn/assets/`。骨架课与分支课（schema 1.3）的增量见 [domain-skeleton.md](domain-skeleton.md)。
+
+## 1. 课程目录
+
+```text
+<lesson-id>/
+├── lesson-plan.json            schema 1.2；骨架课与分支课 1.3
+├── outline.md                  路线图、全部概念、覆盖表；大纲确认时呈现给学习者
+├── units/<section-id>.md       每个非 deferred 的节一份，独立生成
+├── sources.json                来源清单（source_manifest.py）；单个短材料可省略
+├── learning-progress.json      进入教学时由 learning_state.py init 创建
+├── prerequisite-plan.json      前置检查的计划（条件产物）
+├── prerequisite-progress.json  前置作答、来源与桥接复测（条件产物）
+├── prerequisite-guide.md       只含实际暴露的缺口（条件产物）
+├── zoom/<section-id>-guide.md  学习者选择细化时生成，一节最多一份
+└── concepts/                   clarify 技能维护的概念笔记与 _inbox.md
+```
+
+旧课程的单文档 `teaching-guide.md`（schema 1.0 / 1.1）仍被校验器接受（`--guide`），新课程不再生成。
+
+## 2. 顶层字段
+
+| 字段 | 自版本 | 规则 |
+|---|---|---|
+| `schema_version` | 1.0 | `1.0 / 1.1 / 1.2 / 1.3` 之一；新课程写 `1.2`，骨架课与分支课写 `1.3` |
+| `lesson_id`、`title`、`learning_goal` | 1.0 | 非空字符串 |
+| `source_manifest` | 1.0 | `sources.json` 的相对路径，或 `null` |
+| `big_picture` | 1.0 | `{problem, outcome, system_map[]}`：材料总体解决的问题、学完应能做的事、从输入到结果的关键步骤 |
+| `sections[]` | 1.0 | 非空，见 §3 |
+| `final_challenge` | 1.0 | `{prompt, criteria[]}`，结课的迁移题 |
+| `uncertainties[]` | 1.0 | 解析、证据或语义上的未决项，可为空 |
+| `relations[]` | 1.1 | 见 §5 |
+| `mode` | 1.2 | `full / fast` |
+| `outline_confirmed_at` | 1.2 | 必须存在。`null` 表示大纲未确认，此时不得生成 `units/`；确认后写真实 ISO 时间，午夜占位报警告 |
+| `deferred[]` | 1.2 | `[{type: section / concept, id, reason}]`，`id` 必须存在于本课 |
+| `coverage[]` | 1.2 | 见 §7；为空时必须传 `--allow-empty-coverage` |
+| `shape`、`parent_course`、`branch_candidates[]` | 1.3 | 见 domain-skeleton.md |
+
+## 3. `sections[]`
+
+| 字段 | 规则 |
+|---|---|
+| `id`、`title` | `id` 唯一 |
+| `depends_on[]` | 只能指向更早的节 |
+| `problem`、`solution`、`mechanism` | 本节的问题、材料的方案、方案如何工作；渲染进 `units/` |
+| `meaning` | 它的实际意义；rationale 层，只作出题素材，不渲染 |
+| `tradeoffs[]` | 边界、代价、失败方式；rationale 层，不渲染 |
+| `new_problem` | 引向下一节的问题；除末节外非空，末节可为 `null` |
+| `principle` | 1.1 可选。本节体现的可迁移设计思想；principle 层，不渲染 |
+| `concepts[]` | 见 §4 |
+| `source_refs[]` | 见 §8 |
+| `checkpoint` | `{prompt, criteria[], hint}`，见 §6 |
+| `probe` | 1.3，仅骨架课 |
+
+一门课超过 9 节报警告（骨架课除外）。
+
+## 4. `concepts[]`
+
+| 字段 | 自版本 | 规则 |
+|---|---|---|
+| `name`、`explanation` | 1.0 | 面向学习者的一句解释 |
+| `id` | 1.1 | `<domain>.<concept>`，小写 ASCII，如 `cs.tee.enclave`；跨课稳定；同一 id 在多节出现时 `name` 必须一致 |
+| `layer` | 1.1 | `fact / mechanism / rationale / principle` |
+| `domain_path[]` | 1.1 | 1–4 级学科路径，如 `["计算机科学", "可信计算"]`；教学推断 |
+| `aliases[]` | 1.1 | 可选，非空字符串 |
+| `role` | 1.2 | `core / supporting / listed`，必填。`core` 进主问题，每节超过 4 个报警告，超出的降为 supporting 而不是删除；`supporting` 会讲，每节超过 6 个报警告；`listed` 只列名、一句事实层定义与定位，`explanation` 超过 200 字报警告 |
+| `check` | 1.2 | 仅 `supporting`：`{prompt, criteria[], hint}`，学习者说"验收 X"时使用；缺失报警告 |
+| `anchor` | 1.3 | 仅骨架课 |
+
+## 5. `relations[]`
+
+每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。
+
+## 6. 判定标准
+
+`checkpoint.criteria[]`、`check.criteria[]`、`probe.criteria[]`、`final_challenge.criteria[]` 都是 `[{id, text, layer}]`（1.0 是字符串数组），`id` 在节内唯一，供 `criteria_met` 引用。所有 criteria 都不进任何面向学习者的文档。`hint` 是首次作答后按需给的渐进提示。
+
+## 7. `coverage[]` 与 `deferred[]`
+
+`coverage[]` 每行 `{path, heading, disposition, section_id?, reason?}`：
+
+| `disposition` | 需要 | 含义 |
+|---|---|---|
+| `core / supporting / listed / appendix` | `section_id` 存在 | 这个标题的内容进了哪一节、什么角色 |
+| `deferred / excluded` | `reason` | 略过（日后可补）/ 不讲 |
+| `pool / reserve` | 仅骨架课 | 见 domain-skeleton.md |
+
+传 `--sources-root <材料根>` 时，校验器读取来源文件（`.md / .adoc / .txt`）的一级、二级标题，每个标题都必须在表里有一行，否则报 `coverage is missing heading` 错误。这是"不静默遗漏"的确定性保证。
+
+`deferred[]` 记录略过的节或概念。deferred 的节不生成 `units/<id>.md`（存在则警告）；`learning_state.py init` 把它标为 `deferred`，不计入完成。
+
+## 8. `source_refs[]`
+
+每条 `{path, locator, support, note}`。
+
+- `locator` 以可机器核对的定位开头：文档用标题原文（`## Hello World`），代码用符号名（`create_report`），之后再加描述。`score_pack.py` 用第一段在原文里查找，得到 locator 命中率。
+- `support`：`explicit / entailed / external / pedagogical_inference / unsupported`。`external` 用 URL 作 `path`，不进 `sources.json`；`unsupported` 不作稳定讲解的唯一依据。
+- 传 `--manifest sources.json` 时，`path` 必须在清单里（外部 URL 除外）。
+
+## 9. `outline.md`
+
+必含：学习目标、模式、材料范围；总体问题与系统地图；问题链，每节一行"编号、标题、问题 → 方案"，deferred 的节标"本次略过：理由"；全部概念按节、按角色列出（core 只列名，supporting 名 + 一句，listed 名 + 一句 + 定位，deferred 名 + 理由）；覆盖表摘要，`excluded` 附理由；使用说明（讲义在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred）。
+
+校验：课程标题、模式、每个节标题、每个概念名都出现；`criteria`、`check.criteria`、`principle` 出现为错误；`meaning`、`tradeoffs` 逐字出现为警告。模板 `assets/outline-template.md`。
+
+## 10. `units/<section-id>.md`
+
+每个非 deferred 的节一份，独立生成，只带本节的来源定位读原文。必含：当前问题、解决方案、工作机制、引出的新问题、本节概念（core / supporting / listed 三块可见；supporting 各一段"在本节机制里的位置"；listed 只有名 + 一句 + 定位，不讲机制）、来源、"轮到你"检查点。不含 `meaning`、`tradeoffs`、`principle`、`criteria`。
+
+校验：文件存在；含本节标题、`checkpoint.prompt` 原文、每个概念名；`criteria` 或 `principle` 泄漏为错误；`meaning`、`tradeoffs` 逐字出现为警告；supporting 概念旁的"验收 X"提醒为警告——只在 outline 的使用说明里写一次。模板 `assets/units-template/s01.md`。
+
+## 11. 运行校验
+
+```bash
+# 大纲阶段
+python3 scripts/validate_lesson.py lesson-plan.json --outline outline.md [--sources-root <材料根>]
+# units 生成后
+python3 scripts/validate_lesson.py lesson-plan.json --outline outline.md --units-dir units \
+  --manifest sources.json --sources-root <材料根>
+# 1.0 / 1.1 旧课程
+python3 scripts/validate_lesson.py lesson-plan.json --guide teaching-guide.md
+```
+
+错误阻断，警告不阻断。校验器检查结构与交叉引用，不证明讲解本身正确。
+
+## 12. 版本
+
+| 版本 | 增加 |
+|---|---|
+| 1.0 | 线性问题链：每节 `problem / solution / mechanism / meaning / tradeoffs / new_problem / concepts / source_refs / checkpoint` |
+| 1.1 | 概念 `id / layer / domain_path / aliases`；顶层 `relations[]`；`criteria` 改为对象数组；可选 `principle` |
+| 1.2 | `mode`、`outline_confirmed_at`、概念 `role` 与 `check`、`deferred[]`、`coverage[]`；`outline.md` + `units/` 取代 `teaching-guide.md` |
+| 1.3 | `shape`、`parent_course`、`pool / reserve`、`anchor`、`probe`、`branch_candidates[]` |
