@@ -1,5 +1,9 @@
 # 更新记录
 
+## 未发布
+
+- 适配 pi：根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`，`pi install git:github.com/Vico304/whetstone-ai` 或本地路径即可安装；`install_skills.sh` 也可装到 `~/.pi/agent/skills`。SKILL.md 的路径约定加入 pi 的 `<location>`；调用 `/skill:learn` 等。
+
 ## 1.0.0 — 2026-09-09
 
 第一个正式版。功能与 0.6.0 相同，这一版的工作是文档：

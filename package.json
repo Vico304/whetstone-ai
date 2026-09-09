@@ -1,0 +1,11 @@
+{
+  "name": "whetstone-ai",
+  "version": "1.0.0",
+  "description": "把你的文档或代码库变成一门逐节教学的课程。四个技能：learn、guide、outline、clarify。",
+  "license": "Apache-2.0",
+  "repository": "github:Vico304/whetstone-ai",
+  "private": true,
+  "pi": {
+    "skills": ["./plugin/skills"]
+  }
+}
