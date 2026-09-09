@@ -48,13 +48,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 2. 项目要解决的问题",
           "support": "explicit",
           "note": "文档明确把可调用、可迁移的心智模型设为问题核心，并列出传统阅读和普通 LLM 问答的失败"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 3. 已确认的顶层共识 / 3.1–3.2",
           "support": "explicit",
           "note": "文档明确否定摘要器定位，并把学习者主动重建设为核心行为"
@@ -102,13 +102,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 4. 核心逻辑：证据层与双轨图谱 / 4.1",
           "support": "explicit",
           "note": "定义 SEL 的问题、内容和不可变版本规则"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 13. 材料解析的概念性原则",
           "support": "explicit",
           "note": "列出解析必须保留的身份、结构、定位和不确定性，并禁止自动补全读取失败"
@@ -156,19 +156,19 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 4. 核心逻辑：证据层与双轨图谱 / 4.2",
           "support": "explicit",
           "note": "定义 MRG 的问题、组成、目标和可修订性质"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 7. 机器知识管线与 Agent 权限 / 7.1–7.3",
           "support": "explicit",
           "note": "说明候选、确定性检查、语义验证和发布的职责分离"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 8. 支持类型和状态必须分开",
           "support": "explicit",
           "note": "定义五类来源支持和独立审核/发布状态"
@@ -216,13 +216,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 4. 核心逻辑：证据层与双轨图谱 / 4.3–4.4",
           "support": "explicit",
           "note": "定义 LRG 及其与 SEL、MRG 的关系"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 9. 学习闭环共识 / 9.1",
           "support": "explicit",
           "note": "要求隐藏参考、保存首次重建、比较、修订和延迟再次重建"
@@ -270,13 +270,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 10. 双图比较与分歧处理 / 10.1–10.4",
           "support": "explicit",
           "note": "给出比较顺序、差异类别、多维诊断和证据裁决表"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 14. 什么时候必须上报",
           "support": "explicit",
           "note": "列出不可由单 Agent 静默决定的高影响分歧"
@@ -324,13 +324,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 9. 学习闭环共识 / 9.2 提示应逐步淡出",
           "support": "explicit",
           "note": "给出全概念名、锚点、无概念名和迁移四阶段"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 11. 学习者模型共识",
           "support": "explicit",
           "note": "要求从多次证据推断多维学习状态，并排列不同证据强度"
@@ -378,13 +378,13 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 9. 学习闭环共识 / 9.3 学习子图应控制认知负担",
           "support": "explicit",
           "note": "明确给出一次活动的中心概念、相关概念、关键关系和应用任务"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 12. 学习策略的方向性共识",
           "support": "explicit",
           "note": "定义下一学习行为的输入、候选活动、周期整合和中断恢复"
@@ -432,19 +432,19 @@
       ],
       "source_refs": [
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 14. 什么时候必须上报",
           "support": "explicit",
           "note": "列出高影响歧义及审核包应包含的证据、候选和风险"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 15. 成功标准和评估维度",
           "support": "explicit",
           "note": "分别定义机器图、学习效果和双轨机制的指标"
         },
         {
-          "path": "docs/consensus.md",
+          "path": "plugin/examples/project-consensus/source/consensus.md",
           "locator": "## 16–17. 当前范围边界与尚未定论的研究问题",
           "support": "explicit",
           "note": "区分当前优先验证、默认不追求和仍需实验的问题"

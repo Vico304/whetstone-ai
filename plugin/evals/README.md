@@ -20,7 +20,7 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
   --baseline results/<prev>/doc-learning-layers.json
 ```
 
-`--baseline` 逐项打印数值差异。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；它的 `locator_hit_rate` 低于 1 是真实信号——该示例课程建于 consensus v1，部分标题定位在 v2 里已不存在。
+`--baseline` 逐项打印数值差异。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；来源是冻结在 `examples/project-consensus/source/` 里的 v1 共识文本，所以定位可以被脚本核对。
 
 ## 指标含义
 
