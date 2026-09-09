@@ -8,7 +8,7 @@
     {
       "name": "whetstone",
       "source": "./plugin",
-      "description": "Whetstone：guide（档案、材料评估、逐门确认的计划）、outline（确认过的课程大纲）、learn（完整流程：规划 → 大纲 → 按 unit 生成 → 逐节教学）、clarify（Obsidian 概念笔记）。",
+      "description": "Whetstone：把文档或代码库变成逐节教学的课程。learn 开课与继续，guide 规划，outline 改大纲，clarify 概念笔记。",
       "category": "education"
     }
   ]
