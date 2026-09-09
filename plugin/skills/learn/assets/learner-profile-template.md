@@ -25,7 +25,7 @@
 - 取向：`orientation={{material|domain}}`（默认值，可修改）——`material` 学这批材料本身；`domain` 先学骨架课（只讲基本原理，材料作证据池），学完再选分支
 - 默认深度：`mode={{full|fast}}`（默认值，可修改）——每门课的大纲确认时仍会再问一次
 - 前置检查：`prerequisite_check={{always|auto|skip}}`（默认值，可修改）
-- 知识库：`knowledge_store={{绝对路径 | 不开启}}`
+- 知识库：`knowledge_store={{on | off}}`——开启时本工作区的库在 `whetstone/store/`，跨工作区的汇总在 `~/.whetstone/`（结课时推一次）
 - 每周时间：{{…}}；期限：{{…}}
 - 反馈风格：{{如：直接指出误解，不需要客套}}
 - 概念疑问用 `[[wikilink]]` 标记，定期调用 clarify

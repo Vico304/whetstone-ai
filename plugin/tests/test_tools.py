@@ -34,6 +34,7 @@ lrg_record = load_module("lrg_record")
 index_match = load_module("index_match")
 learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
+store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
 
@@ -1153,3 +1154,71 @@ class SkeletonCourseTests(unittest.TestCase):
             (units / "s01.md").write_text(body + section["checkpoint"]["prompt"] + "\n", encoding="utf-8")
             errors, _ = validate_lesson.validate_units(units, plan)
             self.assertEqual(errors, [])
+
+
+class LearnerHomeTests(_StoreHelpers, unittest.TestCase):
+    """Local-first store: every write stays in the workspace; the learner home is a derived aggregate."""
+
+    def test_push_aggregates_two_workspaces_without_raw_answers(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 1, 22, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            ws1 = root / "tee" / "whetstone"
+            ws2 = root / "riscv" / "whetstone"
+            ws1.mkdir(parents=True); ws2.mkdir(parents=True)
+            s1, s2 = self._store(ws1), self._store(ws2)
+            wrong = {"id": "p1", "text": "宏观地图能解释设计理由", "status": "wrong", "concept_ids": ["learning-design.macro-map"]}
+            self._append(s1, "2026-01-20T10:00:00Z", "transfer", "mastered", depth="mechanism", props=[wrong])
+            self._append(s2, "2026-01-21T10:00:00Z", "review", "mastered", depth="rationale")
+            self._append(s2, "2026-01-10T10:00:00Z", "checkpoint", "mastered")
+            r1 = store_sync.push(s1, home, now=now)
+            r2 = store_sync.push(s2, home, now=now)
+            self.assertTrue(r1["slug"].startswith("tee-") and r2["slug"].startswith("riscv-"))
+            self.assertEqual(r2["workspaces"], 2)
+            state = json.loads((home / "learner-state.json").read_text(encoding="utf-8"))
+            macro = state["concepts"]["learning-design.macro-map"]
+            self.assertEqual(sorted(macro["workspaces"]), sorted([r1["slug"], r2["slug"]]))
+            self.assertEqual(macro["attempts"], 3)              # 1 in ws1 + 2 in ws2
+            self.assertEqual(macro["stability"], 3)             # success days add across workspaces (1 + 2)
+            self.assertEqual(macro["evidence_tier"], "delayed")  # latest success is the ws2 review on Jan 21
+            self.assertEqual(macro["freshness"], "fresh")
+            self.assertEqual(macro["depth_max"], "rationale")
+            self.assertEqual(macro["rigor_max"], "full")
+            self.assertEqual(len(macro["error_propositions"]), 1)
+            self.assertEqual(macro["error_propositions"][0]["workspace"], r1["slug"])
+            # the home never contains a raw answer, only derived state and the registry
+            for path in home.rglob("*"):
+                if path.is_file():
+                    self.assertNotIn('"response"', path.read_text(encoding="utf-8"), path)
+            self.assertFalse((home / "lrg").exists())
+            index = json.loads((home / "concepts" / "index.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(index["concepts"]), 4)
+            self.assertEqual(sorted(index["concepts"]["learning-design.macro-map"]["workspaces"]), sorted([r1["slug"], r2["slug"]]))
+            # rebuild from snapshots alone reproduces the aggregate (no access to the workspaces needed)
+            (home / "learner-state.json").unlink()
+            store_sync.rebuild(home, now)
+            again = json.loads((home / "learner-state.json").read_text(encoding="utf-8"))
+            self.assertEqual(again["concepts"]["learning-design.macro-map"]["attempts"], 3)
+            # readers accept the home in place of a store
+            index_home = index_match.load_index(home)
+            decisions = index_match.prerequisite_plan_lookup(index_home, {"prerequisites": [{"id": "p01", "name": "macro map"}]},
+                                                             index_match.load_learner_state(home))
+            self.assertEqual(decisions[0]["action"], "variant")
+            items = review_pool.pool(review_pool.load_state(home), None, None, None, 5)
+            self.assertEqual([i["id"] for i in items], ["p1"])
+            # a workspace is never written by push beyond its own derived learner-state
+            self.assertTrue((s1 / "learner-state.json").is_file())
+            self.assertFalse((s1 / "workspaces.json").exists())
+
+    def test_home_defaults_and_slug_label(self):
+        import os
+        with tempfile.TemporaryDirectory() as temporary:
+            os.environ["WHETSTONE_HOME"] = temporary
+            try:
+                self.assertEqual(store_sync.default_home(), Path(temporary))
+            finally:
+                del os.environ["WHETSTONE_HOME"]
+            self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone")).startswith("tee_dsh-"))
+            self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone/store")).startswith("tee_dsh-"))

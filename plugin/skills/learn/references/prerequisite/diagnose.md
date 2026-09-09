@@ -14,7 +14,8 @@
 在提出任何诊断问题之前运行：
 
 ```bash
-python3 scripts/index_match.py prerequisites --store <知识库目录> --prerequisite-plan path/to/prerequisite-plan.json
+python3 scripts/index_match.py prerequisites --home --prerequisite-plan path/to/prerequisite-plan.json
+# --home 读学习者主目录（所有推过的工作区的汇总），这是开课前唯一一次读工作区之外；主目录不存在时改 --store whetstone/store
 ```
 
 对每个前置项按返回的 `action` 处理：

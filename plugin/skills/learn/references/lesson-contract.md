@@ -159,7 +159,7 @@ python3 scripts/validate_lesson.py path/to/lesson-plan.json \
 校验通过后，把课程导出为分层的机器参考图：
 
 ```bash
-python3 scripts/mrg_export.py path/to/lesson-plan.json --store <知识库目录> [--manifest path/to/sources.json]
+python3 scripts/mrg_export.py path/to/lesson-plan.json --store whetstone/store [--manifest path/to/sources.json]
 ```
 
 产出 `<store>/mrg/<lesson-id>.json`（公开层：`fact / mechanism` 节点与边、各节的问题 / 方案 / 机制骨架）与 `<store>/mrg/<lesson-id>.deep.json`（高层：`rationale / principle` 节点与边、各节的意义、代价、设计思想、检查标准）。**渲染讲义、生成概念笔记、回答学习者查询时只读公开文件；高层文件只在评估与出题时加载。** 已存在的导出不覆盖；修订 MRG 应产生新版本。未开启知识库时不需要此步。

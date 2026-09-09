@@ -1,6 +1,8 @@
 # 知识库
 
-可选开启的持久化目录。建课时把课程导出为分层的 MRG，教学时把每次作答追加进 LRG，由脚本派生跨课的概念索引和带时效的掌握状态。不开启时插件的行为与单课模式完全相同。实现：`plugin/skills/learn/scripts/` 下的 `store_init.py`、`mrg_export.py`、`index_match.py`、`lrg_record.py`、`comparator.py`、`learner_state_build.py`、`review_pool.py`。
+可选开启的持久化目录。建课时把课程导出为分层的 MRG，教学时把每次作答追加进 LRG，由脚本派生跨课的概念索引和带时效的掌握状态。不开启时插件的行为与单课模式完全相同。实现：`plugin/skills/learn/scripts/` 下的 `store_init.py`、`mrg_export.py`、`index_match.py`、`lrg_record.py`、`comparator.py`、`learner_state_build.py`、`review_pool.py`、`store_sync.py`。
+
+知识库分两层（§8）：每个工作区自己的**本地库** `whetstone/store/`，和汇总各工作区快照的**学习者主目录** `~/.whetstone/`。§1–§7 描述的是本地库；主目录只有索引和派生状态，没有 MRG 正文，也没有 LRG。
 
 ## 1. 目录
 
@@ -15,11 +17,11 @@
 └── exports/                    由 init 创建，当前没有脚本写入
 ```
 
-`mrg/`、`lrg/` 是事实源；`lrg/` 只追加。开启方式：档案的 `knowledge_store` 字段或开课语句里的知识库目录。
+`mrg/`、`lrg/` 是事实源；`lrg/` 只追加。开启方式：档案的 `knowledge_store=on` 或开课语句里说开知识库；位置固定为工作区内的 `whetstone/store/`。
 
 ```bash
-python3 scripts/store_init.py init --store <目录> [--domain-root 学科名]
-python3 scripts/store_init.py register --store <目录> --lesson-plan <lesson-plan.json>
+python3 scripts/store_init.py init --store whetstone/store [--domain-root 学科名]
+python3 scripts/store_init.py register --store whetstone/store --lesson-plan <lesson-plan.json>
 ```
 
 ## 2. MRG：`mrg/<lesson-id>.json` 与 `.deep.json`
@@ -147,3 +149,33 @@ python3 scripts/review_pool.py --store <目录> --lesson-id <id> [--progress lea
 - 进入提示词的 LRG 内容只有匿名化的命题文本；
 - 讲义、概念笔记、学习者查询只读公开层文件；
 - 学习者对抽取或判定有异议时追加新一次作答，不修改任何已有记录。
+
+## 8. 学习者主目录：`~/.whetstone/`
+
+为什么分两层：宿主（Claude Code、DeepSeek Harness、Cowork 的连接文件夹）都以当前工作区为信任边界，库放在工作区之外时**每次作答**都会触发一次权限确认。所以每次作答只写本地库；跨工作区的记忆是派生物，头尾各碰一次。
+
+```text
+~/.whetstone/                     可用环境变量 WHETSTONE_HOME 改；不存在时由第一次 push 创建
+├── home.json                     schema_version、created_at、updated_at
+├── workspaces.json               {slug: {path, store, last_push_at, lessons[]}}
+├── snapshots/<slug>/index.json           某工作区本地库的 concepts/index.json 副本
+├── snapshots/<slug>/learner-state.json   该工作区派生状态的副本
+├── concepts/index.json           汇总注册表：同 id 合并 appearances / aliases，每条带 workspaces[]；别名冲突保留先到的并报告
+└── learner-state.json            汇总掌握状态（下文）
+```
+
+`slug` = 材料根目录名 + 路径哈希前 8 位（如 `tee_dsh-31396d90`）。
+
+```bash
+python3 scripts/store_sync.py push --store whetstone/store      # 结课时：重建本地 learner-state → 写快照 → 重算汇总
+python3 scripts/store_sync.py rebuild                           # 只从快照重算，不读任何工作区
+python3 scripts/store_sync.py show                              # 推过哪些工作区、汇总计数；不打印回答
+python3 scripts/index_match.py prerequisites --home --prerequisite-plan …   # 开课前读汇总（一次）
+python3 scripts/index_match.py recall --home --candidates …
+python3 scripts/review_pool.py --home …                          # 跨工作区取错误主张复习
+```
+
+汇总 `learner-state.json` 的每个概念由各工作区快照里的同名概念合并而来：`attempts`、`calibration`、`stability` 相加（稳定性按"不同成功日"计，跨工作区无法去重，取近似）；`lessons`、`error_propositions`（各带 `workspace`）取并集；`depth_max` 取最深；`rigor_max` 有 `full` 即 `full`；`last_evidence_at` / `last_success_at` 取最晚，`evidence_tier` 取最晚一次成功的等级；`freshness` 与 `mastery_estimate` 用合并后的 `stability` 按 §5 的规则在汇总时重算。主目录里没有 `response`、没有 `lrg/`，`show` 也不打印任何回答文本。
+
+宿主在 push 时可能问一次权限；学习者拒绝不影响本课（数据都在本地库），下次结课再推。`--home` 读不到主目录时（还没推过）退回 `--store whetstone/store`。
+
