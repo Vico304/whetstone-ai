@@ -187,7 +187,7 @@ def diff_against(baseline: dict, current: dict) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("pack", type=Path, help="Lesson pack directory (contains lesson-plan.json)")
-    parser.add_argument("--sources-root", type=Path, help="Directory that source_refs.path values are relative to (enables locator check)")
+    parser.add_argument("--sources-root", type=Path, help="Material root (enables locator check); defaults to sources.json base_path")
     parser.add_argument("--material-id", help="Id from materials.json to apply its expectations")
     parser.add_argument("--store", type=Path, help="Knowledge store; adds teach metrics from its LRG log")
     parser.add_argument("--baseline", type=Path, help="Previous result JSON to diff against")
@@ -204,7 +204,11 @@ def main() -> int:
         expect = match.get("expect")
     try:
         plan = json.loads((args.pack / "lesson-plan.json").read_text(encoding="utf-8"))
-        result = {"pack": str(args.pack), "build": build_metrics(args.pack, args.sources_root, expect)}
+        sources_root = args.sources_root
+        if sources_root is None and (args.pack / "sources.json").is_file():
+            sources_root = validate_lesson.sources_root_from_manifest(
+                args.pack / "sources.json", json.loads((args.pack / "sources.json").read_text(encoding="utf-8")))
+        result = {"pack": str(args.pack), "build": build_metrics(args.pack, sources_root, expect)}
         if args.store:
             result["teach"] = teach_metrics(args.store, plan.get("lesson_id"))
     except (OSError, ValueError, json.JSONDecodeError) as error:

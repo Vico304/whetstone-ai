@@ -2,7 +2,7 @@
 
 可选开启的持久化目录。建课时把课程导出为分层的 MRG，教学时把每次作答追加进 LRG，由脚本派生跨课的概念索引和带时效的掌握状态。不开启时插件的行为与单课模式完全相同。实现：`plugin/skills/learn/scripts/` 下的 `store_init.py`、`mrg_export.py`、`index_match.py`、`lrg_record.py`、`comparator.py`、`learner_state_build.py`、`review_pool.py`、`store_sync.py`。
 
-知识库分两层（§8）：每个工作区自己的**本地库** `whetstone/store/`，和汇总各工作区快照的**学习者主目录** `~/.whetstone/`。§1–§7 描述的是本地库；主目录只有索引和派生状态，没有 MRG 正文，也没有 LRG。
+知识库分两层（§8）：每个工作区自己的**本地库**（工作区里的 `store/`，独立布局即 `whetstone/store/`），和汇总各工作区快照的**学习者主目录** `~/.whetstone/`。§1–§7 描述的是本地库；主目录只有索引和派生状态，没有 MRG 正文，也没有 LRG。
 
 ## 1. 目录
 
@@ -17,7 +17,7 @@
 └── exports/                    由 init 创建，当前没有脚本写入
 ```
 
-`mrg/`、`lrg/` 是事实源；`lrg/` 只追加。开启方式：档案的 `knowledge_store=on` 或开课语句里说开知识库；位置固定为工作区内的 `whetstone/store/`。
+`mrg/`、`lrg/` 是事实源；`lrg/` 只追加。开启方式：档案的 `knowledge_store=on` 或开课语句里说开知识库；位置固定为工作区内的 `store/`；下文命令以独立布局的 `whetstone/store` 为例。
 
 ```bash
 python3 scripts/store_init.py init --store whetstone/store [--domain-root 学科名]

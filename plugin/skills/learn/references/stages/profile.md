@@ -1,6 +1,6 @@
 # 阶段 1：目标与背景 → `learner-profile.md`
 
-跨课程的学习者档案，放在学习工作区 `whetstone/` 的根（与 `courses/`、`survey/`、`store/` 同级）。已存在时只做**增量更新**：只问缺失或学习者说要改的字段，不覆盖手写内容。
+跨课程的学习者档案，放在工作区根（与 `courses/`、`store/` 同级；独立布局下即 `whetstone/`）。统一布局下，计划目录 `courses/<目标>/` 可以再放一份只写本目标情境与终点能力的档案，读取时字段覆盖根档案；写入时跨目标的字段（背景、偏好、知识库开关）进根档案，本目标的字段进计划目录那份。已存在时只做**增量更新**：只问缺失或学习者说要改的字段，不覆盖手写内容。
 
 ## 一次问完（最多 4 项，学习者可只答一部分）
 
@@ -13,9 +13,9 @@
 
 ## 写入
 
-按 [../../assets/learner-profile-template.md](../../assets/learner-profile-template.md) 写 `whetstone/learner-profile.md`（目录不存在就创建）。档案是背景说明，不是学习材料：不进 `sources.json`，不进课程内容。
+按 [../../assets/learner-profile-template.md](../../assets/learner-profile-template.md) 写 `<工作区>/learner-profile.md`（目录不存在就创建）。档案是背景说明，不是学习材料：不进 `sources.json`，不进课程内容。
 
-开启知识库时本地库固定在 `whetstone/store/`（`store.json` 不存在就 `store_init.py init`），在 `store.json` 记录 `learner_profile` 的路径（不复制内容）。
+开启知识库时本地库固定在 `<工作区>/store/`（`store.json` 不存在就 `store_init.py init`），在 `store.json` 记录 `learner_profile` 的路径（不复制内容）。
 
 ## 交还
 

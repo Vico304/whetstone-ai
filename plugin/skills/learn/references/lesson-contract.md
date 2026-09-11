@@ -2,7 +2,7 @@
 
 ## 产物
 
-文件模式的标准教学包位于学习工作区 `<材料根>/whetstone/courses/<lesson-id>/`（工作区布局见 SKILL.md）：
+文件模式的标准教学包位于计划目录下的 `<lesson-id>/`（独立布局 `<材料根>/whetstone/courses/<id>/`，统一布局 `<知识库>/courses/<目标>/<id>/`；见 SKILL.md「学习工作区布局」）：
 
 ```text
 <lesson-id>/
@@ -22,7 +22,7 @@
 └── learning-progress.json   # 进入教学或需要恢复时创建
 ```
 
-单一短材料可以省略 `sources.json`，但 `lesson-plan.json` 的 `source_refs` 仍要指向来源。旧课程的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受；新课程生成 `outline.md` + `units/`。三个 `prerequisite-*` 文件是条件产物：没有实质前置依赖、学习者近期证据已就绪，或用户选择 `skip` 时可以省略。`zoom/` 与 `concepts/` 是按需产物，build 阶段不预生成。纯对话模式可以不创建文件，但应保持同样的逻辑结构。
+单一短材料可以省略 `sources.json`，但 `lesson-plan.json` 的 `source_refs` 仍要指向来源。`sources.json` 用 `source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 生成：`base_path` 记录材料根相对课程目录的位置，校验器与评分器据此推出 `--sources-root`；搬动课程目录或换布局后用 `source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 只改这一个字段。旧课程的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受；新课程生成 `outline.md` + `units/`。三个 `prerequisite-*` 文件是条件产物：没有实质前置依赖、学习者近期证据已就绪，或用户选择 `skip` 时可以省略。`zoom/` 与 `concepts/` 是按需产物，build 阶段不预生成。纯对话模式可以不创建文件，但应保持同样的逻辑结构。
 
 ## 细化文档契约（`zoom/<section-id>-guide.md`）
 
@@ -146,10 +146,11 @@ explicit | entailed | pedagogical_inference | external | unsupported
 ```bash
 # 大纲阶段
 python3 scripts/validate_lesson.py path/to/lesson-plan.json \
-  --outline path/to/outline.md --manifest path/to/sources.json --sources-root <材料根目录>
+  --outline path/to/outline.md --manifest path/to/sources.json      # 材料根从 sources.json 的 base_path 推出
 # unit 生成后
 python3 scripts/validate_lesson.py path/to/lesson-plan.json \
-  --outline path/to/outline.md --units-dir path/to/units --manifest path/to/sources.json --sources-root <材料根目录>
+  --outline path/to/outline.md --units-dir path/to/units --manifest path/to/sources.json
+# 没有清单、或旧清单 base_path 为 "." 时：加 --sources-root <材料根>
 ```
 
 清单不是由脚本生成或路径不能一一对应时可省略 `--manifest`，但仍需人工检查引用是否可定位。`--sources-root` 让账本对照真实标题检查，长材料务必加。校验器检查结构和交叉引用，不证明教学解释本身正确。

@@ -1222,3 +1222,43 @@ class LearnerHomeTests(_StoreHelpers, unittest.TestCase):
                 del os.environ["WHETSTONE_HOME"]
             self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone")).startswith("tee_dsh-"))
             self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone/store")).startswith("tee_dsh-"))
+
+
+class LayoutTests(unittest.TestCase):
+    """A course pack is self-contained: sources.json records the material root relative to itself,
+    so validators find the sources in both layouts (<materials>/whetstone/courses/<id>/ and
+    <knowledge-base>/courses/<goal>/<id>/ with materials under material/)."""
+
+    def _materials(self, root: Path) -> Path:
+        materials = root / "material" / "spec"
+        (materials / "examples").mkdir(parents=True)
+        (materials / "examples" / "source.md").write_text("## Architecture\n\n## Course ordering\n\n## Appendix\n\n## Deployment notes\n", encoding="utf-8")
+        return materials
+
+    def test_base_path_is_relative_to_the_manifest_in_both_layouts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            materials = self._materials(root)
+            # knowledge-base layout
+            kb_pack = root / "courses" / "目标A" / "c1"
+            kb_pack.mkdir(parents=True)
+            manifest = source_manifest.build_manifest([materials / "examples"], materials, 1024, 1024, output=kb_pack / "sources.json")
+            self.assertEqual(manifest["base_path"], "../../../material/spec")
+            self.assertEqual(manifest["roots"], ["examples"])
+            (kb_pack / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertEqual(validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", manifest), materials.resolve())
+            # standalone layout: <materials>/whetstone/courses/<id>/
+            sa_pack = materials / "whetstone" / "courses" / "c1"
+            sa_pack.mkdir(parents=True)
+            manifest2 = source_manifest.build_manifest([materials / "examples"], materials, 1024, 1024, output=sa_pack / "sources.json")
+            self.assertEqual(manifest2["base_path"], "../../..")
+            # legacy "." cannot be resolved
+            self.assertIsNone(validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", {"base_path": "."}))
+            # rebase migrates an old manifest in place, touching only base_path
+            (kb_pack / "sources.json").write_text(json.dumps(dict(manifest, base_path=".")), encoding="utf-8")
+            self.assertEqual(source_manifest.rebase_manifest(kb_pack / "sources.json", materials), "../../../material/spec")
+            rebased = json.loads((kb_pack / "sources.json").read_text(encoding="utf-8"))
+            self.assertEqual(rebased["roots"], ["examples"])
+            # the coverage check then works with the derived root
+            plan = load_template()
+            self.assertEqual(validate_lesson.validate_coverage_against_sources(plan, validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", rebased)), [])

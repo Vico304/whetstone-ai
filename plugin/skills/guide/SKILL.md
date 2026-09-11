@@ -18,8 +18,8 @@ description: Whetstone 的向导。每次调用先问：想了解怎么用，还
 阶段协议只在 `learn` 技能里维护一份，本技能按顺序执行其中前三个阶段（协议路径见下）：
 
 1. **目标与背景** → `learner-profile.md`（已有则增量更新，只问缺的或要改的；顺带定取向 `orientation`：学这批材料本身 `material`，还是先学领域骨架课再选分支 `domain`）
-2. **材料评估** → `whetstone/survey/materials-survey.md/json`（材料是目录、多路径或 > 30 KB 时；单个小文件跳过）
-3. **学习计划** → `learning-plan.md`，**逐门确认**（取向 domain：骨架课 + 分支候选表，分支不在此确认）
+2. **材料评估** → `<计划目录>/survey/materials-survey.md/json`（材料是目录、多路径或 > 30 KB 时；单个小文件跳过）
+3. **学习计划** → `<计划目录>/learning-plan.md`，**逐门确认**（取向 domain：骨架课 + 分支候选表，分支不在此确认）
 
 到此结束：报告三个文件的路径、第一门课是哪门、它的调用语句。**不生成大纲，不 build，不教学**——大纲由 `outline` 或 `learn` 在那门课开始时做。
 

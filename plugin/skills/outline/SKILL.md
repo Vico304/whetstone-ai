@@ -9,7 +9,7 @@ description: 生成、讨论或修改一门 Whetstone 课程的大纲——unit 
 
 ## 输入
 
-- 课程目录（`whetstone/courses/<id>/`）；不存在时按 `learning-plan.md` 里该课的条目（材料子集、目标）新建；
+- 课程目录（独立布局 `whetstone/courses/<id>/`，统一布局 `courses/<目标>/<id>/`）；不存在时按计划目录 `learning-plan.md` 里该课的条目（材料子集、目标）新建；
 - 已有 `outline.md` + `lesson-plan.json` 时进入**修改模式**：读现有内容，只改学习者要改的部分，保留其余；
 - 读 `learner-profile.md` 取默认深度与知识库设置。
 

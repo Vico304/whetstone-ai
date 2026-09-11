@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "generated_at": "2026-08-21T07:37:22.305974Z",
-  "base_path": ".",
+  "base_path": "../../..",
   "roots": [
     "plugin/examples/project-consensus/source/consensus.md"
   ],

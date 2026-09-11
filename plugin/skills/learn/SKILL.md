@@ -22,21 +22,25 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ## 学习工作区布局
 
-系统写出的**一切**都放在一个目录里，默认是材料根目录下的 `whetstone/`（学习者在调用语句里另指路径时用那个）。材料根目录本身不写入任何文件：
+系统写出的**一切**都放在学习工作区里，材料本身永远不被写入。两种布局，一套规则：
 
 ```text
-<材料根>/
-├── （你的材料：仓库、文档…）
-└── whetstone/                 # 学习工作区
-    ├── learner-profile.md     # 跨课档案（阶段 1）
-    ├── learning-plan.md       # 课程序列（阶段 3）
-    ├── survey/                # 阶段 2 的清点：materials-survey.md/json（多路径时 materials-survey-<名>.*）
-    ├── courses/<id>/          # 每门课一个教学包
-    ├── store/                 # 知识库默认位置（学习者可另指）
-    └── scripts/               # 仅 Cowork 模式：复制来的脚本
+独立布局：一批材料、就地学                 统一布局：一个总目录管所有材料和课程
+<材料根>/                                  <总目录>/                  ← 宿主打开的目录
+├── （仓库、文档…）                          ├── material/<材料集>/     只读
+└── whetstone/          ← 工作区             ├── learner-profile.md     跨目标的档案（背景、偏好、知识库开关）
+    ├── learner-profile.md                    ├── courses/<目标>/        ← 计划目录：一个学习目标一个
+    ├── learning-plan.md                      │   ├── learning-plan.md   （开头写这个目标的情境与终点能力）
+    ├── survey/                               │   ├── survey/
+    ├── courses/<id>/                         │   └── <course-id>/
+    ├── store/                                └── store/
+    └── scripts/（仅 Cowork）
 ```
 
-所有 `coverage[].path`、`source_refs.path`、`anchor.path`、`sources.json` 里的路径都相对**材料根**（校验时 `--sources-root <材料根>`），与工作区在哪无关。启动时按 `whetstone/learner-profile.md` 判断阶段；旧布局（档案、`courses/`、`materials-survey.*` 直接放在材料根）仍被识别，不强制迁移，但新产物一律写进 `whetstone/`。
+- **工作区**：宿主打开的目录里已有 `courses/`、`store/` 或 `learner-profile.md` 之一 → 就是它（统一布局）；否则是材料根下的 `whetstone/`（独立布局，不存在就创建）；学习者在调用语句里另指路径时用那个。
+- **计划目录**：`learning-plan.md`、`survey/` 和各课程目录所在的目录。独立布局里就是工作区；统一布局里是 `courses/<目标>/`（目标名由学习者给，或按材料集取）。档案只放工作区根；计划目录里可以再放一份 `learner-profile.md` 只写这个目标的情境与终点能力，字段覆盖根档案。
+- **课程包自包含**：`coverage[].path`、`source_refs.path`、`anchor.path` 都相对**材料根**；`sources.json` 的 `base_path` 记录材料根相对课程目录的位置（`source_manifest.py … --output <课程目录>/sources.json` 自动写好，如 `../../..` 或 `../../../material/tee_dsh`）。校验器和评分器不给 `--sources-root` 时从它推出材料根，所以课程目录搬到哪种布局都能校验。
+- 旧布局（档案、`courses/`、`materials-survey.*` 直接放在材料根）仍被识别，不强制迁移。
 
 ## 信任与范围边界
 
@@ -76,13 +80,13 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 学习者说要知识库（调用语句里的"开知识库"，或 `learner-profile.md` 的 `knowledge_store=on`）时开启；未开启时完全不涉及以下步骤。
 
-**两层，本地优先。** 本工作区的库固定在 `whetstone/store/`（与 `courses/` 同级）——建课、每次作答、重建状态都只写这里，宿主已经信任这个目录，不会弹权限。跨工作区的记忆放在学习者主目录 `~/.whetstone/`（可用 `WHETSTONE_HOME` 改），它是各工作区快照汇总出来的派生物，不含任何原始回答；只在两个时刻碰它：开课前**读**一次（`--home`），结课时**推**一次（`store_sync.py push`）。学习者给了别的路径就用那个路径当本地库，但不要再要求把库放到工作区之外。
+**两层，本地优先。** 本工作区的库固定在工作区里的 `store/`（与 `courses/` 同级；独立布局即 `whetstone/store/`，下文命令里的 `<工作区>/store` 照此代入）——建课、每次作答、重建状态都只写这里，宿主已经信任这个目录，不会请求权限。跨工作区的记忆放在学习者主目录 `~/.whetstone/`（可用 `WHETSTONE_HOME` 改），它是各工作区快照汇总出来的派生物，不含任何原始回答；只在两个时刻碰它：开课前**读**一次（`--home`），结课时**推**一次（`store_sync.py push`）。学习者给了别的路径就用那个路径当本地库，但不要再要求把库放到工作区之外。
 
-- 首次：`python3 scripts/store_init.py init --store whetstone/store [--domain-root 学科名]`；每门课 build 时 `store_init.py register --lesson-plan`；
-- build 抽概念时：把候选概念（名称 + 别名）写成 JSON 列表，运行 `scripts/index_match.py recall --home --candidates`（主目录还不存在时改 `--store whetstone/store`），对每个命中项判断"同一概念 / 同名异义 / 粒度不同"：同一则复用已有 id，不同则新建 id；模型无法确定的（`decision_needed = disambiguate`，或语义上拿不准）向学习者问一句，一次最多 3 个；**禁止按名称相似自动合并**；
-- build 校验通过后：`scripts/mrg_export.py <lesson-plan> --store whetstone/store`，得到公开层 `mrg/<id>.json` 与高层 `mrg/<id>.deep.json`；随后 `scripts/index_match.py register --store whetstone/store --lesson-id <id>` 把节点登记进本地注册表（脚本报告的 alias 冲突不自动处理，交学习者确认）；
-- 每次教学会话结束或 resume 开始时：`scripts/learner_state_build.py build --store whetstone/store` 重建本地 `learner-state.json`（派生物，不手改）；结课时再 `scripts/store_sync.py push --store whetstone/store` 把本工作区的快照推进主目录（这是唯一一次写工作区之外，宿主可能问一次权限；学习者拒绝也不影响本课，下次再推）；
-- 教学中每次产生 verdict：按 [references/protocol/assess.md](references/protocol/assess.md) 写抽取 JSON，用 `scripts/lrg_record.py append --store whetstone/store --progress <learning-progress.json>` 一次完成比较、追加日志、同步进度；
+- 首次：`python3 scripts/store_init.py init --store <工作区>/store [--domain-root 学科名]`；每门课 build 时 `store_init.py register --lesson-plan`；
+- build 抽概念时：把候选概念（名称 + 别名）写成 JSON 列表，运行 `scripts/index_match.py recall --home --candidates`（主目录还不存在时改 `--store <工作区>/store`），对每个命中项判断"同一概念 / 同名异义 / 粒度不同"：同一则复用已有 id，不同则新建 id；模型无法确定的（`decision_needed = disambiguate`，或语义上拿不准）向学习者问一句，一次最多 3 个；**禁止按名称相似自动合并**；
+- build 校验通过后：`scripts/mrg_export.py <lesson-plan> --store <工作区>/store`，得到公开层 `mrg/<id>.json` 与高层 `mrg/<id>.deep.json`；随后 `scripts/index_match.py register --store <工作区>/store --lesson-id <id>` 把节点登记进本地注册表（脚本报告的 alias 冲突不自动处理，交学习者确认）；
+- 每次教学会话结束或 resume 开始时：`scripts/learner_state_build.py build --store <工作区>/store` 重建本地 `learner-state.json`（派生物，不手改）；结课时再 `scripts/store_sync.py push --store <工作区>/store` 把本工作区的快照推进主目录（这是唯一一次写工作区之外，宿主可能问一次权限；学习者拒绝也不影响本课，下次再推）；
+- 教学中每次产生 verdict：按 [references/protocol/assess.md](references/protocol/assess.md) 写抽取 JSON，用 `scripts/lrg_record.py append --store <工作区>/store --progress <learning-progress.json>` 一次完成比较、追加日志、同步进度；
 - **三条硬约束**：只从公开层文件渲染任何面向学习者的内容，高层文件只在评估与出题时读取；`lrg/` 下的日志不向学习者展示、不引用原文；学习者对抽取或判定有异议时追加新一次作答，不修改任何已有记录。
 
 详见 `docs/specs/knowledge-store.md`。
@@ -96,7 +100,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 ### 1. 建立来源范围
 
 1. 识别来源类型：普通文档、代码库、会话记录或混合材料。
-2. 多文件或目录输入且可运行脚本时，执行 `scripts/source_manifest.py` 建立文件清单、大小、类型和 SHA-256；脚本不会汇总正文，也不会读取敏感文件。
+2. 多文件或目录输入且可运行脚本时，执行 `scripts/source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 建立文件清单、大小、类型和 SHA-256（`base_path` 自动记录材料根相对课程目录的位置）；脚本不会汇总正文，也不会读取敏感文件。
 3. 读取足以支撑课程主线的来源，记录稳定定位：文档用文件+标题/页码，代码用文件+符号/行号，会话用导出文件或 session 标识+轮次。
 4. 报告实际覆盖范围。搜索不到内容只表示“未在已检查范围发现”，不等于材料中不存在。
 
@@ -128,7 +132,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-产出 `lesson-plan.json`（schema `1.2`；骨架课与分支课用 `1.3`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md [--sources-root <材料根目录>]`。**然后停下**，按 [references/stages/outline.md](references/stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.2`；骨架课与分支课用 `1.3`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [references/stages/outline.md](references/stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ### 4. 生成教学包：按 unit 逐份生成
 
