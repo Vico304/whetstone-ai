@@ -49,6 +49,7 @@ claude plugin install whetstone@whetstone-ai
 ├── material/<材料集>/ …       你的材料，原样不动
 ├── learner-profile.md         跨目标的背景与偏好
 ├── courses/<目标>/            每个学习目标一个：learning-plan.md、survey/、各课程目录
+├── external/<集名>_<日期>/    系统检索来的外部资料存档
 └── store/
 
 独立布局：
@@ -66,9 +67,12 @@ claude plugin install whetstone@whetstone-ai
     │   ├── lesson-plan.json   机器计划，含不展示的判定标准
     │   ├── sources.json       来源清单
     │   └── learning-progress.json   进度和你的原始回答 —— 不要打开
+    ├── external/<集名>_<日期>/  系统检索来的外部资料存档
     ├── store/                 知识库，可选
     └── scripts/               只在 Claude Desktop 聊天模式下出现
 ```
+
+系统在三种情况下会自己检索可靠的外部资料：建前置课、补骨架课里在你材料中找不到落点的概念、材料只说"是什么"没说"为什么"的机制。检索到的先存进 `external/`，每集一份 `_index.md` 记来源、发布方、访问时间和选它的理由；讲义引用它们时标为外部知识，不用它们改写你材料的说法。校验器会打印外部引用占全部引用的比例，没有阈值，课程有没有漂离你的材料由你判断。
 
 课程里所有路径都相对材料根；`sources.json` 记录材料根相对课程目录的位置，校验时不必再给 `--sources-root`。旧课程包的 `sources.json` 若写的是 `"."`，运行一次 `python3 $S/source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 即可。
 

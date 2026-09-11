@@ -1076,7 +1076,7 @@ class SkeletonCourseTests(unittest.TestCase):
         plan["shape"] = "linear"
         errors = validate_lesson.validate_plan(plan)
         for needle in ("probe is only allowed in skeleton", "anchor is only allowed in skeleton",
-                       "branch_candidates is only allowed in skeleton", "disposition 'pool' is only allowed"):
+                       "branch_candidates is only allowed in skeleton", "disposition 'pool' outside a skeleton course"):
             self.assertTrue(any(needle in e for e in errors), (needle, errors))
         plan = load_skeleton()
         plan["shape"] = "branch"
@@ -1085,6 +1085,28 @@ class SkeletonCourseTests(unittest.TestCase):
         old = load_template()
         old["shape"] = "skeleton"
         self.assertTrue(any("requires schema_version '1.3'" in e for e in validate_lesson.validate_plan(old)))
+
+    def test_external_archive_pool_rows_are_allowed_in_any_shape(self):
+        plan = load_template()
+        plan["coverage"].append({"path": "whetstone/external/llm-basics_20260911/01_roofline.md", "heading": "*", "disposition": "pool"})
+        self.assertEqual(validate_lesson.validate_plan(plan, {"examples/source.md"}), [])
+        plan["coverage"].append({"path": "docs/other.md", "heading": "*", "disposition": "pool"})
+        errors = validate_lesson.validate_plan(plan, {"examples/source.md"})
+        self.assertTrue(any("'pool' outside a skeleton course is only allowed for external archives" in e for e in errors), errors)
+        plan["coverage"].pop()
+        plan["coverage"].append({"path": "whetstone/external/x/y.md", "heading": "*", "disposition": "reserve"})
+        errors = validate_lesson.validate_plan(plan, {"examples/source.md"})
+        self.assertTrue(any("'reserve' is only allowed in skeleton" in e for e in errors), errors)
+        self.assertTrue(validate_lesson.is_external_archive("external/x/y.md"))
+        self.assertFalse(validate_lesson.is_external_archive("material/external-notes.md"))
+
+    def test_external_refs_are_counted(self):
+        plan = load_template()
+        before = validate_lesson.external_refs(plan)
+        plan["sections"][0]["source_refs"].append({"path": "whetstone/external/s_20260911/a.md", "locator": "## A", "support": "external", "note": "补充"})
+        after = validate_lesson.external_refs(plan)
+        self.assertEqual(after["total"], before["total"] + 1)
+        self.assertEqual(after["external"], before["external"] + 1)
 
     def test_probe_criteria_never_leak_into_outline(self):
         plan = load_skeleton()

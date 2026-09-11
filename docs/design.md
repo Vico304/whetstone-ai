@@ -46,8 +46,9 @@
 
 - `sources.json`：`source_manifest.py` 生成的文件清单——路径、类型、大小、SHA-256。不复制正文，不读疑似敏感文件。
 - `source_refs[]`：每节、每个概念、每条关系带 `{path, locator, support}`。locator 以标题原文或符号名开头，脚本能核对（`score_pack.py` 的 locator 命中率）。
-- `support` 五类，可信度递减：`explicit`（原文明示）> `entailed`（局部可推出）> `external`（外部知识，path 用 URL，带访问时间，不进 `sources.json`）> `pedagogical_inference`（教学组织推断）> `unsupported`。教学推断不得写成原文明示；`unsupported` 不作稳定知识。
+- `support` 五类，可信度递减：`explicit`（原文明示）> `entailed`（局部可推出）> `external`（材料之外的知识；模型检索来的先存档到 `<工作区>/external/`、从存档引用，裸 URL 只在无法存档时允许）> `pedagogical_inference`（教学组织推断）> `unsupported`。教学推断不得写成原文明示；`unsupported` 不作稳定知识。
 - 材料分四级：A 一手（上游源码、官方文档、规范、教材）、B 自著且已核实、C AI 生成的中间文档、D 噪声。C 级永不作来源。
+- 外部存档：建前置课、补 `no-anchor` 概念、材料只说"是什么"没说"为什么"的机制时，模型可以检索外部来源，存进 `<工作区>/external/<集名>_<日期>/`（每集一份 `_index.md`：URL、发布方、访问时间、理由、定级），整目录作 `pool` 进覆盖表，引用标 `external`；不用外部来源改写原材料的主张。校验器打印 external 引用比例，不设阈值。
 
 ### 4.2 MRG：参考图
 
