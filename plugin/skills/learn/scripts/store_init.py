@@ -87,10 +87,12 @@ def register_lesson(store: Path, plan_path: Path) -> dict:
     if not isinstance(plan, dict) or not isinstance(plan.get("lesson_id"), str):
         raise ValueError("lesson plan must be an object with a lesson_id")
     lesson_id = plan["lesson_id"]
+    relation = {key: plan.get(key) for key in ("prerequisite_of", "blocked_at", "depth") if plan.get(key) is not None}
     for lesson in data["lessons"]:
         if lesson.get("lesson_id") == lesson_id:
             lesson["pack_dir"] = plan_path.resolve().parent.as_posix()
             lesson["title"] = plan.get("title")
+            lesson.update(relation)
             break
     else:
         data["lessons"].append(
@@ -101,6 +103,7 @@ def register_lesson(store: Path, plan_path: Path) -> dict:
                 "schema_version": plan.get("schema_version"),
                 "registered_at": utc_now(),
                 "mrg_version": 1,
+                **relation,
             }
         )
     data["updated_at"] = utc_now()

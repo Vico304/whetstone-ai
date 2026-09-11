@@ -109,6 +109,7 @@ def recall(index: dict, candidates: list[dict], learner_state: dict | None = Non
                         "evidence_tier": state.get("evidence_tier"),
                         "depth_max": state.get("depth_max"),
                         "last_evidence_at": state.get("last_evidence_at"),
+                        "lessons": list(state.get("lessons") or []),
                     }
         results.append({
             "name": candidate["name"],
@@ -182,8 +183,24 @@ ACTION_BY_FRESHNESS = {
 }
 
 
-def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> list[dict]:
-    """For each prerequisite in a prerequisite-plan, decide how the prerequisite phase should treat it."""
+def prerequisite_courses_of(store: Path | None, lesson_id: str | None) -> set[str]:
+    """Lesson ids registered in store.json as prerequisite courses of `lesson_id` (schema 1.4 `prerequisite_of`)."""
+    if store is None or not lesson_id:
+        return set()
+    data = store_init.load_store(store)
+    return {
+        lesson.get("lesson_id") for lesson in data.get("lessons", [])
+        if isinstance(lesson, dict) and lesson.get("prerequisite_of") == lesson_id and isinstance(lesson.get("lesson_id"), str)
+    }
+
+
+def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict, prerequisite_courses: set[str] | None = None) -> list[dict]:
+    """For each prerequisite in a prerequisite-plan, decide how the prerequisite phase should treat it.
+
+    A concept learned in one of this course's own prerequisite courses (`prerequisite_courses`) always gets a
+    variant question: it has only immediate evidence right after that course, and re-diagnosing it would undo
+    the point of having taught it."""
+    prerequisite_courses = prerequisite_courses or set()
     prerequisites = plan.get("prerequisites")
     if not isinstance(prerequisites, list):
         raise ValueError("prerequisite plan must contain a prerequisites list")
@@ -201,6 +218,10 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
         rigor = (best[1].get("learner") or {}).get("rigor_max") if best else None
         if freshness == "fresh" and rigor == "fast":
             freshness = "stale"  # fast-mode evidence never counts as full mastery
+        via = None
+        if best:
+            learned_in = set((best[1].get("learner") or {}).get("lessons") or [])
+            via = next((lesson for lesson in sorted(learned_in & prerequisite_courses)), None)
         decisions.append({
             "prerequisite_id": prerequisite.get("id"),
             "name": prerequisite.get("name"),
@@ -210,7 +231,8 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
             "depth_max": (best[1].get("learner") or {}).get("depth_max") if best else None,
             "rigor_max": rigor,
             "ambiguous": hit["decision_needed"] == "disambiguate",
-            "action": ACTION_BY_FRESHNESS[freshness if best else "unknown"],
+            "action": "variant" if via else ACTION_BY_FRESHNESS[freshness if best else "unknown"],
+            "via_prerequisite_course": via,
         })
     return decisions
 
@@ -218,7 +240,8 @@ def prerequisite_plan_lookup(index: dict, plan: dict, learner_state: dict) -> li
 def command_prerequisites(args: argparse.Namespace) -> int:
     root = registry_root(args)
     plan = json.loads(args.prerequisite_plan.read_text(encoding="utf-8"))
-    decisions = prerequisite_plan_lookup(load_index(root), plan, load_learner_state(root))
+    courses = prerequisite_courses_of(args.store, getattr(args, "lesson_id", None))
+    decisions = prerequisite_plan_lookup(load_index(root), plan, load_learner_state(root), courses)
     print(json.dumps({"decisions": decisions}, ensure_ascii=False, indent=2))
     return 0
 
@@ -265,6 +288,7 @@ def parse_args() -> argparse.Namespace:
     q.add_argument("--store", type=Path, help="a local store")
     q.add_argument("--home", nargs="?", const="", help="the learner home; default $WHETSTONE_HOME or ~/.whetstone")
     q.add_argument("--prerequisite-plan", type=Path, required=True)
+    q.add_argument("--lesson-id", help="this course; concepts learned in its registered prerequisite courses always get a variant (needs --store)")
     q.set_defaults(handler=command_prerequisites)
     g = sub.add_parser("register", help="Register a lesson's exported MRG nodes")
     g.add_argument("--store", type=Path, required=True)

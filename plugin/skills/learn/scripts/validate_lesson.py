@@ -11,8 +11,10 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
-SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3"}
-ROLE_AWARE_VERSIONS = {"1.2", "1.3"}  # course-planning (spec C) fields
+SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3", "1.4"}
+ROLE_AWARE_VERSIONS = {"1.2", "1.3", "1.4"}  # course-planning (spec C) fields
+SHAPE_AWARE_VERSIONS = {"1.3", "1.4"}  # shape / pool / anchor / probe / branch candidates
+PREREQUISITE_KEYS = ("prerequisite_of", "blocked_at", "depth")  # 1.4: a course spawned to fill a parent course's gap
 SHAPES = {"linear", "skeleton", "branch"}
 ANCHOR_MARKERS = {"external", "no-anchor"}
 BRANCH_STATUSES = {"candidate", "chosen", "declined"}
@@ -363,6 +365,48 @@ def validate_v13(plan: dict, concept_ids: set[str], errors: list[str]) -> None:
         errors.append("root.branch_candidates is only allowed in skeleton courses")
 
 
+def is_prerequisite_course(plan: dict) -> bool:
+    return isinstance(plan, dict) and nonempty(plan.get("prerequisite_of"))
+
+
+def validate_v14(plan: dict, errors: list[str]) -> None:
+    """Schema 1.4: prerequisite courses — prerequisite_of, blocked_at, depth travel together on a linear course."""
+    present = [key for key in PREREQUISITE_KEYS if key in plan]
+    if not present:
+        return
+    missing = [key for key in PREREQUISITE_KEYS if key not in plan]
+    if missing:
+        errors.append(f"root.{', root.'.join(missing)} required alongside {', '.join(present)} (a prerequisite course carries all three)")
+    parent = plan.get("prerequisite_of")
+    if "prerequisite_of" in plan and (not nonempty(parent) or parent == plan.get("lesson_id")):
+        errors.append("root.prerequisite_of must name the parent course (not this course)")
+    if "blocked_at" in plan and not nonempty(plan.get("blocked_at")):
+        errors.append("root.blocked_at must name the parent course's blocked section")
+    depth = plan.get("depth")
+    if "depth" in plan and (isinstance(depth, bool) or not isinstance(depth, int) or depth < 1):
+        errors.append("root.depth must be an integer >= 1 (parent depth + 1; the main course is 0)")
+    if plan_shape(plan) != "linear":
+        errors.append("root.prerequisite_of is only allowed when shape = linear")
+    if plan.get("parent_course") is not None:
+        errors.append("root.prerequisite_of and root.parent_course are mutually exclusive (prerequisite course vs branch course)")
+
+
+def fact_ratio(plan: dict) -> dict:
+    """Fact-layer concepts / all concepts (unique by id, else name). No threshold: when nearly everything is a
+    convention, the next level down is cards, not another course."""
+    seen: dict[str, str] = {}
+    for section in plan.get("sections", []) or []:
+        if not isinstance(section, dict):
+            continue
+        for concept in section.get("concepts", []) or []:
+            if not isinstance(concept, dict):
+                continue
+            key = concept.get("id") or concept.get("name")
+            if isinstance(key, str) and key not in seen:
+                seen[key] = concept.get("layer") or "mechanism"
+    return {"fact": sum(1 for layer in seen.values() if layer == "fact"), "total": len(seen)}
+
+
 def grounding(plan: dict) -> dict:
     """Anchored / external / no-anchor counts over core+supporting concepts (skeleton courses)."""
     counts = {"anchored": 0, "external": 0, "no_anchor": 0, "total": 0}
@@ -554,12 +598,18 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         for key in ("mode", "coverage", "deferred"):
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.2'")
-    if version == "1.3":
+    if version in SHAPE_AWARE_VERSIONS:
         validate_v13(plan, set(names_by_id), errors)
     else:
         for key in ("shape", "parent_course", "branch_candidates"):
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.3'")
+    if version == "1.4":
+        validate_v14(plan, errors)
+    else:
+        for key in PREREQUISITE_KEYS:
+            if key in plan:
+                errors.append(f"root.{key} requires schema_version '1.4'")
 
     final_challenge = plan.get("final_challenge")
     if not isinstance(final_challenge, dict):
@@ -864,6 +914,10 @@ def main() -> int:
             g = grounding(plan)
             print(f"INFO: grounding {g['anchored']}/{g['total']} core+supporting concepts anchored in the evidence pool "
                   f"({g['external']} external, {g['no_anchor']} no-anchor) — no threshold; the learner judges")
+        if is_prerequisite_course(plan):
+            f = fact_ratio(plan)
+            print(f"INFO: prerequisite course of {plan.get('prerequisite_of')} (depth {plan.get('depth')}, blocked at {plan.get('blocked_at')}); "
+                  f"fact ratio {f['fact']}/{f['total']} concepts are fact-layer — no threshold; when nearly all are conventions, the next level is cards, not a course")
         x = external_refs(plan)
         if x["external"]:
             print(f"INFO: external refs {x['external']}/{x['total']} source refs come from outside the learner's materials "

@@ -20,9 +20,9 @@ from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-KINDS = ("checkpoint", "supporting", "probe", "review", "variant", "transfer", "bridge", "final")
+KINDS = ("checkpoint", "supporting", "probe", "diagnostic", "review", "variant", "transfer", "bridge", "final")
 RIGORS = ("full", "fast")
-IMMEDIATE_KINDS = {"checkpoint", "supporting", "probe", "bridge"}
+IMMEDIATE_KINDS = {"checkpoint", "supporting", "probe", "diagnostic", "bridge"}
 DELAYED_KINDS = {"review", "variant"}
 TRANSFER_KINDS = {"transfer", "final"}
 
