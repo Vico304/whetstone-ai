@@ -68,7 +68,7 @@
 - `tradeoffs`：边界、代价或失败方式数组；
 - `new_problem`：该方案暴露并引向下一节的问题；末节可为 `null`；
 - `concepts`：`name` 与面向学习者的 `explanation`；**1.1 另需** `id`、`layer`、`domain_path`，可选 `aliases`；
-- `source_refs`：`path`、`locator`、`support` 与简短 `note`。**`locator` 以可机器核对的定位开头**——文档用标题原文（`## Hello World`），代码用符号名（`create_report`）——之后再加描述（`## Flow / ra_config_template.json 的 verify_mr_enclave`）；评测用它的第一段在原文里查找命中率。外部网页用 URL 作 `path`，`support` 必须是 `external`，不进 `sources.json`；
+- `source_refs`：`path`、`locator`、`support` 与简短 `note`。**`locator` 以可机器核对的定位开头**——文档用标题原文（`## Hello World`），代码用符号名（`create_report`）——之后再加描述（`## Flow / ra_config_template.json 的 verify_mr_enclave`）；评测用它的第一段在原文里查找命中率。外部来源先存档到 `<工作区>/external/`（见 `source-handling.md` 的"外部存档"），`path` 指向存档文件、`support` 为 `external`；裸 URL 只在无法存档时允许，此时 `support` 必须是 `external` 且不进 `sources.json`；
 - `checkpoint.prompt`、隐藏评估用 `criteria` 和渐进提示 `hint`；**1.1 中 `criteria` 是对象数组** `{id, text, layer}`，`id` 节内唯一（如 `c1`、`c2`），供 `criteria_met` 引用；
 - **1.1 可选** `principle`：本节体现的可迁移设计思想（`principle` 层，只进高层文件，永不进讲义）。
 
@@ -100,7 +100,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 只有骨架课与分支课写 `1.3`；1.2 的全部规则继续适用。
 
 - `shape`：`linear`（缺省）| `skeleton`（骨架课）| `branch`（分支课）；`parent_course` 仅 `branch` 必需，指向骨架课的 `lesson_id`。
-- `coverage[]` 在骨架课里按**文件/目录**记录：`heading: "*"` 表示整个路径；disposition 新增 `pool`（证据池，骨架课可引用）与 `reserve`（留给分支课，`reason` 可选）；`*` 只允许配 `pool / reserve / excluded`。`--sources-root` 对 `*` 路径跳过逐标题检查。分支课与普通课仍逐标题。
+- `coverage[]` 在骨架课里按**文件/目录**记录：`heading: "*"` 表示整个路径；disposition 新增 `pool`（证据池，骨架课可引用）与 `reserve`（留给分支课，`reason` 可选）；`*` 只允许配 `pool / reserve / excluded`。`--sources-root` 对 `*` 路径跳过逐标题检查。分支课与普通课仍逐标题，唯一例外是 `<工作区>/external/` 下的外部存档集：任何形态的课程都可以整目录作 `pool`（`heading: "*"`），不逐标题；`reserve` 仍只属于骨架课。校验器打印 `INFO: external refs a/b`（`external` 引用数 / 全部引用数），不设阈值。
 - `concepts[].anchor`（骨架课的 `core / supporting` 必需）：`{path, locator}`（`path` 须在某个 `pool` 行之下，`locator` 规则同 `source_refs`）、`"external"`（材料里没有，原理必需）或 `"no-anchor"`（没找到落点；警告，学习者决定）。校验器打印 **grounding** = 有 A 级落点 / 全部 core+supporting，只作 INFO，**不设阈值**。
 - `sections[].probe`（骨架课每节必需）：`{prompt, criteria[{id,text,layer}], hint?}`，原理层、无提示；`criteria` 与 checkpoint 一样不进任何面向学习者的文档。
 - 顶层 `branch_candidates[]`（骨架课必需，≥ 1）：`{id, title, concept_ids[], materials[], work_relevance?, status: candidate|chosen|declined}`；`materials` 须在 `pool` 或 `reserve` 之下（no-anchor 候选可为空）。`outline.md` 必须列出每个候选的 `title`。

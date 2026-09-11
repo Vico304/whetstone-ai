@@ -19,7 +19,8 @@ BRANCH_STATUSES = {"candidate", "chosen", "declined"}
 MODES = {"full", "fast"}
 ROLES = ("core", "supporting", "listed")
 DISPOSITIONS = {"core", "supporting", "listed", "appendix", "deferred", "excluded", "pool", "reserve"}
-FILE_LEVEL_DISPOSITIONS = {"pool", "reserve", "excluded"}  # may use heading "*" (skeleton courses)
+FILE_LEVEL_DISPOSITIONS = {"pool", "reserve", "excluded"}  # may use heading "*" (skeleton courses; external archives anywhere)
+EXTERNAL_ARCHIVE_DIR = "external"  # <workspace>/external/<set>/ — fetched sources archived as material
 MAX_SUPPORTING_PER_SECTION = 6
 MAX_LISTED_EXPLANATION_CHARS = 200
 HEADING_MD = re.compile(r"^(#{1,2})\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -87,6 +88,33 @@ def pool_paths(plan: dict) -> set[str]:
         item["path"] for item in (plan.get("coverage") or []) if isinstance(plan.get("coverage"), list)
         if isinstance(item, dict) and nonempty(item.get("path")) and item.get("disposition") == "pool"
     }
+
+
+def is_external_archive(path: Any) -> bool:
+    """True for paths inside an external archive set (any `external/` directory segment)."""
+    return isinstance(path, str) and EXTERNAL_ARCHIVE_DIR in [part for part in path.strip("/").split("/") if part]
+
+
+def external_refs(plan: dict) -> dict:
+    """How many source refs (sections, relations, concept-level) carry support 'external', out of all refs."""
+    total = external = 0
+    ref_lists: list[Any] = []
+    for section in plan.get("sections", []) or []:
+        if isinstance(section, dict):
+            ref_lists.append(section.get("source_refs"))
+            for concept in section.get("concepts", []) or []:
+                if isinstance(concept, dict):
+                    ref_lists.append(concept.get("source_refs"))
+    for relation in plan.get("relations", []) or []:
+        if isinstance(relation, dict):
+            ref_lists.append(relation.get("source_refs"))
+    for refs in ref_lists:
+        for ref in refs or []:
+            if isinstance(ref, dict):
+                total += 1
+                if ref.get("support") == "external":
+                    external += 1
+    return {"external": external, "total": total}
 
 
 def validate_source_refs(refs: Any, location: str, errors: list[str], manifest_paths: set[str] | None) -> None:
@@ -192,8 +220,11 @@ def validate_coverage(plan: dict, section_ids: set[str], errors: list[str], allo
         if disposition not in DISPOSITIONS:
             errors.append(f"{location}.disposition must be one of {sorted(DISPOSITIONS)}")
             continue
-        if disposition in {"pool", "reserve"} and shape != "skeleton":
-            errors.append(f"{location}.disposition '{disposition}' is only allowed in skeleton courses (schema 1.3, shape = skeleton)")
+        if disposition == "reserve" and shape != "skeleton":
+            errors.append(f"{location}.disposition 'reserve' is only allowed in skeleton courses (schema 1.3, shape = skeleton)")
+        if disposition == "pool" and shape != "skeleton" and not is_external_archive(item.get("path")):
+            errors.append(f"{location}.disposition 'pool' outside a skeleton course is only allowed for external archives "
+                          f"(a path under an '{EXTERNAL_ARCHIVE_DIR}/' directory)")
         if item.get("heading") == "*" and disposition not in FILE_LEVEL_DISPOSITIONS:
             errors.append(f"{location}.heading '*' (whole file) is only allowed for {sorted(FILE_LEVEL_DISPOSITIONS)}")
         if disposition in {"core", "supporting", "listed", "appendix"} and item.get("section_id") not in section_ids:
@@ -833,6 +864,10 @@ def main() -> int:
             g = grounding(plan)
             print(f"INFO: grounding {g['anchored']}/{g['total']} core+supporting concepts anchored in the evidence pool "
                   f"({g['external']} external, {g['no_anchor']} no-anchor) — no threshold; the learner judges")
+        x = external_refs(plan)
+        if x["external"]:
+            print(f"INFO: external refs {x['external']}/{x['total']} source refs come from outside the learner's materials "
+                  f"— no threshold; the learner judges whether the course drifted")
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}")
         return 2

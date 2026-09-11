@@ -85,7 +85,7 @@
 |---|---|---|
 | `core / supporting / listed / appendix` | `section_id` 存在 | 这个标题的内容进了哪一节、什么角色 |
 | `deferred / excluded` | `reason` | 略过（日后可补）/ 不讲 |
-| `pool / reserve` | 仅骨架课 | 见 domain-skeleton.md |
+| `pool / reserve` | 骨架课；`pool` 另可用于任何课程的外部存档集（路径含 `external/` 段，`heading: "*"`） | 见 domain-skeleton.md；外部存档见 §8 |
 
 传 `--sources-root <材料根>` 时，校验器读取来源文件（`.md / .adoc / .txt`）的一级、二级标题，每个标题都必须在表里有一行，否则报 `coverage is missing heading` 错误。这是"不静默遗漏"的确定性保证。
 
@@ -96,7 +96,7 @@
 每条 `{path, locator, support, note}`。
 
 - `locator` 以可机器核对的定位开头：文档用标题原文（`## Hello World`），代码用符号名（`create_report`），之后再加描述。`score_pack.py` 用第一段在原文里查找，得到 locator 命中率。
-- `support`：`explicit / entailed / external / pedagogical_inference / unsupported`。`external` 用 URL 作 `path`，不进 `sources.json`；`unsupported` 不作稳定讲解的唯一依据。
+- `support`：`explicit / entailed / external / pedagogical_inference / unsupported`。`external` 的 `path` 指向 `<工作区>/external/<集名>_<日期>/` 下的存档文件（每集一份 `_index.md` 记 URL、发布方、访问时间、理由、定级），裸 URL 只在无法存档时允许且不进 `sources.json`；`unsupported` 不作稳定讲解的唯一依据。校验器打印 `INFO: external refs a/b`，不设阈值。
 - 传 `--manifest sources.json` 时，`path` 必须在清单里（外部 URL 除外）。
 
 ## 9. `outline.md`

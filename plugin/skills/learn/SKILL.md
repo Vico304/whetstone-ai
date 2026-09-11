@@ -33,6 +33,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
     ├── learning-plan.md                      │   ├── learning-plan.md   （开头写这个目标的情境与终点能力）
     ├── survey/                               │   ├── survey/
     ├── courses/<id>/                         │   └── <course-id>/
+    ├── external/<集名>_<日期>/                ├── external/<集名>_<日期>/   检索来的外部资料存档
     ├── store/                                └── store/
     └── scripts/（仅 Cowork）
 ```
@@ -69,7 +70,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 - 学习目标：从用户描述和材料主题推断，重点是延迟重建知识结构并迁移到新问题，而不是仅完成摘要；
 - 材料范围：覆盖支撑主线所需的内容，次要细节放入附录；大型代码库先从入口、主流程和关键模块建立范围；
 - 前置检查：`prerequisite_check=auto`；用户明确说缺少前置知识时改为 `always`，明确要求直接学习时改为 `skip`；
-- 外部知识：默认不用外知识补齐或改写原材料的主张；前置诊断实际暴露缺口时，可为该缺口执行只读检索，并将所有补充单独标记为 `external`；
+- 外部知识：不用外部知识改写原材料的主张。三种情况可以检索可靠的外部来源补充——建前置课、补骨架课的 `no-anchor` 概念、材料只说"是什么"没说"为什么"的机制；检索到的先按 [references/source-handling.md](references/source-handling.md) 的"外部存档"存进 `<工作区>/external/`，再从存档引用并标 `external`；检索不可用时明确说，请学习者提供，不伪造；
 - 输出：在可写工作区中为本次材料创建独立课程目录；若同名目录已有进度，优先识别为继续课程，不覆盖原文件；
 - 进度：互动教学且有可写工作区时创建或继续 `learning-progress.json`，保留首次回答和所有修订；
 - 节奏：一次只推进一个 LearningUnit，等学习者回答后再评估和继续。
@@ -103,6 +104,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 2. 多文件或目录输入且可运行脚本时，执行 `scripts/source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 建立文件清单、大小、类型和 SHA-256（`base_path` 自动记录材料根相对课程目录的位置）；脚本不会汇总正文，也不会读取敏感文件。
 3. 读取足以支撑课程主线的来源，记录稳定定位：文档用文件+标题/页码，代码用文件+符号/行号，会话用导出文件或 session 标识+轮次。
 4. 报告实际覆盖范围。搜索不到内容只表示“未在已检查范围发现”，不等于材料中不存在。
+5. 需要外部来源时（条件见"低输入自动补全"的外部知识一条）：检索 → 存档到 `<工作区>/external/<集名>_<日期>/` 并写 `_index.md` → 存档目录整个作 `pool` 进覆盖表（`heading: "*"`）→ 从存档文件引用，`support: external`。规则见 [references/source-handling.md](references/source-handling.md) 的"外部存档"。
 
 处理不同来源时读取 [references/source-handling.md](references/source-handling.md)。
 

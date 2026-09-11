@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 外部存档：建前置课、补没有落点的概念、材料只说"是什么"没说"为什么"的机制时，模型可以检索可靠的外部来源，但必须先存进 `<工作区>/external/<集名>_<日期>/`（每集一份 `_index.md`）再引用，不引活 URL，不用外部来源改写原材料的主张。任何课程都可以把外部存档集整目录作 `pool` 进覆盖表；校验器打印外部引用比例，不设阈值。
 - 两种布局：独立布局（`<材料根>/whetstone/`）之外，支持统一布局——一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`）。工作区按打开的目录判断；计划目录可按学习目标分组；`sources.json` 的 `base_path` 改为记录材料根相对课程目录的位置，校验器与评分器据此自动找到来源，课程包搬到哪种布局都能校验；`source_manifest.py --rebase` 迁移旧清单。
 - 知识库改为本地优先：库固定在工作区里的 `store/`，每次作答只写工作区内，不再每节请求写入权限；跨工作区的记忆放到 `~/.whetstone/`（`WHETSTONE_HOME` 可改），由结课时 `store_sync.py push` 把本工作区的索引与掌握状态快照汇总过去，主目录里没有原始回答。`index_match.py` / `review_pool.py` 加 `--home` 读汇总；档案的 `knowledge_store` 改为 on/off。起因：库在工作区之外时每一节都要申请一次写权限。
 - 适配 pi：根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`，`pi install git:github.com/Vico304/whetstone-ai` 或本地路径即可安装；`install_skills.sh` 也可装到 `~/.pi/agent/skills`。SKILL.md 的路径约定加入 pi 的 `<location>`；调用 `/skill:learn` 等。
