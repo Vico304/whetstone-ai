@@ -130,6 +130,9 @@ def append_attempt(
     section = find_section(state, section_id)
     if section.get("status") == "deferred":
         raise ValueError(f"section {section_id} is deferred in this course; un-defer it in the lesson plan first")
+    if section.get("blocked_by") and not review:
+        raise ValueError(f"section {section_id} is blocked by prerequisite course '{section['blocked_by']}'; "
+                         f"finish that course (or `unblock`) before recording an attempt here")
     now = utc_now()
     attempt = {
         "attempt_number": len(section.get("attempts", [])) + 1,
@@ -206,6 +209,57 @@ def defer_section(state: dict, section_id: str, reason: str) -> None:
     state["updated_at"] = now
 
 
+def block_section(state: dict, section_id: str, child_lesson_id: str) -> None:
+    """Mark a section as waiting on a prerequisite course. The parent stays in_progress at that section;
+    attempts on it are refused until `unblock` (normally run when the child course finishes)."""
+    if not child_lesson_id or not child_lesson_id.strip():
+        raise ValueError("--by must name the prerequisite course")
+    section = find_section(state, section_id)
+    if section.get("status") == "deferred":
+        raise ValueError(f"section {section_id} is deferred; it cannot be blocked")
+    if section.get("blocked_by"):
+        raise ValueError(f"section {section_id} is already blocked by '{section['blocked_by']}'")
+    now = utc_now()
+    section["blocked_by"] = child_lesson_id.strip()
+    state["blocked"] = {"section_id": section_id, "by": section["blocked_by"], "at": now}
+    state["status"] = "in_progress"
+    state["current_section_id"] = section_id
+    state.setdefault("events", []).append({"at": now, "type": "section_blocked", "section_id": section_id, "by": section["blocked_by"]})
+
+
+def unblock_section(state: dict, section_id: str) -> str:
+    section = find_section(state, section_id)
+    child = section.get("blocked_by")
+    if not child:
+        raise ValueError(f"section {section_id} is not blocked")
+    now = utc_now()
+    del section["blocked_by"]
+    state.pop("blocked", None)
+    state["current_section_id"] = section_id
+    state.setdefault("events", []).append({"at": now, "type": "section_unblocked", "section_id": section_id, "by": child})
+    return child
+
+
+def command_block(args: argparse.Namespace) -> int:
+    state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("progress state root must be an object")
+    block_section(state, args.section_id, args.by)
+    atomic_write(args.state, state)
+    print(f"OK: {args.section_id} blocked by prerequisite course '{args.by}'; resume this course after it finishes")
+    return 0
+
+
+def command_unblock(args: argparse.Namespace) -> int:
+    state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("progress state root must be an object")
+    child = unblock_section(state, args.section_id)
+    atomic_write(args.state, state)
+    print(f"OK: {args.section_id} unblocked (prerequisite course '{child}' done); current section is {state.get('current_section_id')}")
+    return 0
+
+
 def command_defer(args: argparse.Namespace) -> int:
     state = read_json(args.state)
     if not isinstance(state, dict):
@@ -224,11 +278,14 @@ def command_show(args: argparse.Namespace) -> int:
     print(f"lesson_id: {state.get('lesson_id')}")
     print(f"status: {state.get('status')}")
     print(f"current_section_id: {state.get('current_section_id')}")
+    if state.get("blocked"):
+        print(f"blocked: {state['blocked'].get('section_id')} waits for prerequisite course '{state['blocked'].get('by')}'")
     for section in state.get("sections", []):
         attempts = section.get("attempts", [])
         depths = [a.get("depth_reached") for a in attempts if a.get("depth_reached")]
         depth_note = f", depth {' → '.join(depths)}" if depths else ""
-        print(f"- {section.get('id')}: {section.get('status')} ({len(attempts)} attempts{depth_note})")
+        blocked_note = f", blocked by {section['blocked_by']}" if section.get("blocked_by") else ""
+        print(f"- {section.get('id')}: {section.get('status')} ({len(attempts)} attempts{depth_note}{blocked_note})")
     return 0
 
 
@@ -272,6 +329,17 @@ def parse_args() -> argparse.Namespace:
     defer_parser.add_argument("--section-id", required=True)
     defer_parser.add_argument("--reason", required=True, help="Why it is skipped, e.g. '原理探测通过，学习者选择跳过'")
     defer_parser.set_defaults(handler=command_defer)
+
+    block_parser = subparsers.add_parser("block", help="Mark a section as waiting on a prerequisite course")
+    block_parser.add_argument("--state", type=Path, required=True)
+    block_parser.add_argument("--section-id", required=True)
+    block_parser.add_argument("--by", required=True, help="lesson_id of the prerequisite course")
+    block_parser.set_defaults(handler=command_block)
+
+    unblock_parser = subparsers.add_parser("unblock", help="Release a blocked section (the prerequisite course finished)")
+    unblock_parser.add_argument("--state", type=Path, required=True)
+    unblock_parser.add_argument("--section-id", required=True)
+    unblock_parser.set_defaults(handler=command_unblock)
 
     show_parser = subparsers.add_parser("show", help="Show current progress")
     show_parser.add_argument("--state", type=Path, required=True)
