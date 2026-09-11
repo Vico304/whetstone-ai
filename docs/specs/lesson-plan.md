@@ -12,8 +12,8 @@
 ├── sources.json                来源清单（source_manifest.py）；单个短材料可省略
 ├── learning-progress.json      进入教学时由 learning_state.py init 创建
 ├── prerequisite-plan.json      前置检查的计划（条件产物）
-├── prerequisite-progress.json  前置作答、来源与桥接复测（条件产物）
-├── prerequisite-guide.md       只含实际暴露的缺口（条件产物）
+├── prerequisite-progress.json  前置作答与回程复测（条件产物）；缺口建成前置课，是同级的另一个课程目录
+├── prerequisite-guide.md       旧课程的补充文档；1.4 起不再生成
 ├── zoom/<section-id>-guide.md  学习者选择细化时生成，一节最多一份
 └── concepts/                   clarify 技能维护的概念笔记与 _inbox.md
 ```
@@ -24,7 +24,7 @@
 
 | 字段 | 自版本 | 规则 |
 |---|---|---|
-| `schema_version` | 1.0 | `1.0 / 1.1 / 1.2 / 1.3` 之一；新课程写 `1.2`，骨架课与分支课写 `1.3` |
+| `schema_version` | 1.0 | `1.0 / 1.1 / 1.2 / 1.3 / 1.4` 之一；新课程写 `1.2`，骨架课与分支课写 `1.3`，前置课写 `1.4` |
 | `lesson_id`、`title`、`learning_goal` | 1.0 | 非空字符串 |
 | `source_manifest` | 1.0 | `sources.json` 的相对路径，或 `null`。清单的 `base_path` 记录材料根相对课程目录的位置（`../../..` 或 `../../../material/x`），校验器与评分器据此推出材料根，课程包因此自包含 |
 | `big_picture` | 1.0 | `{problem, outcome, system_map[]}`：材料总体解决的问题、学完应能做的事、从输入到结果的关键步骤 |
@@ -37,6 +37,7 @@
 | `deferred[]` | 1.2 | `[{type: section / concept, id, reason}]`，`id` 必须存在于本课 |
 | `coverage[]` | 1.2 | 见 §7；为空时必须传 `--allow-empty-coverage` |
 | `shape`、`parent_course`、`branch_candidates[]` | 1.3 | 见 domain-skeleton.md |
+| `prerequisite_of`、`blocked_at`、`depth` | 1.4 | 前置课，三者同时出现：父课 `lesson_id`、父课被卡住的节 id、父课 depth + 1（主课为 0）；`shape` 必须是 `linear`，与 `parent_course` 互斥。校验器打印 `INFO: fact ratio a/b`（fact 层概念 / 全部概念），不设阈值 |
 
 ## 3. `sections[]`
 
@@ -133,3 +134,4 @@ python3 scripts/validate_lesson.py lesson-plan.json --guide teaching-guide.md
 | 1.1 | 概念 `id / layer / domain_path / aliases`；顶层 `relations[]`；`criteria` 改为对象数组；可选 `principle` |
 | 1.2 | `mode`、`outline_confirmed_at`、概念 `role` 与 `check`、`deferred[]`、`coverage[]`；`outline.md` + `units/` 取代 `teaching-guide.md` |
 | 1.3 | `shape`、`parent_course`、`pool / reserve`、`anchor`、`probe`、`branch_candidates[]` |
+| 1.4 | 前置课：`prerequisite_of`、`blocked_at`、`depth`；任何课程可用外部存档集作 `pool` |

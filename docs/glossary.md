@@ -22,6 +22,7 @@
 | 概念索引 | `concepts/index.json` | 跨课程的概念 id、别名、出现记录 |
 | 掌握状态 | `learner-state.json` | 从学习记录派生的每个概念的状态：证据强弱、时效、到达过的层、错误说法、信心校准 |
 | 外部资料存档 | 外部存档；`<工作区>/external/<集名>_<日期>/` | 模型检索来的资料先存成材料集再引用；引用标 `external` |
+| 前置课、前置栈 | 前置课（`prerequisite_of / blocked_at / depth`，schema 1.4）；前置栈（`learning-plan.md` §3a） | 为父课的缺口建的一门普通课，父课在被卡的节等它；栈记录每一层与回程 |
 
 规则：
 
