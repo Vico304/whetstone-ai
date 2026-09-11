@@ -690,6 +690,20 @@ def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+def sources_root_from_manifest(manifest_path: Path, manifest: Any) -> Path | None:
+    """Material root recorded in sources.json: base_path relative to the manifest's own directory.
+    "." (legacy: relative to whatever cwd was at generation) cannot be resolved and yields None."""
+    if not isinstance(manifest, dict):
+        return None
+    base = manifest.get("base_path")
+    if not nonempty(base) or base.strip() == ".":
+        return None
+    candidate = Path(base).expanduser()
+    if not candidate.is_absolute():
+        candidate = manifest_path.resolve().parent / candidate
+    return candidate.resolve()
+
+
 def manifest_paths(manifest: Any) -> set[str]:
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         raise ValueError("source manifest must contain a files list")
@@ -783,7 +797,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outline", type=Path, help="outline.md (schema 1.2+ packs)")
     parser.add_argument("--units-dir", type=Path, help="units/ directory (schema 1.2+ packs)")
     parser.add_argument("--manifest", type=Path)
-    parser.add_argument("--sources-root", type=Path, help="Check coverage[] against the headings of the actual source files")
+    parser.add_argument("--sources-root", type=Path, help="Material root for the coverage check; defaults to sources.json base_path (relative to the pack)")
     parser.add_argument("--allow-empty-coverage", action="store_true")
     return parser.parse_args()
 
@@ -792,7 +806,15 @@ def main() -> int:
     args = parse_args()
     try:
         plan = load_json(args.lesson_plan)
-        paths = manifest_paths(load_json(args.manifest)) if args.manifest else None
+        manifest = load_json(args.manifest) if args.manifest else None
+        paths = manifest_paths(manifest) if manifest is not None else None
+        sources_root = args.sources_root
+        if sources_root is None:
+            manifest_path = args.manifest or (args.lesson_plan.parent / "sources.json")
+            if manifest_path.is_file():
+                sources_root = sources_root_from_manifest(manifest_path, manifest if manifest is not None else load_json(manifest_path))
+                if sources_root is not None:
+                    print(f"INFO: sources root {sources_root} (from {manifest_path.name} base_path)")
         errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage)
         warnings = collect_warnings(plan)
         if args.guide:
@@ -805,8 +827,8 @@ def main() -> int:
             unit_errors, unit_warnings = validate_units(args.units_dir, plan)
             errors.extend(unit_errors)
             warnings.extend(unit_warnings)
-        if args.sources_root and schema_version(plan) in ROLE_AWARE_VERSIONS:
-            errors.extend(validate_coverage_against_sources(plan, args.sources_root))
+        if sources_root and schema_version(plan) in ROLE_AWARE_VERSIONS:
+            errors.extend(validate_coverage_against_sources(plan, sources_root))
         if plan_shape(plan) == "skeleton":
             g = grounding(plan)
             print(f"INFO: grounding {g['anchored']}/{g['total']} core+supporting concepts anchored in the evidence pool "

@@ -140,7 +140,27 @@ def iter_files(inputs: Iterable[Path]) -> tuple[list[Path], list[dict[str, str]]
     return [unique[key] for key in sorted(unique, key=lambda item: item.as_posix())], problems
 
 
-def build_manifest(inputs: list[Path], base: Path, max_text_bytes: int, max_hash_bytes: int) -> dict:
+def base_path_for(base: Path, output: Path | None) -> str:
+    """The material root as recorded in sources.json.
+
+    Relative to the directory the manifest lives in when --output is given (so a course pack is
+    self-contained: validators derive the sources root from the pack alone, whatever the layout —
+    `../../..` for <materials>/whetstone/courses/<id>/, `../../../material/x` for a knowledge base);
+    "." when written to stdout from the material root itself (legacy behaviour)."""
+    if output is not None:
+        return Path(os.path.relpath(base.resolve(), output.resolve().parent)).as_posix()
+    return "." if base.resolve() == Path.cwd().resolve() else base.as_posix()
+
+
+def rebase_manifest(manifest_path: Path, base: Path) -> str:
+    """Rewrite only base_path of an existing sources.json (migration between layouts)."""
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data["base_path"] = base_path_for(base, manifest_path)
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return data["base_path"]
+
+
+def build_manifest(inputs: list[Path], base: Path, max_text_bytes: int, max_hash_bytes: int, output: Path | None = None) -> dict:
     files, problems = iter_files(inputs)
     entries: list[dict] = []
     for path in files:
@@ -176,7 +196,7 @@ def build_manifest(inputs: list[Path], base: Path, max_text_bytes: int, max_hash
     return {
         "schema_version": "1.0",
         "generated_at": utc_now(),
-        "base_path": "." if base.resolve() == Path.cwd().resolve() else base.as_posix(),
+        "base_path": base_path_for(base, output),
         "roots": [portable_path(path, base) for path in inputs],
         "files": entries,
         "problems": problems,
@@ -192,9 +212,10 @@ def build_manifest(inputs: list[Path], base: Path, max_text_bytes: int, max_hash
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("sources", nargs="+", type=Path, help="Files or directories to inventory")
-    parser.add_argument("--base", type=Path, default=Path.cwd(), help="Base path for portable paths")
-    parser.add_argument("--output", type=Path, help="Write JSON here; stdout when omitted")
+    parser.add_argument("sources", nargs="*", type=Path, help="Files or directories to inventory")
+    parser.add_argument("--base", type=Path, default=Path.cwd(), help="Material root: paths in the manifest are relative to it")
+    parser.add_argument("--output", type=Path, help="Write JSON here; stdout when omitted. base_path is then recorded relative to this file's directory")
+    parser.add_argument("--rebase", type=Path, metavar="SOURCES_JSON", help="Only rewrite base_path of an existing manifest so it points at --base from where the file lives")
     parser.add_argument("--max-text-bytes", type=int, default=2 * 1024 * 1024)
     parser.add_argument("--max-hash-bytes", type=int, default=50 * 1024 * 1024)
     return parser.parse_args()
@@ -204,7 +225,12 @@ def main() -> int:
     args = parse_args()
     if args.max_text_bytes < 1 or args.max_hash_bytes < 1:
         raise SystemExit("Size limits must be positive integers.")
-    manifest = build_manifest(args.sources, args.base, args.max_text_bytes, args.max_hash_bytes)
+    if args.rebase:
+        print(f"OK: {args.rebase} base_path = {rebase_manifest(args.rebase, args.base)}")
+        return 0
+    if not args.sources:
+        raise SystemExit("give at least one source path (or --rebase SOURCES_JSON)")
+    manifest = build_manifest(args.sources, args.base, args.max_text_bytes, args.max_hash_bytes, args.output)
     payload = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

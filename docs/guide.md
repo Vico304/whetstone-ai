@@ -38,9 +38,20 @@ claude plugin install whetstone@whetstone-ai
 
 ## 3. 目录
 
-系统写出的一切都放在材料根目录下的 `whetstone/`，你的材料本身不会被写入。想放别处，在调用语句里说"工作区 <路径>"。
+系统写出的一切都放在一个工作区里，你的材料本身不会被写入。工作区有两种布局：
+
+**独立布局**：打开材料目录就地学，工作区是它下面的 `whetstone/`。
+**统一布局**：建一个总目录，材料放在 `material/` 下，用工具打开这个总目录；工作区就是它，课程按学习目标分组放在 `courses/<目标>/`，一个 `store/` 管所有课。已有的 `whetstone/` 可以整个搬进去——课程包自己记着材料根在哪，搬完照常校验。
 
 ```text
+统一布局：
+<总目录>/
+├── material/<材料集>/ …       你的材料，原样不动
+├── learner-profile.md         跨目标的背景与偏好
+├── courses/<目标>/            每个学习目标一个：learning-plan.md、survey/、各课程目录
+└── store/
+
+独立布局：
 <材料根>/
 ├── occlum/ 文档/ …            你的材料，原样不动
 └── whetstone/                 工作区，可以整个搬走、备份、用 Obsidian 打开
@@ -59,7 +70,7 @@ claude plugin install whetstone@whetstone-ai
     └── scripts/               只在 Claude Desktop 聊天模式下出现
 ```
 
-课程里所有路径都相对材料根，校验时用 `--sources-root <材料根>`。
+课程里所有路径都相对材料根；`sources.json` 记录材料根相对课程目录的位置，校验时不必再给 `--sources-root`。旧课程包的 `sources.json` 若写的是 `"."`，运行一次 `python3 $S/source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 即可。
 
 ## 4. 一门课的流程
 
@@ -256,13 +267,13 @@ claude plugin install whetstone@whetstone-ai
 
 ## 8. 知识库
 
-在档案里写 `knowledge_store=on`，或开课时说一句"开知识库"即开启；不开，一切与单课模式相同。库分两层：这个材料目录自己的 `whetstone/store/`（每次作答写这里，在工作区里面，宿主不会弹权限），和你的主目录 `~/.whetstone/`（所有材料目录的汇总，结课时推一次，可能被问一次权限）。开启后：
+在档案里写 `knowledge_store=on`，或开课时说一句"开知识库"即开启；不开，一切与单课模式相同。库分两层：工作区里的 `store/`（独立布局是 `whetstone/store/`，统一布局是总目录下的 `store/`；每次作答写这里，不会被请求权限），和你的主目录 `~/.whetstone/`（所有工作区的汇总，结课时推送一次，可能被请求一次权限）。开启后：
 
 - 建课时把课程的参考图导出到 `store/mrg/`，事实与机制一份、后两层另一份；
 - 教学时把你每次作答只追加到 `store/lrg/`：原文、模型的读取、与参考图的差异、判定、回答到了哪一层、把握、用时；
 - 维护跨课的概念索引 `store/concepts/index.json` 和派生的掌握状态 `store/learner-state.json`：每个概念的证据强弱、有效期、到达过的层、错误说法；
 - 新课的前置检查先查你主目录里的汇总索引：学过且仍有效的概念出一道变式题代替检查；过期的先变式题、答错再检查；复习时旧的错误说法以匿名形式回来。
-- 结课时 `store_sync.py push` 把这个目录的索引和掌握状态快照推进 `~/.whetstone/`，主目录里只有派生状态，没有你的任何原始回答。
+- 结课时 `store_sync.py push` 把这个工作区的索引和掌握状态快照推送到 `~/.whetstone/`，主目录里只有派生状态，没有你的任何原始回答。
 
 首次：
 
@@ -271,7 +282,7 @@ S=whetstone-ai/plugin/skills/learn/scripts
 python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科学
 ```
 
-之后模型自己运行登记、导出、追加、重建、推送。换一个材料目录学新东西时再 `init` 一次它自己的 `whetstone/store`，主目录会自动把两边接起来。想换主目录位置就设环境变量 `WHETSTONE_HOME`。
+统一布局下把 `whetstone/store` 换成总目录下的 `store`。之后模型自己运行登记、导出、追加、重建、推送。换一个工作区学新东西时再 `init` 一次它自己的 `store/`，结课推送后主目录里就有两边的汇总。想换主目录位置就设环境变量 `WHETSTONE_HOME`。
 
 | 可以看 | 不要看，规则靠你自己守 |
 |---|---|
@@ -279,7 +290,7 @@ python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科
 | `whetstone/store/mrg/<课程>.json` | `whetstone/store/mrg/*.deep.json`（后两层，看了就变成背诵材料） |
 | `whetstone/store/concepts/index.json`、`learner-state.json`、`~/.whetstone/` 整个目录 | `whetstone/store/lrg/*.jsonl`（作答日志） |
 
-看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨目录的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：
+看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨工作区的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：
 
 ```bash
 python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store
