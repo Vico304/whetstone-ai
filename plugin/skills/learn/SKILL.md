@@ -96,7 +96,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 0. 缺什么补什么（启动时静默判断）
 
-读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume；无 `whetstone/learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认；档案 `orientation=domain` 且这门课是骨架课时改读 [stages/skeleton.md](references/stages/skeleton.md)）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
+读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume（进度里有 `blocked` → 先去那门前置课）；无 `whetstone/learner-profile.md` → 阶段 1 目标与背景（[stages/profile.md](references/stages/profile.md)）；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估（[stages/triage.md](references/stages/triage.md)）→ 阶段 3 学习计划、逐门确认（[stages/plan.md](references/stages/plan.md)）；本课无确认过的大纲 → 阶段 4（[stages/outline.md](references/stages/outline.md)，即下文 §1–§3 + 呈现确认；档案 `orientation=domain` 且这门课是骨架课时改读 [stages/skeleton.md](references/stages/skeleton.md)）；否则直接 §4。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
 
 ### 1. 建立来源范围
 
@@ -110,15 +110,15 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 
 ### 2. 检查并补足前置知识
 
-**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[references/protocol/probe.md](references/protocol/probe.md)）。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](references/prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[references/protocol/probe.md](references/protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](references/prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
-2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题；
+2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
 3. 根据学习者的原始回答判断当前材料所需的概念生成、边界、关系和应用证据，不扩大为一般能力画像；
-4. 只针对 `fragile | gap | misconception` 检索可审核来源，生成有引用的 `prerequisite-guide.md`；
-5. 通过减少提示的重建与桥接问题复测，再根据结果调整正课深度。
+4. 有任何 `fragile | gap | misconception` 的簇，就为它们建**一门前置课**（[references/prerequisite/course.md](references/prerequisite/course.md)）：外部存档作来源、`schema 1.4`、模式跟随本课、大纲照常确认、逐节教学与记录；本课在当前节 `learning_state.py block`；
+5. 前置课结课后回程（[references/prerequisite/return.md](references/prerequisite/return.md)）：`unblock`、对被卡簇出变式题，再从被卡的节继续。
 
-在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
+小缺口也建课，不再生成补充文档。前置课自己暴露缺口时同一协议递归；`learning-plan.md` 的"前置栈"随时可见。在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
 
 ### 3. 大纲：从大框架建立问题链，并列出全部概念
 
@@ -144,7 +144,7 @@ shell 的当前工作目录通常是用户项目目录而非技能目录，不�
 - `units/<section-id>.md`：**每个非 deferred 的 unit 一份，每份是一次独立生成**——只带该 unit 的来源定位去读原文，长度预算按 unit 计，不受整包限制；宿主支持并行子代理时可并行生成；生成后逐份运行 `validate_lesson.py <plan> --units-dir units/`；
 - `lesson-plan.json`：小节、概念角色、关系、来源、检查点、覆盖账本（骨架课：证据池、概念落点、探测题、分支候选）；骨架课的每份 unit 文档末尾列出"这个原理在你的材料里的落点"（来自 `anchor`），且只引用 `pool` 里的 A 级定位；unit 文档的"轮到你"**原样放 `checkpoint.prompt`**，探测题 `probe.prompt` 不进 unit（校验器对两者都检查）；
 - `sources.json`：多文件输入时的来源清单；
-- `prerequisite-plan.json` / `prerequisite-progress.json` / `prerequisite-guide.md`：前置阶段产物（条件生成）；
+- `prerequisite-plan.json` / `prerequisite-progress.json`：前置检查产物（条件生成）；缺口建成前置课，是与本课同级的另一个课程目录；
 - `learning-progress.json`：进入教学时用 `scripts/learning_state.py init` 创建（deferred 的 unit 自动标为 `deferred`，不计入完成）。
 
 教学过程中还可能按需产生：`zoom/<section-id>-guide.md`（学习者选择细化某节时，候选来自该节的 `listed` 概念）与 `concepts/`（clarify 技能维护）。旧的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受，新课程不再生成。

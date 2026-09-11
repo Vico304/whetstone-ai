@@ -9,7 +9,7 @@
 ├── sources.json
 ├── prerequisite-plan.json       # 运行前置检查时创建
 ├── prerequisite-progress.json   # 前置作答、来源与桥接复测
-├── prerequisite-guide.md        # 实际暴露缺口时创建
+├── prerequisite-guide.md        # 旧课程的补充文档；1.4 起缺口建成前置课，不再生成
 ├── lesson-plan.json             # schema 1.2（骨架课 / 分支课：1.3）
 ├── outline.md                   # 路线图 + 全部概念 + 覆盖账本（取代 teaching-guide.md）
 ├── units/                       # 每个非 deferred 的 unit 一份，独立生成
@@ -22,7 +22,7 @@
 └── learning-progress.json   # 进入教学或需要恢复时创建
 ```
 
-单一短材料可以省略 `sources.json`，但 `lesson-plan.json` 的 `source_refs` 仍要指向来源。`sources.json` 用 `source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 生成：`base_path` 记录材料根相对课程目录的位置，校验器与评分器据此推出 `--sources-root`；搬动课程目录或换布局后用 `source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 只改这一个字段。旧课程的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受；新课程生成 `outline.md` + `units/`。三个 `prerequisite-*` 文件是条件产物：没有实质前置依赖、学习者近期证据已就绪，或用户选择 `skip` 时可以省略。`zoom/` 与 `concepts/` 是按需产物，build 阶段不预生成。纯对话模式可以不创建文件，但应保持同样的逻辑结构。
+单一短材料可以省略 `sources.json`，但 `lesson-plan.json` 的 `source_refs` 仍要指向来源。`sources.json` 用 `source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 生成：`base_path` 记录材料根相对课程目录的位置，校验器与评分器据此推出 `--sources-root`；搬动课程目录或换布局后用 `source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 只改这一个字段。旧课程的单文档 `teaching-guide.md`（schema 1.0/1.1）仍被校验器接受；新课程生成 `outline.md` + `units/`。`prerequisite-plan.json` 与 `prerequisite-progress.json` 是条件产物：没有实质前置依赖、学习者近期证据已就绪，或用户选择 `skip` 时可以省略；诊断出的缺口按 `prerequisite/course.md` 建成前置课，父课进度里记 `blocked`。`zoom/` 与 `concepts/` 是按需产物，build 阶段不预生成。纯对话模式可以不创建文件，但应保持同样的逻辑结构。
 
 ## 细化文档契约（`zoom/<section-id>-guide.md`）
 
@@ -40,14 +40,14 @@
 
 - `prerequisite-plan.json` 只列出会阻断当前材料主线的最小概念簇，并记录它与主材料的依赖与来源定位。
 - `prerequisite-progress.json` 是仅限当前课程的证据记录，保留诊断回答、反馈、外部来源和桥接复测；不记录广泛人格或能力标签。
-- `prerequisite-guide.md` 只包含实际需要补充的缺口。关键主张需有可点击来源，并标记为 `external`；不得与原材料来源混成一个无区分的“标准答案”。
+- 缺口不再写成 `prerequisite-guide.md`，而是一门前置课（见下文 1.4）；旧课程的补充文档校验器仍接受。
 - 使用 `scripts/validate_prerequisites.py` 校验计划和补充文档，使用 `scripts/prerequisite_state.py` 维护诊断进度。
 
 ## `lesson-plan.json`
 
 顶层必需字段：
 
-- `schema_version`：新课程写 `1.2`；校验器与导出脚本同时接受 `1.0` / `1.1`（旧课程）；
+- `schema_version`：新课程写 `1.2`（骨架课与分支课 `1.3`，前置课 `1.4`）；校验器与导出脚本同时接受 `1.0` / `1.1`（旧课程）；
 - **1.2** `mode`：`full | fast`；`outline_confirmed_at`：大纲生成时为 `null`，学习者确认后写 ISO 时间——为 `null` 时不得生成 `units/`；
 - `lesson_id`、`title`、`learning_goal`；
 - `source_manifest`：清单相对路径或 `null`；
@@ -94,6 +94,15 @@ explicit | entailed | pedagogical_inference | external | unsupported
 - `concepts[].check`（仅 `supporting`）：`{prompt, criteria[{id,text,layer}], hint}`，学习者要求"验收 X"时使用；**每个 supporting 概念都要写**（缺失时校验器警告）；criteria 与主 checkpoint 一样不进任何面向学习者的文档。
 - 顶层 `deferred[]`：`[{type: "section"|"concept", id, reason}]`。快速模式略过的 unit、学习者选择略过的 unit 都在这里；deferred 的 section 不生成 `units/<id>.md`，`learning_state.py init` 把它标为 `deferred`，不计入完成，之后可补。
 - 顶层 `coverage[]`：`[{path, heading, disposition, section_id?, reason?}]`，`disposition ∈ core | supporting | listed | appendix | deferred | excluded`。材料的每个一级/二级标题都必须有一行；`core/supporting/listed/appendix` 需要 `section_id`，`deferred/excluded` 需要 `reason`。`validate_lesson.py --sources-root <材料根>` 会对照真实文件的标题逐条检查。**这是"绝不静默遗漏"的确定性保证。**
+
+### 1.4 新增：前置课
+
+只有前置课写 `1.4`；1.3 的全部规则继续适用（`shape` 必须是 `linear`）。三个字段同时出现：
+
+- `prerequisite_of`：父课的 `lesson_id`；`blocked_at`：父课被卡住的节 id；`depth`：父课 + 1（主课为 0）。与 `parent_course` 互斥。
+- 来源几乎全靠 `<工作区>/external/` 的外部存档（整目录作 `pool`）；每节"当前问题"用删除思想实验；`final_challenge` 出成靠近父课材料的桥接题。
+- 校验器打印 `INFO: fact ratio a/b`（fact 层概念 / 全部概念），不设阈值：接近全是 fact 时这一层是约定，再往下不该建课。
+- 父课：`learning_state.py block --section-id <blocked_at> --by <本课>`；结课后 `unblock`。开启知识库时 `store.json` 的 `lessons[]` 记下关系，`index_match.py prerequisites --lesson-id <父课>` 对本课学过的概念返回 `variant`。
 
 ### 1.3 新增：课程形态、证据池、落点、探测、分支候选（规格 D）
 

@@ -4,43 +4,38 @@
 
 1. 先读取足以识别主题、边界和关键推理的原材料，不先用外部资料替代原文分析。
 2. 对每个候选前置项记录：名称、为何是前置、它支撑哪一段主线、材料位置、当前确定性。
-3. 优先按相互依赖的概念簇组织，不用大量孤立术语进行考察。
-4. 使用 `assets/prerequisite-plan-template.json` 创建 `prerequisite-plan.json`，并执行 `scripts/validate_prerequisites.py`。
+3. 按相互依赖的概念簇组织，不用大量孤立术语考察。
+4. 用 `assets/prerequisite-plan-template.json` 写 `prerequisite-plan.json`，运行 `scripts/validate_prerequisites.py`。
 
-前置地图是用来组织诊断的机器参考，不是对学习者的判决，也不是不可修订的标准答案。
+前置地图是组织诊断的机器参考，不是对学习者的判决，也不是标准答案。
 
-## 开启知识库时：先查学习者状态
+## 开启知识库时：先查掌握状态
 
-在提出任何诊断问题之前运行：
+提出任何诊断问题之前运行：
 
 ```bash
-python3 scripts/index_match.py prerequisites --home --prerequisite-plan path/to/prerequisite-plan.json
-# --home 读学习者主目录（所有推过的工作区的汇总），这是开课前唯一一次读工作区之外；主目录不存在时改 --store whetstone/store
+python3 scripts/index_match.py prerequisites --store <工作区>/store --lesson-id <本课 lesson_id> --prerequisite-plan path/to/prerequisite-plan.json
 ```
 
-对每个前置项按返回的 `action` 处理：
+按每项返回的 `action` 处理：
 
 | `action` | 学习者状态 | 处理 |
 |---|---|---|
-| `variant` | `fresh`：近期有延迟或迁移证据 | **一道变式检索题替代诊断**：换情境或换角度考同一机制，禁止复用原 `diagnostic.prompt`。答对即 `ready`；答错进入正常诊断 |
-| `variant_then_diagnose` | `stale`：有证据但已过期 | 先出变式题；答错则走下方正常诊断 |
-| `diagnose` | `unknown`：无记录或只有即时证据 | 正常诊断 |
+| `variant` | `fresh`；或 `via_prerequisite_course` 非空——这个概念是在本课的前置课里学的 | **一道变式题代替诊断**：换情境或角度考同一机制，不复用原 `diagnostic.prompt`。答对即 `ready`，答错进正常诊断 |
+| `variant_then_diagnose` | `stale` | 先变式题，答错走正常诊断 |
+| `diagnose` | `unknown` | 正常诊断 |
 
-`ambiguous = true` 的项（别名命中多个概念）先向学习者确认是不是同一概念，再决定。变式题的作答用 `lrg_record.py append --kind variant` 记录（同时 `prerequisite_state.py record` 记 verdict）——跨课复用因此同时是一次间隔复习。**替代不是跳过**：`fresh` 也要答一题。
+`ambiguous = true` 的项先向学习者确认是不是同一概念。变式题作答记 `lrg_record.py append --kind variant`，同时 `prerequisite_state.py record` 记 verdict。替代不是跳过：`fresh` 也要答一题。
 
 ## 阶段二：无提示、自适应诊断
 
-1. 简短说明将评估哪些"针对当前材料的准备能力"，并允许学习者回答"不知道"或跳过。
-2. 一次只问一个主问题。提问后立即把对话交还给学习者，不同时提供参考答案或检索补充。
-3. 问题优先暴露以下证据：
-   - 能否用自己的话生成概念，而不只是识别名称；
-   - 能否说明概念边界、反例或失效条件；
-   - 能否说明概念之间的关系、方向和理由；
-   - 能否把它应用到一个简单的新情境。
-4. 不用文本相似度判分。对每个概念簇记录 `ready | fragile | gap | misconception | skipped`，并单独记录判断置信度。
-5. 当已有足够证据决定是否需要补充时停止追问；不为了凑固定题数继续测试。
-6. 用 `scripts/prerequisite_state.py` 追加原始回答和修订，生成 `prerequisite-progress.json`；不用后续回答覆盖首次证据。
+1. 简短说明将评估哪些"针对当前材料的准备能力"，允许学习者回答"不知道"或跳过。
+2. 一次只问一个主问题。提问后交还对话，不同时给参考答案或检索补充。
+3. 问题优先暴露：能否用自己的话生成概念而不只是识别名称；能否说明边界、反例或失效条件；能否说明概念之间的关系、方向和理由；能否应用到一个简单的新情境。
+4. 不用文本相似度判分。对每个簇记 `ready | fragile | gap | misconception | skipped`，单独记判断置信度。
+5. 证据够就停，不为凑题数继续。
+6. `scripts/prerequisite_state.py` 追加原始回答与修订，生成 `prerequisite-progress.json`；不用后续回答覆盖首次证据。开启知识库时每次诊断作答同时 `lrg_record.py append --kind diagnostic --concept <id>`（即时证据，不加 `--progress`）。
 
-仅根据当前证据说"这个概念簇对本材料尚未就绪"，不说"学习者基础差"或类似的概括结论。
+只说"这个簇对本材料尚未就绪"，不说"学习者基础差"之类的概括。
 
-诊断结束后，只对 `fragile | gap | misconception` 进入 [supplement.md](supplement.md)；全部 `ready | skipped` 则直接进入 [bridge.md](bridge.md) 的课程适配。
+诊断结束：全部 `ready | skipped` → 直接进正课；有任何 `fragile | gap | misconception` → [course.md](course.md)。学习者在大纲确认时自述不懂的概念，视为已诊断为 `gap`，不必再问。

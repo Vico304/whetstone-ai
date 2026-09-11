@@ -30,4 +30,6 @@
 - 更新 `outline.md` 的模式与状态列，重新校验；
 - **确认前不得生成任何 `units/<id>.md`。**
 
+学习者在确认时说"我不懂 X、Y"（大纲里的概念或它们依赖的更基础的东西）：这些视为已诊断为 `gap`，写回大纲后不生成 units，直接按 [../prerequisite/course.md](../prerequisite/course.md) 为它们建前置课，本课在第一个未 deferred 的节上 `block`。
+
 学习者说"你定"时：完整模式、不略过；照常写回并继续。`learner-profile.md` 已写明默认深度时用它作默认，但仍呈现大纲并问这一句。

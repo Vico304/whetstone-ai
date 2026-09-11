@@ -8,7 +8,7 @@
 
 ```text
 <store>/
-├── store.json                  schema_version、created_at、updated_at、domain_roots[]、lessons[]
+├── store.json                  schema_version、created_at、updated_at、domain_roots[]、lessons[]（每门课的 lesson_id、title、pack_dir、schema_version；前置课另有 prerequisite_of、blocked_at、depth）
 ├── concepts/index.json         概念索引（§3）
 ├── mrg/<lesson-id>.json        MRG 公开层：fact / mechanism 节点与边，各节骨架（§2）
 ├── mrg/<lesson-id>.deep.json   MRG 高层：rationale / principle 节点与边，各节的意义、代价、思想、criteria
@@ -58,7 +58,7 @@ python3 scripts/index_match.py recall --store <目录> --candidates candidates.j
 **前置判定**（新课前置检查之前）：
 
 ```bash
-python3 scripts/index_match.py prerequisites --store <目录> --prerequisite-plan prerequisite-plan.json
+python3 scripts/index_match.py prerequisites --store <目录> --lesson-id <本课> --prerequisite-plan prerequisite-plan.json
 ```
 
 | 掌握状态 | `action` | 处理 |
@@ -66,6 +66,7 @@ python3 scripts/index_match.py prerequisites --store <目录> --prerequisite-pla
 | `fresh` | `variant` | 一道变式题代替诊断；答对即 `ready`，答错进正常诊断 |
 | `stale` | `variant_then_diagnose` | 先变式题，答错再诊断 |
 | `unknown` | `diagnose` | 正常诊断 |
+| 概念的 `lessons` 里有本课的前置课（`store.json` 里 `prerequisite_of` 指向本课） | `variant`，附 `via_prerequisite_course` | 不看时效：前置课刚学完只有即时证据，重新诊断会抵消建课的意义 |
 
 只有快速模式证据（`rigor_max: fast`）的 `fresh` 概念按 `stale` 处理。`ambiguous: true` 的项先向学习者确认是不是同一概念。变式题作答记 `--kind variant`。
 
@@ -82,8 +83,8 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | 字段 | 含义 |
 |---|---|
 | `at`、`event: attempt`、`lesson_id`、`section_id`、`attempt_number` | 时间与位置 |
-| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`bridge`、`review`（resume 变式）、`variant`（跨课前置替代题）、`transfer`（迁移题）、`final`（结课整体重述） |
-| `evidence_tier` | 由 `kind` 决定：`checkpoint / supporting / probe / bridge` 为 `immediate`，`review / variant` 为 `delayed`，`transfer / final` 为 `transfer` |
+| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`diagnostic`（前置诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
+| `evidence_tier` | 由 `kind` 决定：`checkpoint / supporting / probe / diagnostic / bridge` 为 `immediate`，`review / variant` 为 `delayed`，`transfer / final` 为 `transfer` |
 | `rigor` | `full / fast`，默认取进度文件的 `mode` |
 | `confidence`、`verdict`、`criteria_met[]`、`depth_reached` | 1–5 的信心；`mastered / partial / retry / skipped`；满足的 criteria id；到达的层 |
 | `response`、`feedback` | 原文。永不进入任何面向学习者的输出 |

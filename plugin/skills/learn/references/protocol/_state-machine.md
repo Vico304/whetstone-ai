@@ -37,4 +37,4 @@ ASSESS
 
 一次回复只推进一个状态。提出问题或追问后应把对话交还给学习者，不同时回答自己的问题。
 
-若正课中暴露出之前未识别的前置缺口，只对受影响的概念簇运行 [../prerequisite/](../prerequisite/_index.md) 协议，补充和桥接复测后回到原小节。不因一个缺口将整门课程或学习者状态清零。
+若正课中暴露出之前未识别的前置缺口，只对受影响的概念簇诊断（[../prerequisite/diagnose.md](../prerequisite/diagnose.md)），非 `ready` 的簇建成一门前置课（[../prerequisite/course.md](../prerequisite/course.md)），本课在当前节 `block`，前置课结课后按 [../prerequisite/return.md](../prerequisite/return.md) 回到这一节。不因一个缺口将整门课程或学习者状态清零。

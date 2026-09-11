@@ -19,5 +19,7 @@
 4. 每个选中的分支追加到 `learning-plan.md`（一门普通课程：`shape: branch`、`parent_course` = 本课 `lesson_id`、材料 = 候选的路径，取向回到 material，逐标题账本照常），给出它的 `learn` 调用语句；**不在这里生成分支课的大纲**——那是分支课自己的阶段 4；
 5. 知识库开启时，分支课的前置判断会按概念 id 命中骨架课已记录的证据（跨课注册表本来就这样工作；`parent_course` 只是导航）。
 
+**前置课**（`prerequisite_of` 非空）：整体重述与桥接题（`final_challenge`）之后不做分支决策，按 [../prerequisite/return.md](../prerequisite/return.md) 回程：登记概念、`unblock` 父课、更新前置栈、报告回到父课哪一节。
+
 开启知识库时：整体重述与迁移题的作答分别用 `lrg_record.py append --kind final` 与 `--kind transfer` 记录（它们是迁移级证据）；结束后运行 `store_sync.py push --store whetstone/store`——它先重建本地学习者状态，再把本工作区的快照推进学习者主目录 `~/.whetstone/`。这是全课唯一一次写工作区之外的地方；宿主问权限时说明这一点，学习者拒绝就跳过，本课数据都在本地库里，下次结课时会一起推。
 

@@ -13,11 +13,13 @@
 工作区与计划目录的定义见 learn SKILL.md「学习工作区布局」：宿主打开的目录里有 `courses/` / `store/` / `learner-profile.md` → 它是工作区，计划目录是 `courses/<目标>/`；否则工作区是材料根下的 `whetstone/`，计划目录就是它。判断顺序（learn 启动时静默执行）：
 
 ```text
-有 learning-progress.json 且未完成 → resume（protocol/resume.md）
+有 learning-progress.json 且未完成 → resume（protocol/resume.md；进度里有 blocked → 先去那门前置课）
 工作区无 learner-profile.md      → 阶段 1（旧布局：材料根下的 learner-profile.md 也算）
 材料是目录 / 多路径 / > 30 KB      → 阶段 2 → 阶段 3
 本课无 lesson-plan.json 或 outline_confirmed_at 为 null → 阶段 4（档案 orientation=domain 且计划里这门课是骨架课 → skeleton.md）
 否则 → 阶段 5
 ```
+
+前置课（`lesson-plan.json` 有 `prerequisite_of`）是普通课程，走同样的阶段 4 → 5；它的来龙去脉在 `learning-plan.md` 的"前置栈"里，结课后按 `prerequisite/return.md` 回父课。
 
 参与度上限：熟手一轮就应看到第一道题；新手最多三轮。每阶段只问一个问题，其余用默认值并在产物里标 `（默认值，可修改）`。
