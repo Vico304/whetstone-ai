@@ -82,4 +82,4 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 python3 evals/score_pack.py <课程目录> --sources-root <材料根> [--store <目录>] [--material-id <id>] [--baseline 上次.json] [--output 本次.json]
 ```
 
-建课指标：校验错误与警告数、节数、每节概念数、`support` 分布与 `unsupported` 比例、关系数、各层概念数、每节 criteria 数、locator 命中率、模式、角色分布、覆盖表各去处计数、deferred 数、units 是否齐全。教学指标（给 `--store` 时从 LRG 读）：作答数、各 `kind` 与 `verdict` 计数、`depth_reached` 分布、主问题用时中位数。`--baseline` 逐项打印差异。`results/example-baseline.json` 是示例课程包的一次打分。提示词或协议的改动应在同一组材料上看到指标变化。
+建课指标：校验错误与警告数、节数、每节概念数、`support` 分布与 `unsupported` 比例、关系数、各层概念数、每节 criteria 数、locator 命中率、模式、角色分布、覆盖表各去处计数、deferred 数、units 是否齐全。教学指标（给 `--store` 时从 LRG 读）：作答数、各 `kind` 与 `verdict` 计数、`depth_reached` 分布、主问题用时中位数。`--baseline` 逐项打印差异。`results/example-baseline.json` 是示例课程目录的一次打分。提示词或协议的改动应在同一组材料上看到指标变化。

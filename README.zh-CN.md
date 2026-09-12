@@ -90,6 +90,7 @@ cd plugin && python3 -m unittest discover -s tests
 | [`docs/evidence.md`](docs/evidence.md) | 学习科学依据与开放问题 |
 | [`docs/glossary.md`](docs/glossary.md) | 术语表与写作规则 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 更新记录 |
+| [`AGENTS.md`](AGENTS.md) | 给 AI 会话的规则：用语、改动边界、提交前检查 |
 | [`plugin/`](plugin/) | 可运行的技能插件 |
 
 ## 许可证

@@ -12,8 +12,6 @@ Whetstone 把你给它的材料（教材章节、规范、代码库、论文）�
 
 ## 2. 安装
 
-同一份 `plugin/` 目录，四个环境。
-
 **Claude Code**
 
 ```bash
@@ -22,7 +20,7 @@ claude plugin marketplace add /path/to/whetstone-ai      # 持久安装
 claude plugin install whetstone@whetstone-ai
 ```
 
-新开会话输入 `/`，应看到 `whetstone:guide`、`whetstone:outline`、`whetstone:learn`、`whetstone:clarify`。
+新开会话输入 `/`，应看到 `whetstone:guide`、`whetstone:outline`、`whetstone:learn`、`whetstone:clarify`。检查：`cd plugin && python3 -m unittest discover -s tests`，应全部通过。
 
 **Claude Desktop**：Code 标签页不支持 `/plugin` 命令，在终端按上面的方式装好即可（共用 `~/.claude/`）。聊天模式：仓库根目录运行 `python3 package_plugin.py` 生成 `../dist/whetstone.plugin`，在插件管理器上传。这时插件在云端，你的材料、课程目录和知识库在本地连接的文件夹里，开课时把本地路径说清楚；脚本会被复制到 `whetstone/scripts/` 本地执行。
 
@@ -32,16 +30,14 @@ claude plugin install whetstone@whetstone-ai
 
 **DeepSeek Harness**：`./install_skills.sh ~/.agents/skills`（全局）或 `./install_skills.sh <项目>/.agents/skills`（项目级，目录里要有 `.git`）。四个技能必须平铺在同一个根目录下，guide 和 outline 会引用同级的 learn。启动 `npx @deepseek-ai/dsh web`（Node 22.19 以上），打开 http://127.0.0.1:3080 ，首次在 Settings → Models 填 API key，用 Choose workspace 选中工作目录；重启后在 `/` 面板的 Skills 组里能看到。
 
-**pi**：`pi install git:github.com/Vico304/whetstone-ai`（仓库根目录的 `package.json` 通过 `pi.skills` 指向 `plugin/skills`），或本地 `pi install /path/to/whetstone-ai`；不想走包管理就 `./install_skills.sh ~/.pi/agent/skills`。pi 也会读 `~/.agents/skills`，装过 DeepSeek Harness 那份的话不用再装。调用 `/skill:learn` 等，或直接用自然语言。
-
-检查：`cd plugin && python3 -m unittest discover -s tests`，应全部通过。
+**pi**：`pi install git:github.com/Vico304/whetstone-ai`（根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`），或本地 `pi install /path/to/whetstone-ai`，或 `./install_skills.sh ~/.pi/agent/skills`；pi 也读 `~/.agents/skills`，装过 DeepSeek Harness 那份就不用再装。调用 `/skill:learn` 等。
 
 ## 3. 目录
 
 系统写出的一切都放在一个工作区里，你的材料本身不会被写入。工作区有两种布局：
 
 **独立布局**：打开材料目录就地学，工作区是它下面的 `whetstone/`。
-**统一布局**：建一个总目录，材料放在 `material/` 下，用工具打开这个总目录；工作区就是它，课程按学习目标分组放在 `courses/<目标>/`，一个 `store/` 管所有课。已有的 `whetstone/` 可以整个搬进去——课程包自己记着材料根在哪，搬完照常校验。
+**统一布局**：建一个总目录，材料放在 `material/` 下，用工具打开这个总目录；工作区就是它，课程按学习目标分组放在 `courses/<目标>/`，一个 `store/` 管所有课。已有的 `whetstone/` 可以整个搬进去——课程目录自己记着材料根在哪，搬完照常校验。
 
 ```text
 统一布局：
@@ -72,9 +68,7 @@ claude plugin install whetstone@whetstone-ai
     └── scripts/               只在 Claude Desktop 聊天模式下出现
 ```
 
-系统在三种情况下会自己检索可靠的外部资料：建前置课、补骨架课里在你材料中找不到落点的概念、材料只说"是什么"没说"为什么"的机制。检索到的先存进 `external/`，每集一份 `_index.md` 记来源、发布方、访问时间和选它的理由；讲义引用它们时标为外部知识，不用它们改写你材料的说法。校验器会打印外部引用占全部引用的比例，没有阈值，课程有没有漂离你的材料由你判断。
-
-课程里所有路径都相对材料根；`sources.json` 记录材料根相对课程目录的位置，校验时不必再给 `--sources-root`。旧课程包的 `sources.json` 若写的是 `"."`，运行一次 `python3 $S/source_manifest.py --rebase <课程目录>/sources.json --base <材料根>` 即可。
+系统在三种情况下会自己检索可靠的外部资料：建前置课、补骨架课里在你材料中找不到落点的概念、材料只说"是什么"没说"为什么"的机制。检索到的先存进 `external/`，每集一份 `_index.md` 记来源、发布方、访问时间和选它的理由；引用时标为外部知识，不用它们改写你材料的说法；校验器打印外部引用的比例，没有阈值。课程里所有路径都相对材料根，`sources.json` 记录材料根相对课程目录的位置，校验时不必再给 `--sources-root`；旧课程目录里写的是 `"."` 时运行一次 `python3 $S/source_manifest.py --rebase <课程目录>/sources.json --base <材料根>`。
 
 ## 4. 一门课的流程
 
@@ -204,11 +198,7 @@ claude plugin install whetstone@whetstone-ai
 
 ### 6.1 按材料学
 
-> **你**：/whetstone:guide
-
-> **模型**：想先知道**怎么用**，还是现在就**规划之后的学习**？
-
-> **你**：规划。目录 /Users/me/Project/tee，我想学的是里面的可信计算部分
+> **你**：/whetstone:guide → 规划。目录 /Users/me/Project/tee，我想学的是里面的可信计算部分
 
 > **模型**：先一轮背景与目标：为什么学、相关经验、学完要能做什么、默认深度、要不要知识库？
 
@@ -222,7 +212,7 @@ claude plugin install whetstone@whetstone-ai
 
 > **你**：接受。后面的都接受。
 
-> **模型**：写入 `learning-plan.md`，三门均已确认。第一门的调用语句：`/whetstone:learn 学习 …，课程目录 whetstone/courses/capsule-manager-keys/`。想先看大纲：`/whetstone:outline whetstone/courses/capsule-manager-keys/`。
+> **模型**：写入 `learning-plan.md`，三门均已确认。第一门的调用语句：`/whetstone:learn 学习 …，课程目录 whetstone/courses/capsule-manager-keys/`；想先看大纲：`/whetstone:outline whetstone/courses/capsule-manager-keys/`。
 
 材料分四级：一手材料（上游源码、官方文档、规范、教材）、你自己写并核实过的、AI 生成的中间文档（会话总结、交接、汇报）、噪声（日志、构建产物）。AI 生成的中间文档永远不作课程来源，最多用来提示"还有哪些待做事项"。
 
@@ -289,7 +279,7 @@ S=whetstone-ai/plugin/skills/learn/scripts
 python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科学
 ```
 
-统一布局下把 `whetstone/store` 换成总目录下的 `store`。之后模型自己运行登记、导出、追加、重建、推送。换一个工作区学新东西时再 `init` 一次它自己的 `store/`，结课推送后主目录里就有两边的汇总。想换主目录位置就设环境变量 `WHETSTONE_HOME`。
+统一布局下把 `whetstone/store` 换成总目录下的 `store`。之后模型自己运行登记、导出、追加、重建、推送；换一个工作区再 `init` 一次它自己的 `store/`，推送后主目录里就有两边的汇总；主目录位置由环境变量 `WHETSTONE_HOME` 决定。
 
 | 可以看 | 不要看，规则靠你自己守 |
 |---|---|
@@ -297,13 +287,7 @@ python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科
 | `whetstone/store/mrg/<课程>.json` | `whetstone/store/mrg/*.deep.json`（后两层，看了就变成背诵材料） |
 | `whetstone/store/concepts/index.json`、`learner-state.json`、`~/.whetstone/` 整个目录 | `whetstone/store/lrg/*.jsonl`（作答日志） |
 
-看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨工作区的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：
-
-```bash
-python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store
-```
-
-看三个数：来源定位的命中率、每节用时的中位数（模型在提问前后各运行一次 `date +%s`，不是估的）、你的回答到达过哪些层。`--baseline` 可与上次结果逐项比较。
+看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨工作区的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：`python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store`，看三个数——来源定位的命中率、每节用时的中位数（模型在提问前后各运行一次 `date +%s`，不是估的）、你的回答到达过哪些层；`--baseline` 可与上次结果逐项比较。
 
 ## 9. 学习时的纪律
 
@@ -354,13 +338,11 @@ python3 $S/learning_state.py init --lesson-plan whetstone/courses/x/lesson-plan.
 python3 $S/learning_state.py show --state whetstone/courses/x/learning-progress.json
 python3 $S/learning_state.py defer --state whetstone/courses/x/learning-progress.json --section-id s01 --reason "探测通过，学习者选择跳过"
 # 记一次作答（知识库）
-python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint \
-  --response-file /tmp/r.txt --feedback-file /tmp/f.txt --verdict partial --confidence 4 \
-  --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
+python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint --response-file /tmp/r.txt \
+  --verdict partial --confidence 4 --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
   --progress whetstone/courses/x/learning-progress.json --elapsed-seconds 240
-# 知识库（模型通常自动运行）
+# 重建掌握状态（模型通常自动运行）
 python3 $S/learner_state_build.py build --store store
-python3 $S/learner_state_build.py show --store store
 # 概念笔记扫描；打包插件
 python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone/courses/x
 python3 whetstone-ai/package_plugin.py

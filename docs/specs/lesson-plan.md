@@ -26,7 +26,7 @@
 |---|---|---|
 | `schema_version` | 1.0 | `1.0 / 1.1 / 1.2 / 1.3 / 1.4` 之一；新课程写 `1.2`，骨架课与分支课写 `1.3`，前置课写 `1.4` |
 | `lesson_id`、`title`、`learning_goal` | 1.0 | 非空字符串 |
-| `source_manifest` | 1.0 | `sources.json` 的相对路径，或 `null`。清单的 `base_path` 记录材料根相对课程目录的位置（`../../..` 或 `../../../material/x`），校验器与评分器据此推出材料根，课程包因此自包含 |
+| `source_manifest` | 1.0 | `sources.json` 的相对路径，或 `null`。清单的 `base_path` 记录材料根相对课程目录的位置（`../../..` 或 `../../../material/x`），校验器与评分器据此推出材料根，课程目录因此自包含 |
 | `big_picture` | 1.0 | `{problem, outcome, system_map[]}`：材料总体解决的问题、学完应能做的事、从输入到结果的关键步骤 |
 | `sections[]` | 1.0 | 非空，见 §3 |
 | `final_challenge` | 1.0 | `{prompt, criteria[]}`，结课的迁移题 |
