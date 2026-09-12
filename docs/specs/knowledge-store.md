@@ -83,7 +83,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | 字段 | 含义 |
 |---|---|
 | `at`、`event: attempt`、`lesson_id`、`section_id`、`attempt_number` | 时间与位置 |
-| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`diagnostic`（前置诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
+| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`diagnostic`（前置检查的诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
 | `evidence_tier` | 由 `kind` 决定：`checkpoint / supporting / probe / diagnostic / bridge` 为 `immediate`，`review / variant` 为 `delayed`，`transfer / final` 为 `transfer` |
 | `rigor` | `full / fast`，默认取进度文件的 `mode` |
 | `confidence`、`verdict`、`criteria_met[]`、`depth_reached` | 1–5 的信心；`mastered / partial / retry / skipped`；满足的 criteria id；到达的层 |

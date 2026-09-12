@@ -146,7 +146,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify） |
 | `evals/score_pack.py` | 给一个课程目录打分：校验错误、概念数、support 分布、locator 命中率、角色与覆盖表指标、每节耗时与 `depth_reached` |
 
-**两种布局，一套规则。** 独立布局：在材料目录就地学，工作区是 `<材料根>/whetstone/`；统一布局：一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`），工作区就是总目录。判断规则：宿主打开的目录里已有 `courses/`、`store/` 或档案之一时，工作区就是它；否则是材料根下的 `whetstone/`。课程包自包含——`sources.json` 的 `base_path` 记录材料根相对课程目录的位置，校验与评分据此找到来源。
+**两种布局，一套规则。** 独立布局：在材料目录就地学，工作区是 `<材料根>/whetstone/`；统一布局：一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`），工作区就是总目录。判断规则：宿主打开的目录里已有 `courses/`、`store/` 或档案之一时，工作区就是它；否则是材料根下的 `whetstone/`。课程目录自包含——`sources.json` 的 `base_path` 记录材料根相对课程目录的位置，校验与评分据此找到来源。
 
 **五个宿主，一份技能目录。** Claude Code 插件、Claude Desktop（`.plugin` 包或 `~/.claude/skills`）、Codex、DeepSeek Harness、pi（根目录 `package.json` 的 `pi.skills`）。技能内路径按 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、pi 给出的 `<location>` 或技能目录本身解析；Claude Desktop 聊天模式下插件在云端、文件在本地，脚本复制到 `whetstone/scripts/` 本地执行。同一协议在不同模型上的遵循差异本身是数据：Claude 的 locator 命中率 0.145、DeepSeek 0.647（两次真实建课，2026-09-08），由此定下"标题原文或符号名开头"的定位约定。
 

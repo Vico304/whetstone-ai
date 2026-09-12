@@ -2,9 +2,10 @@
 
 ## 未发布
 
+- `AGENTS.md`（`CLAUDE.md` 指向它）给在仓库里工作的 AI 会话定规则：用语按 `docs/glossary.md`、一个概念一个名字、长度上限、只改被要求改的协议、提交前检查。`check_docs.py` 把断链、手册里的设计用语、旧词、长度上限做成检查，CI 每次运行。
 - 前置课（schema 1.4）：前置检查、骨架课探测轮或大纲确认时发现的缺口，一律建成一门普通课（`prerequisite_of`、`blocked_at`、`depth`），来源用外部存档、模式跟随父课、大纲照常确认、逐节教学与记录；父课在被卡的节 `block`，前置课结课后 `unblock` 并对被卡簇出变式题；前置课里学过的概念不看时效直接出变式题；可递归，学习计划里的前置栈随时可见；自述基础薄弱时探测轮不跳过；校验器打印前置课的 fact 比例，不设阈值。不再生成 `prerequisite-guide.md`；诊断作答可记为 `kind: diagnostic`。
 - 外部存档：建前置课、补没有落点的概念、材料只说"是什么"没说"为什么"的机制时，模型可以检索可靠的外部来源，但必须先存进 `<工作区>/external/<集名>_<日期>/`（每集一份 `_index.md`）再引用，不引活 URL，不用外部来源改写原材料的主张。任何课程都可以把外部存档集整目录作 `pool` 进覆盖表；校验器打印外部引用比例，不设阈值。
-- 两种布局：独立布局（`<材料根>/whetstone/`）之外，支持统一布局——一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`）。工作区按打开的目录判断；计划目录可按学习目标分组；`sources.json` 的 `base_path` 改为记录材料根相对课程目录的位置，校验器与评分器据此自动找到来源，课程包搬到哪种布局都能校验；`source_manifest.py --rebase` 迁移旧清单。
+- 两种布局：独立布局（`<材料根>/whetstone/`）之外，支持统一布局——一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`）。工作区按打开的目录判断；计划目录可按学习目标分组；`sources.json` 的 `base_path` 改为记录材料根相对课程目录的位置，校验器与评分器据此自动找到来源，课程目录搬到哪种布局都能校验；`source_manifest.py --rebase` 迁移旧清单。
 - 知识库改为本地优先：库固定在工作区里的 `store/`，每次作答只写工作区内，不再每节请求写入权限；跨工作区的记忆放到 `~/.whetstone/`（`WHETSTONE_HOME` 可改），由结课时 `store_sync.py push` 把本工作区的索引与掌握状态快照汇总过去，主目录里没有原始回答。`index_match.py` / `review_pool.py` 加 `--home` 读汇总；档案的 `knowledge_store` 改为 on/off。起因：库在工作区之外时每一节都要申请一次写权限。
 - 适配 pi：根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`，`pi install git:github.com/Vico304/whetstone-ai` 或本地路径即可安装；`install_skills.sh` 也可装到 `~/.pi/agent/skills`。SKILL.md 的路径约定加入 pi 的 `<location>`；调用 `/skill:learn` 等。
 
@@ -14,7 +15,7 @@
 
 - 文档按读者分成两套用语：README 与使用手册只用平实的中文，设计文档与 specs 保留 MRG、LRG、SEL 和 schema 里的字段值；对照表在 `docs/glossary.md`。
 - `docs/` 重组为 `design.md`（设计）、`guide.md`（手册）、`evidence.md`（依据与开放问题）、`specs/`（按主题的四份参考：课程文件、取向与骨架课、知识库、教学协议）。共识文档、四份按时间编号的设计定稿、路线图、旧手册、评审与幻灯片删除；v2 设计中未实现的部分（多 Agent 管线、对象模型、质疑通道、可视化导出）不再出现在文档里。
-- 示例课程包的来源冻结为它当初依据的 v1 共识文本（`plugin/examples/project-consensus/source/`），两份评测材料冻结进 `plugin/evals/materials/`，测试、CI 与评测不再依赖 `docs/`。
+- 示例课程目录的来源冻结为它当初依据的 v1 共识文本（`plugin/examples/project-consensus/source/`），两份评测材料冻结进 `plugin/evals/materials/`，测试、CI 与评测不再依赖 `docs/`。
 - 插件内模型读取的文件（`plugin/skills/`）一字未改。
 
 状态：规划管线与建课在 Claude Desktop 和 DeepSeek Harness 上各跑过多次，逐节教学在日常使用中；知识库是可选功能，尚无长期使用数据。
