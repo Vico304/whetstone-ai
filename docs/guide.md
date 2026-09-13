@@ -82,10 +82,12 @@ claude plugin install whetstone@whetstone-ai
     ↓  有缺口 → 为它们建一门前置课（外部资料、和主课一样确认大纲、逐节教、记录），学完回到主课卡住的那一节
     ↓  逐节教学：预测 → 揭示 → [细化] → 打分 → 作答 → 追问 → 记录
     ↓  结课：只给概念名，你画出它们之间的关系 + 迁移题
-中断后：新会话说"继续我的课程" → 先一道变式题 → 回到未完成的节
+中断后：新会话说"继续我的课程" → 先一道变式题 → 回到未完成的节；学完后说"复习 <课程>" → 一门只讲薄弱处的复习课
 ```
 
 **前置课。** 前置检查（或骨架课的探测题）发现你缺的不是一两个词而是一层基础时，系统不写补充文档，而是为这些缺口建一门课：来源是它检索并存档的外部资料，模式和主课相同，大纲同样要你确认，逐节教、逐节记录。主课在卡住的那一节等着；前置课学完，系统对那几个概念出变式题，然后从卡住的节继续。前置课自己也可能再建一层。你在哪一层、离回到主课还差什么，随时在 `learning-plan.md` 的"前置栈"里能看到。自述"基础薄弱"时探测题不能跳过——它量的是你的地板在哪。
+
+**复习课。** 开着知识库学完一门课后说"复习 <课程>"（也可以几门一起）：系统从掌握状态里取薄弱处——建立在薄弱基础上的概念、答错过的说法、结课时漏掉的关系、过期的概念——按原来的节归簇，建成一门新课；每节先在新情境里问你，答完判定后才揭示，不重讲原文。已经稳固的节会提供一个可选的子节往深处学，一次最多一个，学不学你定。两门课一起复习时结课出接缝题。
 
 **选材料。** 第一门课用一章教材或一个模块，30 KB 以内，能切 4–6 节。整本书会得到很长的大纲，先挑一段。代码库先给入口和主流程所在的目录。
 
@@ -335,14 +337,13 @@ python3 $S/validate_lesson.py whetstone/courses/x/lesson-plan.json --outline whe
   --units-dir whetstone/courses/x/units --manifest whetstone/courses/x/sources.json --sources-root .
 # 进度
 python3 $S/learning_state.py init --lesson-plan whetstone/courses/x/lesson-plan.json --output whetstone/courses/x/learning-progress.json
-python3 $S/learning_state.py show --state whetstone/courses/x/learning-progress.json
+python3 $S/learning_state.py show --state whetstone/courses/x/learning-progress.json   # 或 next_step.py --progress … 看下一步
 python3 $S/learning_state.py defer --state whetstone/courses/x/learning-progress.json --section-id s01 --reason "探测通过，学习者选择跳过"
 # 记一次作答（知识库）
 python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint --response-file /tmp/r.txt \
   --verdict partial --confidence 4 --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
   --progress whetstone/courses/x/learning-progress.json
-# 重建掌握状态（模型通常自动运行）
-python3 $S/learner_state_build.py build --store store
+python3 $S/learner_state_build.py build --store store   # 重建掌握状态（模型通常自动运行）
 # 概念笔记扫描；打包插件
 python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone   # 只扫最近在学的课；--all 全部
 python3 whetstone-ai/package_plugin.py

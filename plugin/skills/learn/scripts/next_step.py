@@ -72,7 +72,7 @@ def decide(progress: dict, plan: dict | None, now: datetime, resume: bool) -> di
     if progress.get("status") == "completed" or out["section_id"] is None:
         out.update(state="FINISH", read="finish.md", why="every section is completed or deferred")
         return out
-    if shape == "skeleton" and not probed and not any_attempts and not deferred:
+    if shape == "skeleton" and not probed and not any_attempts and not deferred:  # review courses have no probe round
         out.update(state="PROBE", read="probe.md", why="skeleton course: the probe round has not been recorded (learning_state.py mark --type probe_completed)")
         return out
     current = next((s for s in sections if s.get("id") == out["section_id"]), None)
@@ -83,6 +83,8 @@ def decide(progress: dict, plan: dict | None, now: datetime, resume: bool) -> di
     if last and last.get("verdict") in WEAK_VERDICTS:
         out.update(state="AWAITING_RETRY", read="feedback.md", attempt_number=last.get("attempt_number"), last_verdict=last.get("verdict"),
                    why=f"attempt #{last.get('attempt_number')} was {last.get('verdict')}: one targeted follow-up, then assess again")
+    elif shape == "review":
+        out.update(state="READY", read="main.md", why="review course: ask the main question first (no PREDICT reveal); reveal units/<id>.md only after the verdict")
     else:
         out.update(state="READY", read="ready.md", why="no attempt on this section yet: READY → PREDICT → MAIN, then wait for the answer")
     return out
@@ -112,7 +114,7 @@ def render(decision: dict, progress: dict, plan: dict | None, args: argparse.Nam
             lines.append(f"  {py} {q(SCRIPT_DIR / 'learner_state_build.py')} build --store {store}")
             lines.append(f"  {py} {q(SCRIPT_DIR / 'review_pool.py')} --store {store} --lesson-id {progress.get('lesson_id')} --progress {progress_path}")
     lines.append(f"read: {(PROTOCOL / decision['read']).resolve()}")
-    if decision["state"] == "READY":
+    if decision["state"] == "READY" and decision["read"] == "ready.md":
         lines.append(f"then: {PROTOCOL / 'predict.md'} → {PROTOCOL / 'main.md'} (one state per reply; deepen.md only if the learner asks)")
     if decision["state"] in {"READY", "AWAITING_RETRY"}:
         lines.append(f"section data: {py} {q(SCRIPT_DIR / 'lesson_section.py')} {plan_path} --section {sid}   (not the whole lesson-plan.json)")

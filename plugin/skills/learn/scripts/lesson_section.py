@@ -118,7 +118,9 @@ def render_section(plan: dict, section_id: str) -> str:
            f"depends_on: {', '.join(section.get('depends_on', []) or []) or '-'}"]
     parent = section.get("parent_section")
     if isinstance(parent, dict):
-        out.append(f"子节，深化 {parent.get('lesson_id')} 的 {parent.get('section_id')}")
+        kind = section.get("review_kind")
+        label = {"repeat": "复习节，重访", "deepen": "子节，深化"}.get(kind, "子节，深化")
+        out.append(f"{label} {parent.get('lesson_id')} 的 {parent.get('section_id')}" + ("（先作答，判定后再揭示本节文档）" if kind else ""))
     out.append("")
     for label, key in (("当前问题", "problem"), ("方案", "solution"), ("机制", "mechanism"), ("引出的新问题", "new_problem")):
         out += [f"## {label}", str(section.get(key) or "-"), ""]

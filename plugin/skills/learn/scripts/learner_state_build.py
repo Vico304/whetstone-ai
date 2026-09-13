@@ -187,6 +187,7 @@ def new_state() -> dict:
         "depth_latest": None,
         "depth_max": None,
         "stability": 0,
+        "delayed_successes": 0,
         "rigor_max": None,
         "attempts": 0,
         "freshness": "unknown",
@@ -251,6 +252,8 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
             if verdict in SUCCESS_VERDICTS:
                 state["last_success_at"] = at
                 latest_success[cid] = (at, tier)
+                if tier != "immediate":
+                    state["delayed_successes"] += 1
                 success_days.setdefault(cid, set()).add(local_day(at_time, tz).isoformat())
                 if confidence is not None and confidence <= 2:
                     state["calibration"]["underconfident"] += 1

@@ -34,7 +34,7 @@ description: Whetstone 的总入口——从规划到教学的完整流程。缺
 
 ## 启动：缺什么补什么
 
-读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume（进度里有 `blocked` → 先去那门前置课）；无档案 → 阶段 1 目标与背景；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估 → 阶段 3 学习计划、逐门确认；本课无确认过的大纲 → 阶段 4 大纲（骨架课读 `stages/skeleton.md`）；否则阶段 5：生成 units → 前置检查或探测轮 → 教学。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
+读 [references/stages/_index.md](references/stages/_index.md) 的判断顺序：有未完成进度 → resume（进度里有 `blocked` → 先去那门前置课）；无档案 → 阶段 1 目标与背景；材料是目录、多路径或 > 30 KB → 阶段 2 材料评估 → 阶段 3 学习计划、逐门确认；本课无确认过的大纲 → 阶段 4 大纲（骨架课读 `stages/skeleton.md`）；否则阶段 5：生成 units → 前置检查或探测轮 → 教学。学习者说"复习 <课程>" → 读 [references/stages/review.md](references/stages/review.md)，为学过的课建一门复习课。每个阶段只问一个问题；熟手应一轮就看到第一道题，新手最多三轮。`guide` 与 `outline` 技能是这些阶段的独立入口，协议只在本技能维护。
 
 阶段 4–5 的建课规则（来源范围、前置课、大纲与覆盖表、units 生成、质量要求、完成标准）和启动时的默认值（目标、范围、前置检查、外部知识、输出位置、节奏）在 [references/build.md](references/build.md)，进入建课时读它。
 

@@ -36,6 +36,7 @@ learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
 lesson_section = load_module("lesson_section")
 next_step = load_module("next_step")
+review_outline = load_module("review_outline")
 store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
@@ -1787,7 +1788,14 @@ class Schema15Tests(unittest.TestCase):
         review = self.plan15()
         review["shape"], review["review_of"], review["coverage"] = "review", ["tee-skeleton-1", "other-course"], []
         review["sections"][0]["parent_section"] = {"lesson_id": "other-course", "section_id": "u02"}
+        errors = validate_lesson.validate_plan(review)
+        self.assertTrue(any("review_kind must be one of" in e for e in errors), errors)
+        review["sections"][0]["review_kind"] = "repeat"
         self.assertEqual(validate_lesson.validate_plan(review), [])   # empty coverage is fine: the material is the reviewed courses
+        self.assertIn("复习节，重访 other-course 的 u02", lesson_section.render_section(review, "s01"))
+        linear_kind = self.plan15()
+        linear_kind["sections"][0]["review_kind"] = "repeat"
+        self.assertTrue(any("only allowed in a review course" in e for e in validate_lesson.validate_plan(linear_kind)))
         self.assertEqual(mrg_export.export(review)[0]["review_of"], ["tee-skeleton-1", "other-course"])
         review["review_of"] = [review["lesson_id"]]
         self.assertTrue(any("must not contain this course" in e for e in validate_lesson.validate_plan(review)))
@@ -1805,3 +1813,57 @@ class Schema15Tests(unittest.TestCase):
         self.assertEqual(validate_prerequisites.validate_plan(plan), [])
         plan["prerequisites"][0]["dependency_kind"] = "skill"
         self.assertTrue(any("dependency_kind must be one of" in e for e in validate_prerequisites.validate_plan(plan)))
+
+    def test_review_units_must_not_repeat_the_reviewed_solution_or_mechanism(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reviewed = load_template()
+            (root / "reviewed.json").write_text(json.dumps(reviewed, ensure_ascii=False), encoding="utf-8")
+            review = self.plan15()
+            review["lesson_id"], review["shape"], review["review_of"], review["coverage"] = "sample-review-1", "review", ["sample-guided-lesson"], []
+            section = review["sections"][0]
+            section["parent_section"], section["review_kind"] = {"lesson_id": "sample-guided-lesson", "section_id": "s01"}, "repeat"
+            section["solution"], section["mechanism"] = "换一个情境重述：先划定范围，再把范围内的步骤排成流程", "在新情境里，地图仍然是把细节挂到位置上的工具"
+            self.assertEqual(validate_lesson.validate_plan(review), [])
+            units = root / "units"
+            units.mkdir()
+            template = (PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template" / "s01.md").read_text(encoding="utf-8")
+            leaky = template + "\n\n" + reviewed["sections"][0]["mechanism"] + "。\n"  # the reviewed mechanism sentence reappears verbatim
+            (units / "s01.md").write_text(leaky, encoding="utf-8")
+            errors, warnings = validate_lesson.validate_units(units, review, [root / "reviewed.json"])
+            self.assertTrue(any("repeats the reviewed section" in e for e in errors), errors)
+            (units / "s01.md").write_text(template, encoding="utf-8")  # reworded in the template: no verbatim sentence
+            errors, warnings = validate_lesson.validate_units(units, review, [root / "reviewed.json"])
+            self.assertFalse(any("repeats the reviewed section" in e for e in errors), errors)
+            _, warnings = validate_lesson.validate_units(units, review, None)
+            self.assertTrue(any("--reviewed" in w for w in warnings))
+
+
+class ReviewOutlineTests(_StoreHelpers, unittest.TestCase):
+    def test_review_outline_groups_weak_items_by_section_and_gates_sub_units(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            wrong = {"id": "p-w", "text": "边界是从地图里读出来的", "status": "wrong", "concept_ids": ["learning-design.system-boundary"]}
+            self._append(store, "2026-09-01T10:00:00Z", "checkpoint", "mastered", depth="mechanism", props=[wrong])
+            state = learner_state_build.build(store, now=datetime(2026, 9, 2, tzinfo=timezone.utc), tz=timezone.utc)
+            store_init.atomic_write(store / "learner-state.json", state)
+            result = review_outline.outline(store, ["sample-guided-lesson"])
+            self.assertEqual(result["reviewed"][0]["lesson_id"], "sample-guided-lesson")
+            cluster = result["clusters"][0]
+            self.assertEqual(cluster["section_id"], "s01")
+            self.assertEqual([r["kind"] for r in cluster["reasons"]], ["error_proposition"])
+            self.assertEqual(result["stable_sections"], [])  # only immediate evidence so far
+            # two delayed successes on every core concept, one reaching rationale → the section may grow a sub-section
+            self._append(store, "2026-09-03T10:00:00Z", "review", "mastered", depth="rationale")
+            self._append(store, "2026-09-05T10:00:00Z", "review", "mastered", depth="mechanism")
+            state = learner_state_build.build(store, now=datetime(2026, 9, 6, tzinfo=timezone.utc), tz=timezone.utc)
+            self.assertEqual(state["concepts"]["learning-design.macro-map"]["delayed_successes"], 2)
+            store_init.atomic_write(store / "learner-state.json", state)
+            result = review_outline.outline(store, ["sample-guided-lesson"])
+            self.assertEqual([s["section_id"] for s in result["stable_sections"]], ["s01"])
+            self.assertEqual(result["stable_sections"][0]["listed_concept_ids"], ["learning-design.appendix"])
+            self.assertEqual(result["rules"]["sub_units_per_review"], 1)
+            with self.assertRaises(ValueError):
+                review_outline.outline(store, ["no-such-course"])
+

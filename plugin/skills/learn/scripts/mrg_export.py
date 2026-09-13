@@ -138,6 +138,7 @@ def section_skeleton(plan: dict) -> list[dict]:
                 "title": section.get("title"),
                 "depends_on": list(section.get("depends_on", [])),
                 "parent_section": section.get("parent_section"),
+                "review_kind": section.get("review_kind"),
                 "problem": section.get("problem"),
                 "solution": section.get("solution"),
                 "mechanism": section.get("mechanism"),

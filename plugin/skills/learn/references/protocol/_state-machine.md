@@ -37,4 +37,6 @@ ASSESS
 
 一次回复只推进一个状态。提出问题或追问后应把对话交还给学习者，不同时回答自己的问题。
 
+复习课（`shape: review`）：READY 直接提出主问题（[main.md](main.md)），判定与反馈之后才揭示 `units/<id>.md`；没有 PREDICT 与探测轮；`repeat` 节记 `--kind review`，`deepen` 节记 `--kind checkpoint`。`next_step.py` 会按此打印。
+
 若正课中暴露出之前未识别的前置缺口，只对受影响的概念簇诊断（[../prerequisite/diagnose.md](../prerequisite/diagnose.md)），非 `ready` 的簇建成一门前置课（[../prerequisite/course.md](../prerequisite/course.md)），本课在当前节 `block`，前置课结课后按 [../prerequisite/return.md](../prerequisite/return.md) 回到这一节。不因一个缺口将整门课程或学习者状态清零。

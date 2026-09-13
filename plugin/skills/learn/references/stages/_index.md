@@ -14,6 +14,7 @@
 
 ```text
 有 learning-progress.json 且未完成 → resume（protocol/resume.md；进度里有 blocked → 先去那门前置课）
+学习者说“复习 <课程>”          → review.md（为学过的课建一门复习课，需要知识库）
 工作区无 learner-profile.md      → 阶段 1（旧布局：材料根下的 learner-profile.md 也算）
 材料是目录 / 多路径 / > 30 KB      → 阶段 2 → 阶段 3
 本课无 lesson-plan.json 或 outline_confirmed_at 为 null → 阶段 4（档案 orientation=domain 且计划里这门课是骨架课 → skeleton.md）
