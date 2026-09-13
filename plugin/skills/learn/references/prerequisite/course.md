@@ -5,7 +5,7 @@
 ## 建课
 
 1. **来源**：前置课几乎全靠外部来源。按 [../source-handling.md](../source-handling.md) 的"外部存档"检索、存档到 `<工作区>/external/<集名>_<日期>/`，整目录作 `pool` 进覆盖表，引用标 `external`。父课材料里能落点的部分照常引用。检索不可用时明确说，请学习者提供资料。
-2. **`lesson-plan.json`**：`schema_version: "1.4"`、`shape: linear`、`prerequisite_of: <父课 lesson_id>`、`blocked_at: <父课被卡住的节 id>`、`depth: <父课 depth + 1>`（主课为 0）；`mode` 与父课相同；课程目录与父课同级（`<计划目录>/<lesson_id>/`），id 建议 `<主题>-<depth>`，如 `linear-algebra-min-1`。
+2. **`lesson-plan.json`**：`schema_version: "1.5"`、`shape: linear`、`prerequisite_of: <父课 lesson_id>`、`blocked_at: <父课被卡住的节 id>`、`depth: <父课 depth + 1>`（主课为 0）；`mode` 与父课相同；课程目录与父课同级（`<计划目录>/<lesson_id>/`），id 建议 `<主题>-<depth>`，如 `linear-algebra-min-1`。
 3. **切节**：每节一个中心机制及其直接依赖。前置概念多是基础机制，"当前问题"用删除思想实验写——没有它，父课的哪一步最先讲不通——而不是历史上人们卡在什么问题上。概念角色、覆盖表、criteria 照常；约定类内容（单位、名称、形状读法）进 `listed` 或 `fact` 层，不为它们单独立节。
 4. **`final_challenge`**：出成靠近父课材料的桥接题——用父课 `blocked_at` 那节的一个具体说法，要求学习者用本课概念解释它。
 5. **校验**：`validate_lesson.py` 会打印 `fact ratio`。接近全是 fact 层时告诉学习者：这一层是约定，再往下不该建课；本版本仍按课处理，卡片功能未实现。

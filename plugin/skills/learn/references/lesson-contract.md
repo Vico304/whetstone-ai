@@ -10,7 +10,7 @@
 ├── prerequisite-plan.json       # 运行前置检查时创建
 ├── prerequisite-progress.json   # 前置作答、来源与桥接复测
 ├── prerequisite-guide.md        # 旧课程的补充文档；1.4 起缺口建成前置课，不再生成
-├── lesson-plan.json             # schema 1.2（骨架课 / 分支课：1.3）
+├── lesson-plan.json             # schema 1.5（旧课程 1.0–1.4 仍被接受）
 ├── outline.md                   # 路线图 + 全部概念 + 覆盖账本（取代 teaching-guide.md）
 ├── units/                       # 每个非 deferred 的 unit 一份，独立生成
 │   └── <section-id>.md
@@ -47,7 +47,7 @@
 
 顶层必需字段：
 
-- `schema_version`：新课程写 `1.2`（骨架课与分支课 `1.3`，前置课 `1.4`）；校验器与导出脚本同时接受 `1.0` / `1.1`（旧课程）；
+- `schema_version`：新课程写 `1.5`（1.4 的超集，新增字段都可选：概念 `contrast / cases / ontology`、`tradeoffs[]` 的 `contested`、节 `parent_section`、复习课 `review_of`）；校验器与导出脚本同时接受 `1.0`–`1.4`（旧课程）；
 - **1.2** `mode`：`full | fast`；`outline_confirmed_at`：大纲生成时为 `null`，学习者确认后写 ISO 时间——为 `null` 时不得生成 `units/`；
 - `lesson_id`、`title`、`learning_goal`；
 - `source_manifest`：清单相对路径或 `null`；
@@ -106,7 +106,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 
 ### 1.3 新增：课程形态、证据池、落点、探测、分支候选（规格 D）
 
-只有骨架课与分支课写 `1.3`；1.2 的全部规则继续适用。
+骨架课与分支课的字段从 `1.3` 起可用；1.2 的全部规则继续适用。
 
 - `shape`：`linear`（缺省）| `skeleton`（骨架课）| `branch`（分支课）；`parent_course` 仅 `branch` 必需，指向骨架课的 `lesson_id`。
 - `coverage[]` 在骨架课里按**文件/目录**记录：`heading: "*"` 表示整个路径；disposition 新增 `pool`（证据池，骨架课可引用）与 `reserve`（留给分支课，`reason` 可选）；`*` 只允许配 `pool / reserve / excluded`。`--sources-root` 对 `*` 路径跳过逐标题检查。分支课与普通课仍逐标题，唯一例外是 `<工作区>/external/` 下的外部存档集：任何形态的课程都可以整目录作 `pool`（`heading: "*"`），不逐标题；`reserve` 仍只属于骨架课。校验器打印 `INFO: external refs a/b`（`external` 引用数 / 全部引用数），不设阈值。

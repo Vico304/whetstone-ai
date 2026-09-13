@@ -24,7 +24,7 @@
 
 | 字段 | 自版本 | 规则 |
 |---|---|---|
-| `schema_version` | 1.0 | `1.0 / 1.1 / 1.2 / 1.3 / 1.4` 之一；新课程写 `1.2`，骨架课与分支课写 `1.3`，前置课写 `1.4` |
+| `schema_version` | 1.0 | `1.0` 到 `1.5` 之一；新课程写 `1.5`（1.4 的超集，1.5 字段都可选）；旧课程按原版本校验 |
 | `lesson_id`、`title`、`learning_goal` | 1.0 | 非空字符串 |
 | `source_manifest` | 1.0 | `sources.json` 的相对路径，或 `null`。清单的 `base_path` 记录材料根相对课程目录的位置（`../../..` 或 `../../../material/x`），校验器与评分器据此推出材料根，课程目录因此自包含 |
 | `big_picture` | 1.0 | `{problem, outcome, system_map[]}`：材料总体解决的问题、学完应能做的事、从输入到结果的关键步骤 |
@@ -38,6 +38,7 @@
 | `coverage[]` | 1.2 | 见 §7；为空时必须传 `--allow-empty-coverage` |
 | `shape`、`parent_course`、`branch_candidates[]` | 1.3 | 见 domain-skeleton.md |
 | `prerequisite_of`、`blocked_at`、`depth` | 1.4 | 前置课，三者同时出现：父课 `lesson_id`、父课被卡住的节 id、父课 depth + 1（主课为 0）；`shape` 必须是 `linear`，与 `parent_course` 互斥。校验器打印 `INFO: fact ratio a/b`（fact 层概念 / 全部概念），不设阈值 |
+| `review_of[]` | 1.5 | 复习课：`shape: review` 时必填，列被复习的课程 id（不含本课）；其他形态不允许。复习课不允许探测题、分支候选、前置课字段；覆盖表可为空，材料就是被复习课的文件 |
 
 ## 3. `sections[]`
 
@@ -47,13 +48,14 @@
 | `depends_on[]` | 只能指向更早的节 |
 | `problem`、`solution`、`mechanism` | 本节的问题、材料的方案、方案如何工作；渲染进 `units/` |
 | `meaning` | 它的实际意义；rationale 层，只作出题素材，不渲染 |
-| `tradeoffs[]` | 边界、代价、失败方式；rationale 层，不渲染 |
+| `tradeoffs[]` | 边界、代价、失败方式；rationale 层，不渲染。1.5 起条目可以是对象 `{text, contested, sides[]}`：`contested: true` 表示材料在此处不一致，`sides` 恰好两方，各带 `claim` 与 `source_refs[]`；不一致本身是事实，可以在讲义里说，主问题可以问“你信哪个、凭什么” |
 | `new_problem` | 引向下一节的问题；除末节外非空，末节可为 `null` |
 | `principle` | 1.1 可选。本节体现的可迁移设计思想；principle 层，不渲染 |
 | `concepts[]` | 见 §4 |
 | `source_refs[]` | 见 §8 |
 | `checkpoint` | `{prompt, criteria[], hint}`，见 §6 |
 | `probe` | 1.3，仅骨架课 |
+| `parent_section` | 1.5 可选。`{lesson_id, section_id}`：本节是子节，深化那一节。指向本课的节时不能是自身、不能成环；指向别的课时那门课必须在 `review_of` 里 |
 
 一门课超过 9 节报警告（骨架课除外）。
 
@@ -69,10 +71,13 @@
 | `role` | 1.2 | `core / supporting / listed`，必填。`core` 进主问题，每节超过 4 个报警告，超出的降为 supporting 而不是删除；`supporting` 会讲，每节超过 6 个报警告；`listed` 只列名、一句事实层定义与定位，`explanation` 超过 200 字报警告 |
 | `check` | 1.2 | 仅 `supporting`：`{prompt, criteria[], hint}`，学习者说"验收 X"时使用；缺失报警告 |
 | `anchor` | 1.3 | 仅骨架课 |
+| `contrast` | 1.5 | 可选。`{with, differs_in}`：最容易与本概念混淆的近邻（概念 id，不能是自身）和差在哪个变量；出题与反馈优先放在这里 |
+| `cases[]` | 1.5 | 可选。恰好两个 `{summary, source_refs[]}`：表面不同、结构相同的案例，来自材料池或外部存档；讲义先摆案例再揭示机制 |
+| `ontology` | 1.5 | 可选。`entity / process / constraint / relation`：本体类别，只在骨架课与前置课建议填；类别错置的回答要重新归类而不是反驳 |
 
 ## 5. `relations[]`
 
-每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。校验器打印 `INFO: orphan concepts a/b`——没有出现在任何关系里的核心概念数，不设阈值；链重建对不到这些概念。
+每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。校验器打印 `INFO: orphan concepts a/b`——没有出现在任何关系里的核心概念数，不设阈值；链重建对不到这些概念。`shape: review` 的课程与其他课程一样写 `relations[]`。
 
 ## 6. 判定标准
 
@@ -135,3 +140,4 @@ python3 scripts/validate_lesson.py lesson-plan.json --guide teaching-guide.md
 | 1.2 | `mode`、`outline_confirmed_at`、概念 `role` 与 `check`、`deferred[]`、`coverage[]`；`outline.md` + `units/` 取代 `teaching-guide.md` |
 | 1.3 | `shape`、`parent_course`、`pool / reserve`、`anchor`、`probe`、`branch_candidates[]` |
 | 1.4 | 前置课：`prerequisite_of`、`blocked_at`、`depth`；任何课程可用外部存档集作 `pool` |
+| 1.5 | 概念 `contrast / cases / ontology`；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`；复习课 `shape: review` 与 `review_of[]`。校验器打印 `INFO: variation a/b`（有易混对、有两个案例的核心概念数），不设阈值 |

@@ -33,7 +33,7 @@
 
 `prerequisite_check`：`auto`（默认，材料依赖了课程内不解释、且会阻断主线的知识，而学习者背景未知时才做）、`always`（学习者自述基础薄弱时档案里记这个）、`skip`。骨架课不跑这一阶段，改为探测轮；探测暴露地板太低时进入同样的诊断与建课。三个触发点：前置检查或探测轮之后、大纲确认时学习者说"我不懂 X、Y"、正课中途暴露缺口（只诊断受影响的簇）。
 
-1. **最小前置地图**：只列会阻断主线的概念簇，记名称、为何是前置、支撑哪段主线、材料位置、确定性；写 `prerequisite-plan.json`，`validate_prerequisites.py` 校验。开启知识库时先 `index_match.py prerequisites --lesson-id <本课>`，按 `variant / variant_then_diagnose / diagnose` 处理（见 [knowledge-store.md](knowledge-store.md) §3）；本课的前置课里学过的概念一律 `variant`。
+1. **最小前置地图**：只列会阻断主线的概念簇，记名称、为何是前置、支撑哪段主线、材料位置、确定性，可选 `dependency_kind`（`def` 缺定义、`mech` 缺机制、`tool` 缺表征或操作）；写 `prerequisite-plan.json`，`validate_prerequisites.py` 校验。开启知识库时先 `index_match.py prerequisites --lesson-id <本课>`，按 `variant / variant_then_diagnose / diagnose` 处理（见 [knowledge-store.md](knowledge-store.md) §3）；本课的前置课里学过的概念一律 `variant`。
 2. **诊断**：一次一题，提问后交还对话，不给参考答案；问题优先暴露能否生成概念、说明边界、说明关系与方向、应用到新情境；对每个簇记 `ready / fragile / gap / misconception / skipped` 与判断置信度；证据够就停，不凑题数；`prerequisite_state.py` 追加原始回答，开启知识库时同时记 `kind: diagnostic`。只说"这个簇对本材料尚未就绪"，不作能力概括。`build + teach` 模式下写完计划、提出第一题就停。
 3. **建前置课**：对全部非 `ready` 的簇建一门课（簇多、有依赖时按依赖拆成几门串成栈）。来源按外部存档规则检索、存档、整目录作 `pool`；`lesson-plan.json` 写 `schema_version: "1.4"`、`prerequisite_of`、`blocked_at`、`depth`，`mode` 与父课相同；每节"当前问题"用删除思想实验；`final_challenge` 出成靠近父课材料的桥接题。父课 `learning_state.py block --section-id <blocked_at> --by <本课>`；学习计划的"前置栈"加一行。之后与普通课程完全相同：确认大纲、生成 units、逐节教学、记录。前置课自己暴露缺口时同一协议递归。
 4. **回程**：前置课结课后登记概念、重建掌握状态、`unblock` 父课、更新前置栈、报告回到父课哪一节。父课 resume 时对被卡簇各出一道变式题（知识库：`kind: variant`，隔夜再答才算延迟证据；未开知识库：`prerequisite_state.py bridge`），答错的簇不再建课，给一个针对性追问后继续；然后从 `blocked_at` 那节的 READY 继续。学习者中途放弃前置课时 `unblock` 父课并在栈里标"未完成"，不清零记录。

@@ -28,7 +28,7 @@ python3 scripts/store_init.py register --store whetstone/store --lesson-plan <le
 
 `mrg_export.py <lesson-plan> --store <目录> [--manifest sources.json]` 从 lesson-plan 导出，模型不直接写 MRG 文件。两个文件都带 `schema_version: "1.3"`、`lesson_id`、`title`、`shape`、`parent_course`、`branch_candidates`、`grounding`（非骨架课为 `null`）、`generated_at`。
 
-**节点**：`{id, name, aliases[], domain_path[], layer, lesson_id, section_ids[], explanation, source_refs[]}`。公开文件只含 `layer ∈ {fact, mechanism}` 的节点，高层文件只含 `rationale / principle` 的节点。1.0 课程导出时概念 id 由名字生成、`layer` 默认 `mechanism`。
+**节点**：`{id, name, aliases[], domain_path[], layer, lesson_id, section_ids[], explanation, source_refs[]}`，1.5 课程另带 `contrast / cases / ontology`；节带 `parent_section`，课带 `review_of[]`。公开文件只含 `layer ∈ {fact, mechanism}` 的节点，高层文件只含 `rationale / principle` 的节点。1.0 课程导出时概念 id 由名字生成、`layer` 默认 `mechanism`。
 
 **边**：来自 `relations[]`，`{id, from, to, type, layer, rationale, source_refs[]}`，按 `layer` 分到两个文件。
 

@@ -51,6 +51,23 @@ def criteria_lines(criteria: Any) -> list[str]:
     return lines
 
 
+def tradeoff_lines(tradeoffs: list) -> list[str]:
+    lines = []
+    for item in tradeoffs:
+        if isinstance(item, str):
+            lines.append(f"- {item}")
+        elif isinstance(item, dict):
+            line = f"- {item.get('text')}"
+            if item.get("contested"):
+                line += "  [材料在此处不一致，可展示为事实；主问题可问“你信哪个、凭什么”]"
+                for side in item.get("sides") or []:
+                    if isinstance(side, dict):
+                        refs = "; ".join(f"{r.get('path')} {r.get('locator') or ''}".strip() for r in side.get("source_refs") or [] if isinstance(r, dict))
+                        line += f"\n  一方: {side.get('claim')}" + (f" [{refs}]" if refs else "")
+            lines.append(line)
+    return lines
+
+
 def concept_lines(section: dict) -> list[str]:
     lines = []
     for concept in section.get("concepts", []) or []:
@@ -58,7 +75,16 @@ def concept_lines(section: dict) -> list[str]:
             continue
         role = concept.get("role", "core")
         ident = concept.get("id") or concept.get("name")
-        line = f"- {role} {concept.get('name')} (`{ident}`, {concept.get('layer', 'mechanism')}): {concept.get('explanation')}"
+        line = f"- {role} {concept.get('name')} (`{ident}`, {concept.get('layer', 'mechanism')}"
+        line += f", {concept['ontology']}" if concept.get("ontology") else ""
+        line += f"): {concept.get('explanation')}"
+        contrast = concept.get("contrast")
+        if isinstance(contrast, dict):
+            line += f"\n  易混对: {contrast.get('with')} —— 差在 {contrast.get('differs_in')}"
+        for index, case in enumerate(concept.get("cases") or []):
+            if isinstance(case, dict):
+                refs = "; ".join(f"{r.get('path')} {r.get('locator') or ''}".strip() for r in case.get("source_refs") or [] if isinstance(r, dict))
+                line += f"\n  案例 {index + 1}: {case.get('summary')}" + (f" [{refs}]" if refs else "")
         check = concept.get("check")
         if isinstance(check, dict) and check.get("prompt"):
             line += f"\n  验收题: {check['prompt']}"
@@ -89,7 +115,11 @@ def render_section(plan: dict, section_id: str) -> str:
     section = find_section(plan, section_id)
     flag = " [deferred]" if section_id in deferred_ids(plan) else ""
     out = [f"# {section_id} {section.get('title')}{flag}  ({plan.get('lesson_id')}, mode {plan.get('mode', 'full')})",
-           f"depends_on: {', '.join(section.get('depends_on', []) or []) or '-'}", ""]
+           f"depends_on: {', '.join(section.get('depends_on', []) or []) or '-'}"]
+    parent = section.get("parent_section")
+    if isinstance(parent, dict):
+        out.append(f"子节，深化 {parent.get('lesson_id')} 的 {parent.get('section_id')}")
+    out.append("")
     for label, key in (("当前问题", "problem"), ("方案", "solution"), ("机制", "mechanism"), ("引出的新问题", "new_problem")):
         out += [f"## {label}", str(section.get(key) or "-"), ""]
     out += ["## 概念", *concept_lines(section), ""]
@@ -101,8 +131,7 @@ def render_section(plan: dict, section_id: str) -> str:
             "## 判定标准（不展示）", *(criteria_lines(checkpoint.get("criteria")) or ["-"]), "",
             "## 提示（首次作答后按需）", str(checkpoint.get("hint") or "-"), ""]
     out += ["## 意义（不展示，出题素材）", str(section.get("meaning") or "-"), ""]
-    tradeoffs = section.get("tradeoffs") or []
-    out += ["## 取舍（不展示，追问素材）", *([f"- {t}" if isinstance(t, str) else f"- {json.dumps(t, ensure_ascii=False)}" for t in tradeoffs] or ["-"]), ""]
+    out += ["## 取舍（不展示，追问素材）", *(tradeoff_lines(section.get("tradeoffs") or []) or ["-"]), ""]
     out += ["## 思想（不展示，迁移题素材）", str(section.get("principle") or "-")]
     return "\n".join(out)
 
