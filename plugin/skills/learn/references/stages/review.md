@@ -23,7 +23,7 @@ python3 scripts/review_outline.py --store <工作区>/store --lesson-id <课程 
 
 ## 教学时的差别
 
-- 每节 READY 直接提出主问题（读 `protocol/main.md`），作答、判定、反馈之后再揭示 `units/<id>.md`；没有 PREDICT，没有探测轮。`next_step.py` 对复习课打印这个顺序。
+- 每次会话开始先过到期的事实卡（同 resume：`cards.py due`）。每节 READY 直接提出主问题（读 `protocol/main.md`），作答、判定、反馈之后再揭示 `units/<id>.md`；没有 PREDICT，没有探测轮。`next_step.py` 对复习课打印这个顺序。
 - 记录：`repeat` 节记 `--kind review`，`deepen` 节记 `--kind checkpoint`；证据等级由间隔判定，与普通课相同。
 - 结课：链重建照常（概念名来自复习课自己的概念）；`review_of` 多于一门时迁移题出成接缝题——一个必须同时用到两门课机制的情境。
 - 复习课结课不改变被复习课的进度文件；掌握状态重建后，被复习课下次 resume 的变式题自然反映这次结果。

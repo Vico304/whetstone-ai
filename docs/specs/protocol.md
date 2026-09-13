@@ -70,7 +70,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **记录**：每次产生 verdict 都记录。不开知识库：`learning_state.py record --state … --section-id … --response-file … --verdict … [--confidence] [--criteria-met c1,c3] [--depth …]`，只追加，不覆盖首次回答。开知识库：`lrg_record.py append`（字段见 [knowledge-store.md](knowledge-store.md) §4）。两个命令都拒绝同一节里回答原文相同的记录（`--force` 才追加），回填用 `--at`；每节用时由脚本按与上一条记录的间隔算。
 
-**resume**：先不进未完成的节。从已完成的节里选一个概念出一道变式题——换情境或换角度考同一机制，禁止复用原 `checkpoint` 措辞；作答记 `record --review`（知识库：`--kind review`），当前位置不变；变式失败的节回到 `in_progress`，在后续节完成后再重做。开启知识库时先 `learner_state_build.py build`，再按 `review_pool.py` 给出的顺序取题：假性掌握的概念 → 匿名命题（"有一种说法是「…」。这个说法哪里有问题？"——不说是学习者自己说的，不引用原文，纠正在同一轮给出）→ 链重建漏掉的边（"X 和 Y 之间是什么关系"）→ 过期的概念。然后一两句重建上下文，进入未完成节的 READY。
+**resume**：先不进未完成的节。从已完成的节里选一个概念出一道变式题——换情境或换角度考同一机制，禁止复用原 `checkpoint` 措辞；作答记 `record --review`（知识库：`--kind review`），当前位置不变；变式失败的节回到 `in_progress`，在后续节完成后再重做。开启知识库时先 `learner_state_build.py build`，先过到期的事实卡（`cards.py due`，一张一问，记 `--kind recall --concept <id>`），再按 `review_pool.py` 给出的顺序取题：假性掌握的概念 → 匿名命题（"有一种说法是「…」。这个说法哪里有问题？"——不说是学习者自己说的，不引用原文，纠正在同一轮给出）→ 链重建漏掉的边（"X 和 Y 之间是什么关系"）→ 过期的概念。然后一两句重建上下文，进入未完成节的 READY。
 
 **复习课**（`stages/review.md`，需要知识库）：`review_outline.py --store … --lesson-id <课程>…` 输出薄弱簇（按被复习课的节归，薄弱多的在前）、稳固的节（每个核心概念 ≥ 2 次延迟或迁移级成功且一个到过本质层，附 `listed` 概念）与被复习课的目录。大纲：一簇一节，`review_kind: repeat`，`parent_section` 指回原节，问题在新情境里、放在最易混淆处，方案与机制用新情境重述；稳固的节列一个可选子节（`review_kind: deepen`，`id` 为 `<原节>.1`，来源只用材料池与外部存档），一门最多一个，确认大纲时问学不学。教学：READY 直接出主问题，判定后再揭示；`repeat` 记 `--kind review`，`deepen` 记 `--kind checkpoint`；`review_of` 多于一门时结课迁移题是接缝题。校验加 `--reviewed <被复习课的 lesson-plan.json>`。
 

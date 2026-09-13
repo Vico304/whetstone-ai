@@ -167,6 +167,8 @@ def load_events(store: Path) -> list[dict]:
 
 
 def concepts_for_event(event: dict, section_concepts: dict) -> set[str]:
+    if event.get("kind") == "recall":  # a card touches its own concept only, never the section around it
+        return set(event.get("target_concept_ids", []) or [])
     ids: set[str] = set(section_concepts.get(event.get("lesson_id"), {}).get(event.get("section_id"), []))
     ids.update(event.get("target_concept_ids", []) or [])
     for prop in event.get("propositions", []) or []:

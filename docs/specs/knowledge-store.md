@@ -12,6 +12,7 @@
 ├── concepts/index.json         概念索引（§3）
 ├── mrg/<lesson-id>.json        MRG 公开层：fact / mechanism 节点与边，各节骨架（§2）
 ├── mrg/<lesson-id>.deep.json   MRG 高层：rationale / principle 节点与边，各节的意义、代价、思想、criteria
+├── cards/<lesson-id>.json      事实卡：fact 层与 listed 概念的名字对定义（§7）
 ├── lrg/<lesson-id>.jsonl       只追加的作答日志（§4）
 ├── learner-state.json          派生的掌握状态（§5），随时可重建，不手改
 └── exports/                    由 init 创建，当前没有脚本写入
@@ -85,7 +86,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | 字段 | 含义 |
 |---|---|
 | `at`、`event: attempt`、`lesson_id`、`section_id`、`attempt_number` | 时间与位置 |
-| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`diagnostic`（前置检查的诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
+| `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`recall`（事实卡，同样需 `--concept`，只落在该概念上）、`probe`、`diagnostic`（前置检查的诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
 | `recorded_at` | 只在 `--at` 回填时出现：`at` 是作答时间，`recorded_at` 是写入时间 |
 | `rigor` | `full / fast`，默认取进度文件的 `mode` |
 | `confidence`、`verdict`、`criteria_met[]`、`depth_reached` | 1–5 的信心；`mastered / partial / retry / skipped`；满足的 criteria id；到达的层 |
@@ -159,12 +160,11 @@ python3 scripts/review_pool.py --store <目录> --lesson-id <id> [--progress lea
 
 只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。`review_outline.py --store … --lesson-id <课程>…` 把同样的池按被复习课的节归簇、并列出可长子节的稳固节，供复习课出大纲（[protocol.md](protocol.md)）。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
 
-## 7. 不可见的实现
+## 7. 事实卡：`cards/<lesson-id>.json`
 
-- 日志不在课程目录里；`lrg_record.py show`、`learner_state_build.py show` 都不打印 `response`；
-- 进入提示词的 LRG 内容只有匿名化的命题文本；
-- 讲义、概念笔记、学习者查询只读公开层文件；
-- 学习者对抽取或判定有异议时追加新一次作答，不修改任何已有记录。
+`cards.py build --store <目录> --lesson-id <id>` 为公开导出里 `layer: fact` 或 `role: listed` 的概念各生成一张卡（`{id, concept_id, section_id, prompt, answer, layer, role, source_refs[]}`），已有的卡不改；机制、本质、思想层不做卡。`cards.py due [--lesson-id <id>] [--limit N]` 列到期卡：从未答对、上次 `retry / partial`、或上次答对距今超过 7 × 2^(答对日数 − 1) 天（上限 180）的卡，最久的在前——与时效同一条占位规则，不是遗忘模型。作答记 `lrg_record.py append --kind recall --concept <id> --section-id <节>`，不加 `--progress`；`recall` 事件只落在目标概念上，不碰同节其他概念，证据等级照常按间隔判定。同一概念在几门课里各有一张卡时只问一次，任何一门课下记的 `recall` 都算。resume 与复习课开场先过到期卡，再出变式题。
+
+不可见的实现：日志不在课程目录里，`show` 类命令都不打印 `response`；进入提示词的 LRG 内容只有匿名化的命题文本；讲义、概念笔记、学习者查询只读公开层文件；学习者对抽取或判定有异议时追加新一次作答，不修改任何已有记录。
 
 ## 8. 学习者主目录：`~/.whetstone/`
 

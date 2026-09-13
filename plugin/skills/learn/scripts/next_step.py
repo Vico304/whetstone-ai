@@ -112,6 +112,7 @@ def render(decision: dict, progress: dict, plan: dict | None, args: argparse.Nam
         lines.append(f"opener: new sitting — read {PROTOCOL / decision['opener']} first (variant question from a completed section), then continue below")
         if args.store:
             lines.append(f"  {py} {q(SCRIPT_DIR / 'learner_state_build.py')} build --store {store}")
+            lines.append(f"  {py} {q(SCRIPT_DIR / 'cards.py')} due --store {store} --lesson-id {progress.get('lesson_id')}   (due fact cards first, one at a time)")
             lines.append(f"  {py} {q(SCRIPT_DIR / 'review_pool.py')} --store {store} --lesson-id {progress.get('lesson_id')} --progress {progress_path}")
     lines.append(f"read: {(PROTOCOL / decision['read']).resolve()}")
     if decision["state"] == "READY" and decision["read"] == "ready.md":

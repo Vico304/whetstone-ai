@@ -37,6 +37,7 @@ review_pool = load_module("review_pool")
 lesson_section = load_module("lesson_section")
 next_step = load_module("next_step")
 review_outline = load_module("review_outline")
+cards = load_module("cards")
 store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
@@ -1866,4 +1867,48 @@ class ReviewOutlineTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(result["rules"]["sub_units_per_review"], 1)
             with self.assertRaises(ValueError):
                 review_outline.outline(store, ["no-such-course"])
+
+
+class FactCardTests(_StoreHelpers, unittest.TestCase):
+    def test_cards_come_from_fact_and_listed_concepts_and_recall_touches_one_concept(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            result = cards.build(store, "sample-guided-lesson")
+            self.assertEqual(sorted(result["added"]), ["learning-design.appendix", "learning-design.system-boundary"])  # listed + fact; never mechanism
+            self.assertEqual(cards.build(store, "sample-guided-lesson")["added"], [])  # idempotent
+            data = cards.load_cards(store, "sample-guided-lesson")
+            card = next(c for c in data["cards"] if c["concept_id"] == "learning-design.system-boundary")
+            self.assertEqual((card["section_id"], card["layer"]), ("s01", "fact"))
+            self.assertTrue(card["answer"])
+            now = datetime(2026, 9, 10, tzinfo=timezone.utc)
+            items = cards.due(store, ["sample-guided-lesson"], now, 5)
+            self.assertEqual([i["reason"] for i in items], ["never recalled", "never recalled"])
+
+            def recall(at, verdict, cid="learning-design.system-boundary"):
+                event = lrg_record.build_event(
+                    lesson_id="sample-guided-lesson", section_id="s01", kind="recall", attempt_number=1, response="r", feedback="",
+                    verdict=verdict, confidence=None, criteria_met=[], depth_reached="fact", extraction=None, comparison=None,
+                    elapsed_seconds=None, target_concept_ids=[cid])
+                event["at"] = at
+                lrg_record.append_event(store, "sample-guided-lesson", event)
+
+            with self.assertRaises(ValueError):
+                lrg_record.build_event(lesson_id="l", section_id="s", kind="recall", attempt_number=1, response="", feedback="",
+                                       verdict="mastered", confidence=None, criteria_met=[], depth_reached=None,
+                                       extraction=None, comparison=None, elapsed_seconds=None)
+            recall("2026-09-10T10:00:00Z", "mastered")
+            items = cards.due(store, ["sample-guided-lesson"], datetime(2026, 9, 12, tzinfo=timezone.utc), 5)
+            self.assertEqual([i["concept_id"] for i in items], ["learning-design.appendix"])  # the recalled card waits 7 days
+            items = cards.due(store, ["sample-guided-lesson"], datetime(2026, 9, 18, tzinfo=timezone.utc), 5)
+            self.assertEqual({i["concept_id"] for i in items}, {"learning-design.appendix", "learning-design.system-boundary"})
+            recall("2026-09-18T10:00:00Z", "retry")
+            items = cards.due(store, ["sample-guided-lesson"], datetime(2026, 9, 18, 12, tzinfo=timezone.utc), 5)
+            self.assertIn("last recall was retry", [i["reason"] for i in items])
+            # the recall events touched only their concept: the section's mechanism concept has no attempts
+            state = learner_state_build.build(store, now=datetime(2026, 9, 19, tzinfo=timezone.utc), tz=timezone.utc)
+            self.assertNotIn("learning-design.macro-map", state["concepts"])
+            boundary = state["concepts"]["learning-design.system-boundary"]
+            self.assertEqual((boundary["attempts"], boundary["last_verdict"], boundary["depth_max"]), (2, "retry", "fact"))
+            self.assertEqual(cards.lesson_ids_with_cards(store), ["sample-guided-lesson"])
 

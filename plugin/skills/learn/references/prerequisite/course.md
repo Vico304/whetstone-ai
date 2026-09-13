@@ -1,6 +1,6 @@
 # 阶段三：建前置课
 
-先按依赖类型分流（诊断时记的 `dependency_kind`）：`def`（缺定义或约定）不建课，写进父课当前节的 `listed` 概念——一句定义加定位；`mech`（缺机制）建课；`tool`（缺表征或操作，如矩阵乘、单位换算）建课，但每节主问题改为"做一遍"——给一个小例子要求算出或写出结果，判定看结果，不看解释。对需要建课的簇建**一门**前置课；簇之间有依赖且规模大时按依赖拆成几门，串成栈（`skeleton`/父课 ← depth 1 ← depth 2 …）。每门都是普通课程，走阶段 4 → 5，大纲照常呈现并确认。
+先按依赖类型分流（诊断时记的 `dependency_kind`）：`def`（缺定义或约定）不建课，写进父课当前节的 `listed` 概念——一句定义加定位，重新导出并 `cards.py build` 后它们就是事实卡；`mech`（缺机制）建课；`tool`（缺表征或操作，如矩阵乘、单位换算）建课，但每节主问题改为"做一遍"——给一个小例子要求算出或写出结果，判定看结果，不看解释。对需要建课的簇建**一门**前置课；簇之间有依赖且规模大时按依赖拆成几门，串成栈（`skeleton`/父课 ← depth 1 ← depth 2 …）。每门都是普通课程，走阶段 4 → 5，大纲照常呈现并确认。
 
 ## 建课
 
@@ -8,7 +8,7 @@
 2. **`lesson-plan.json`**：`schema_version: "1.5"`、`shape: linear`、`prerequisite_of: <父课 lesson_id>`、`blocked_at: <父课被卡住的节 id>`、`depth: <父课 depth + 1>`（主课为 0）；`mode` 与父课相同；课程目录与父课同级（`<计划目录>/<lesson_id>/`），id 建议 `<主题>-<depth>`，如 `linear-algebra-min-1`。
 3. **切节**：每节一个中心机制及其直接依赖。前置概念多是基础机制，"当前问题"用删除思想实验写——没有它，父课的哪一步最先讲不通——而不是历史上人们卡在什么问题上。概念角色、覆盖表、criteria 照常；约定类内容（单位、名称、形状读法）进 `listed` 或 `fact` 层，不为它们单独立节。
 4. **`final_challenge`**：出成靠近父课材料的桥接题——用父课 `blocked_at` 那节的一个具体说法，要求学习者用本课概念解释它。
-5. **校验**：`validate_lesson.py` 会打印 `fact ratio`。接近全是 fact 层时告诉学习者：这一层是约定，再往下不该建课；本版本仍按课处理，卡片功能未实现。
+5. **校验**：`validate_lesson.py` 会打印 `fact ratio`。接近全是 fact 层时告诉学习者：这一层是约定，再往下不该建课——这些概念进父课 `listed`，由事实卡复习。
 6. **父课**：`learning_state.py block --state <父课 learning-progress.json> --section-id <blocked_at> --by <本课 lesson_id>`；开启知识库时 `store_init.py register` 会把关系记进 `store.json`。
 7. **学习计划**：在 `learning-plan.md` 的"前置栈"里加一行（栈的写法见 `assets/learning-plan-template.md` §3a），每层写 depth、状态、卡在父课哪一节。
 

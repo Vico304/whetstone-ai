@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 事实卡：`cards.py build` 为 `fact` 层与 `listed` 概念生成卡（`store/cards/<课程>.json`），`cards.py due` 按与时效同一条规则列到期卡；作答记 `kind: recall`，只落在该概念上；resume 与复习课开场先过到期卡；前置检查里的定义类缺口进父课 `listed` 后由事实卡复习。不给机制、本质、思想做卡，不接 FSRS。
 - 复习课：说"复习 <课程>"进入 `stages/review.md`；`review_outline.py` 从掌握状态取薄弱项按被复习课的节归簇，并列出可长子节的稳固节（每个核心概念至少两次延迟证据且到过本质层）；节带 `review_kind: repeat / deepen` 与 `parent_section`；先作答再揭示，`next_step.py` 认得；校验器 `--reviewed` 做反向泄漏检查；`review_of` 多于一门时结课出接缝题；掌握状态加每个概念的 `delayed_successes`。
 - 协议五处：结课第一题改为链重建（只给打乱的概念名，学习者写出关系，`--chain` 比对，反馈只说漏了哪对、哪条反了）；把握改三档（有把握 / 没把握 / 不知道，记 5 / 3 / 1，高把握阈值改为 5）；概念带 `cases` 时先摆两个案例请学习者写共同点再揭示，带 `contrast` 时揭示后点出近邻；前置缺口按 `dependency_kind` 分流（定义进父课 `listed`，机制建课，操作建课但主问题改为做一遍）；第六种追问“重新归类”。设计文档立场改为五条。模板课程升到 1.5 并示范易混对与两个案例。
 - clarify 只处理当前课程：`scan_wikilinks.py` 收到工作区或计划目录时，只扫最近更新过进度的那门课，其他课程只报告 inbox 待处理数；`--course` 指定一门，`--all` 全部。
