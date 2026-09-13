@@ -135,7 +135,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | `attempts`、`lessons[]` | 次数与出现过的课程 |
 | `freshness` | 最近成功是 `delayed / transfer` 且距今 ≤ 7 × 2^(stability − 1) 天（上限 180）为 `fresh`，超过为 `stale`；只有 `immediate` 证据或无成功为 `unknown` |
 | `error_propositions[]` | 状态为 `wrong / partial` 的命题：`{id, text, status, at, lesson_id, section_id}` |
-| `calibration` | `overconfident`：`retry` 或高信心冲突且信心 ≥ 4 的次数；`underconfident`：`mastered` 且信心 ≤ 2 的次数 |
+| `calibration` | `overconfident`：`retry` 或高信心冲突且把握为 5（有把握）的次数；`underconfident`：`mastered` 且把握为 1（不知道）的次数 |
 | `mastery_estimate` | 证据等级权重（`immediate` 0.4、`delayed` 0.7、`transfer` 1.0）× 时效权重（`fresh` 1.0、`stale` 0.5、`unknown` 0.2）。只供可视化着色，不参与任何教学决策 |
 
 时效窗口是刻意简单的规则，不是遗忘模型。
@@ -146,7 +146,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 |---|---|
 | `fringe.outer` | 前沿：自身最近判定不是 `mastered`（或没作答过）、有前置、且每个前置最近判定都是 `mastered` 的概念。前置关系取公开导出里的 `prerequisite_for` 与 `depends_on` 边（`A prerequisite_for B` 与 `B depends_on A` 都表示 A 在 B 之前） |
 | `fringe.suspect`、`fringe.suspect_edges` | 假性掌握：最近判定 `mastered`、但某个前置最近判定是 `partial / retry` 的概念，以及这些边（带 `from_verdict`）。这条边的先后顺序在数据里没有得到支持 |
-| `summary` | `concepts`、`mastered`、`delayed_or_transfer`（证据等级为延迟或迁移的概念数）、`high_confidence_attempts` 与 `overconfident_attempts`（信心 ≥ 4 的作答次数，及其中 `retry` 或高信心冲突的次数）、`suspect`、`outer`。`build` 打印这几个数，不设阈值 |
+| `summary` | `concepts`、`mastered`、`delayed_or_transfer`（证据等级为延迟或迁移的概念数）、`high_confidence_attempts` 与 `overconfident_attempts`（把握为 5 的作答次数，及其中 `retry` 或高信心冲突的次数）、`suspect`、`outer`。`build` 打印这几个数，不设阈值 |
 | `lessons.<id>.chain_rebuild` | 该课最近一次链重建：`at`、`ratio`、`matched`、`reference_edges`、`missing[]`、`direction_reversed[]`（记参考方向）、`wrong_type` 计数 |
 
 汇总到主目录时只合并概念；`fringe`、`summary`、`lessons` 是工作区内的派生物。

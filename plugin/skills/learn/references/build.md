@@ -12,7 +12,7 @@
 - 学习目标：从用户描述和材料主题推断，重点是延迟重建知识结构并迁移到新问题，而不是仅完成摘要；
 - 材料范围：覆盖支撑主线所需的内容，次要细节放入附录；大型代码库先从入口、主流程和关键模块建立范围；
 - 前置检查：`prerequisite_check=auto`；用户明确说缺少前置知识时改为 `always`，明确要求直接学习时改为 `skip`；
-- 外部知识：不用外部知识改写原材料的主张。三种情况可以检索可靠的外部来源补充——建前置课、补骨架课的 `no-anchor` 概念、材料只说"是什么"没说"为什么"的机制；检索到的先按 [references/source-handling.md](source-handling.md) 的"外部存档"存进 `<工作区>/external/`，再从存档引用并标 `external`；检索不可用时明确说，请学习者提供，不伪造；
+- 外部知识：不用外部知识改写原材料的主张。三种情况可以检索可靠的外部来源补充——建前置课、补骨架课的 `no-anchor` 概念、材料只说"是什么"没说"为什么"的机制；检索到的先按 [source-handling.md](source-handling.md) 的"外部存档"存进 `<工作区>/external/`，再从存档引用并标 `external`；检索不可用时明确说，请学习者提供，不伪造；
 - 输出：在可写工作区中为本次材料创建独立课程目录；若同名目录已有进度，优先识别为继续课程，不覆盖原文件；
 - 进度：互动教学且有可写工作区时创建或继续 `learning-progress.json`，保留首次回答和所有修订；
 - 节奏：一次只推进一个 LearningUnit，等学习者回答后再评估和继续。
@@ -25,19 +25,19 @@
 2. 多文件或目录输入且可运行脚本时，执行 `scripts/source_manifest.py <材料…> --base <材料根> --output <课程目录>/sources.json` 建立文件清单、大小、类型和 SHA-256（`base_path` 自动记录材料根相对课程目录的位置）；脚本不会汇总正文，也不会读取敏感文件。
 3. 读取足以支撑课程主线的来源，记录稳定定位：文档用文件+标题/页码，代码用文件+符号/行号，会话用导出文件或 session 标识+轮次。
 4. 报告实际覆盖范围。搜索不到内容只表示“未在已检查范围发现”，不等于材料中不存在。
-5. 需要外部来源时（条件见"低输入自动补全"的外部知识一条）：检索 → 存档到 `<工作区>/external/<集名>_<日期>/` 并写 `_index.md` → 存档目录整个作 `pool` 进覆盖表（`heading: "*"`）→ 从存档文件引用，`support: external`。规则见 [references/source-handling.md](source-handling.md) 的"外部存档"。
+5. 需要外部来源时（条件见"低输入自动补全"的外部知识一条）：检索 → 存档到 `<工作区>/external/<集名>_<日期>/` 并写 `_index.md` → 存档目录整个作 `pool` 进覆盖表（`heading: "*"`）→ 从存档文件引用，`support: external`。规则见 [source-handling.md](source-handling.md) 的"外部存档"。
 
-处理不同来源时读取 [references/source-handling.md](source-handling.md)。
+处理不同来源时读取 [source-handling.md](source-handling.md)。
 
 ## 2. 检查并补足前置知识
 
-**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[references/protocol/probe.md](protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[protocol/probe.md](protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
 3. 根据学习者的原始回答判断当前材料所需的概念生成、边界、关系和应用证据，不扩大为一般能力画像；
 4. 有任何 `fragile | gap | misconception` 的簇，就为它们建**一门前置课**（[prerequisite/course.md](prerequisite/course.md)）：外部存档作来源、`schema 1.4`、模式跟随本课、大纲照常确认、逐节教学与记录；本课在当前节 `learning_state.py block`；
-5. 前置课结课后回程（[references/prerequisite/return.md](prerequisite/return.md)）：`unblock`、对被卡簇出变式题，再从被卡的节继续。
+5. 前置课结课后回程（[prerequisite/return.md](prerequisite/return.md)）：`unblock`、对被卡簇出变式题，再从被卡的节继续。
 
 小缺口也建课，不再生成补充文档。前置课自己暴露缺口时同一协议递归；`learning-plan.md` 的"前置栈"随时可见。在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
 
@@ -72,12 +72,12 @@
 
 没有文件工作区时，在对话中提供同等内容，并在当前会话维护进度。使用 [assets/outline-template.md](../assets/outline-template.md)、[assets/units-template/s01.md](../assets/units-template/s01.md) 与 [assets/lesson-plan-template.json](../assets/lesson-plan-template.json) 作为起点。
 
-生成前读取 [references/lesson-contract.md](lesson-contract.md)。前置产物运行 `scripts/validate_prerequisites.py`。用户开启了知识库目录时，校验通过后再运行 `scripts/mrg_export.py --store <目录>` 导出分层参考图并 `index_match.py register`。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
+生成前读取 [lesson-contract.md](lesson-contract.md)。前置产物运行 `scripts/validate_prerequisites.py`。用户开启了知识库目录时，校验通过后再运行 `scripts/mrg_export.py --store <目录>` 导出分层参考图并 `index_match.py register`。若创建进度文件，分别使用 `scripts/prerequisite_state.py init` 和 `scripts/learning_state.py init`，不要手写覆盖已有尝试。
 
 ## 5. 大纲与 unit 文档质量要求
 
 - `outline.md`：学习目标与模式、材料范围、总体问题、系统地图、问题链（每 unit 一行问题 → 方案）、**全部概念按 unit 与角色列出**、覆盖账本摘要、使用说明。不含任何 unit 的机制、意义、代价、criteria、principle。
-- `units/<id>.md`：围绕一个可解释步骤，至少包含：当前问题、解决方案、工作机制、它引出的新问题、本节概念（core / supporting / listed 三块都可见）、来源定位和学习者检查点。`supporting` 概念各有一段"它在本节机制里的位置"，不附"想验收它就说……"的提醒（只在 outline 使用说明里写一次）；`listed` 只有名 + 一句 + 定位，**不讲机制**。**意义、代价与设计思想不进文档**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
+- `units/<id>.md`：围绕一个可解释步骤，至少包含：当前问题、（core 概念带 `cases` 时）两个案例并列并请学习者先写共同点、解决方案、工作机制、它引出的新问题、本节概念（core / supporting / listed 三块都可见）、来源定位和学习者检查点。`supporting` 概念各有一段"它在本节机制里的位置"，不附"想验收它就说……"的提醒（只在 outline 使用说明里写一次）；`listed` 只有名 + 一句 + 定位，**不讲机制**。**意义、代价与设计思想不进文档**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
 - "新问题"应自然引出下一 unit；最后一个 unit 可转为未决问题、边界或迁移挑战。
 - 来源定位靠近相关结论。外部知识必须单独标记，不得用来填补材料缺口而不说明。
 - 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题。

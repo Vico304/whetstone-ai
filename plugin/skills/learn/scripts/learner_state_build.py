@@ -53,7 +53,7 @@ TRANSFER_KINDS = {"transfer", "final"}
 DELAYED_MIN_HOURS = 8  # together with a local day boundary: "a night in between"
 PREREQUISITE_EDGE_TYPES = {"prerequisite_for", "depends_on"}  # public-layer edges that order learning
 WEAK_VERDICTS = {"partial", "retry"}
-HIGH_CONFIDENCE = 4
+HIGH_CONFIDENCE = 5  # the learner said 有把握 (5); 没把握 is 3, 不知道 is 1
 
 
 def parse_time(value: str) -> datetime:
