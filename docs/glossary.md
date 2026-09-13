@@ -23,6 +23,8 @@
 | 掌握状态 | `learner-state.json` | 从学习记录派生的每个概念的状态：证据强弱、时效、到达过的层、错误说法、信心校准 |
 | 外部资料存档 | 外部存档；`<工作区>/external/<集名>_<日期>/` | 模型检索来的资料先存成材料集再引用；引用标 `external` |
 | 前置课、前置栈 | 前置课（`prerequisite_of / blocked_at / depth`，schema 1.4）；前置栈（`learning-plan.md` §3a） | 为父课的缺口建的一门普通课，父课在被卡的节等它；栈记录每一层与回程 |
+| 下一步清单、假性掌握 | `fringe.outer / fringe.suspect`（`learner-state.json`） | 由前置关系和掌握状态算出：前置都已掌握而自身未掌握的概念，是下一步；自身已掌握而某个前置薄弱的概念，是假性掌握 |
+| 链重建 | `comparator.py --chain`、事件的 `chain`、`lessons.<id>.chain_rebuild` | 学习者说出概念之间的关系，与参考图的关系集逐条比对；对上的边占参考边的比例是链重建比例 |
 
 规则：
 

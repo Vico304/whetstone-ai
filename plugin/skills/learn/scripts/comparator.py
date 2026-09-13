@@ -14,6 +14,9 @@ Output categories (docs/specs/knowledge-store.md §5.1):
   representation_only  correct, differently worded → not reported
   beyond_reference     concept or relation the reference does not have → recorded, not judged
   unresolved_refs      names the script could not map to a concept id
+
+`compare_relations` is the whole-lesson entry (chain rebuild at the end of a course): the
+relations the learner asserted, as a set, against the public reference edges, as a set.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from typing import Any
 
 
 STRONG_SUPPORT = {"explicit", "entailed", "external"}
+SYMMETRIC_TYPES = {"contrasts_with"}
 CONCEPT_STATUSES = {"correct", "partial", "wrong", "missing"}
 RELATION_STATUSES = {"correct", "direction_reversed", "wrong_type", "missing", "extra"}
 PROPOSITION_STATUSES = {"correct", "partial", "wrong", "representation_only"}
@@ -52,7 +56,8 @@ class Reference:
         self.nodes: dict[str, dict] = {}
         for node in public.get("nodes", []) + deep.get("nodes", []):
             self.nodes[node["id"]] = node
-        self.edges: list[dict] = list(public.get("edges", [])) + list(deep.get("edges", []))
+        self.public_edges: list[dict] = list(public.get("edges", []))
+        self.edges: list[dict] = self.public_edges + list(deep.get("edges", []))
         self.sections = {section["id"]: section for section in public.get("sections", [])}
         self.lookup: dict[str, str] = {}
         for node in self.nodes.values():
@@ -190,6 +195,53 @@ def compare(reference: Reference, section_id: str, extraction: dict) -> dict:
             "feedback_priority": feedback_priority(diff)}
 
 
+def compare_relations(reference: Reference, asserted: list[dict]) -> dict:
+    """Relation set against relation set, over the public edges of the whole lesson.
+
+    Each asserted relation is {from, to, type}; any `status` is ignored — the matching is done here.
+    A reference edge is matched at most once. Deep-layer edges are not in the denominator: a learner
+    relation that only matches one of them is recorded as beyond_reference, not judged."""
+    result: dict[str, list] = {"matched": [], "direction_reversed": [], "wrong_type": [], "beyond_reference": [], "missing": [],
+                               "unresolved_refs": []}
+    used: set[int] = set()
+    for item in asserted or []:
+        if not isinstance(item, dict):
+            raise ValueError(f"relation must be an object: {item}")
+        a, b = reference.resolve(item.get("from")), reference.resolve(item.get("to"))
+        record = {"from": a or item.get("from"), "to": b or item.get("to"), "type": item.get("type")}
+        if a is None or b is None:
+            result["beyond_reference"].append(record)
+            result["unresolved_refs"].extend(r for r in (item.get("from"), item.get("to")) if reference.resolve(r) is None)
+            continue
+        candidates = [(i, e) for i, e in enumerate(reference.public_edges)
+                      if i not in used and {e.get("from"), e.get("to")} == {a, b}]
+        exact = [(i, e) for i, e in candidates if e.get("type") == item.get("type")
+                 and ((e.get("from"), e.get("to")) == (a, b) or e.get("type") in SYMMETRIC_TYPES)]
+        reversed_ = [(i, e) for i, e in candidates if e.get("type") == item.get("type") and (i, e) not in exact]
+        if exact:
+            i, e = exact[0]
+            used.add(i)
+            result["matched"].append(dict(record, id=e.get("id")))
+        elif reversed_:
+            i, e = reversed_[0]
+            used.add(i)
+            result["direction_reversed"].append(dict(record, id=e.get("id"), reference_from=e.get("from"), reference_to=e.get("to")))
+        elif candidates:
+            i, e = candidates[0]
+            used.add(i)
+            result["wrong_type"].append(dict(record, id=e.get("id"), reference_type=e.get("type")))
+        else:
+            result["beyond_reference"].append(record)
+    for i, e in enumerate(reference.public_edges):
+        if i not in used:
+            result["missing"].append({"id": e.get("id"), "from": e.get("from"), "to": e.get("to"), "type": e.get("type")})
+    result["unresolved_refs"] = sorted({r for r in result["unresolved_refs"] if isinstance(r, str)})
+    total = len(reference.public_edges)
+    result["reference_edges"] = total
+    result["ratio"] = round(len(result["matched"]) / total, 3) if total else None
+    return result
+
+
 def feedback_priority(diff: dict) -> list[str]:
     """Ordered list of what to address first (tutoring protocol: one thing at a time)."""
     order: list[str] = []
@@ -225,10 +277,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--lesson-id", required=True)
-    parser.add_argument("--section-id", required=True)
+    parser.add_argument("--section-id", help="Section to diagnose (required unless --chain)")
     parser.add_argument("--extraction", type=Path, required=True, help="Model extraction JSON (assets/extraction-template.json)")
+    parser.add_argument("--chain", action="store_true", help="Whole-lesson relation set against the public reference edges (chain rebuild)")
     parser.add_argument("--output", type=Path, help="Write the diff here instead of stdout")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.chain and not args.section_id:
+        parser.error("--section-id is required unless --chain")
+    return args
 
 
 def main() -> int:
@@ -238,7 +294,8 @@ def main() -> int:
         extraction = load_json(args.extraction)
         if not isinstance(extraction, dict):
             raise ValueError("extraction root must be an object")
-        result = compare(reference, args.section_id, extraction)
+        result = compare_relations(reference, extraction.get("relations") or []) if args.chain \
+            else compare(reference, args.section_id, extraction)
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

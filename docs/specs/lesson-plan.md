@@ -72,7 +72,7 @@
 
 ## 5. `relations[]`
 
-每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。
+每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。校验器打印 `INFO: orphan concepts a/b`——没有出现在任何关系里的核心概念数，不设阈值；链重建对不到这些概念。
 
 ## 6. 判定标准
 

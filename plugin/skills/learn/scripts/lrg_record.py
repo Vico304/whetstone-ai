@@ -177,8 +177,13 @@ def command_append(args: argparse.Namespace) -> int:
     criteria_met = [c.strip() for chunk in (args.criteria_met or []) for c in chunk.split(",") if c.strip()]
 
     extraction = json.loads(args.extraction.read_text(encoding="utf-8")) if args.extraction else None
-    comparison = None
-    if extraction is not None and not args.no_compare:
+    comparison = chain = None
+    if args.chain:
+        if args.kind != "final" or extraction is None:
+            raise ValueError("--chain is the end-of-course chain rebuild: it needs --kind final and --extraction")
+        reference = comparator.load_reference(args.store, args.lesson_id)
+        chain = comparator.compare_relations(reference, extraction.get("relations") or [])
+    elif extraction is not None and not args.no_compare:
         reference = comparator.load_reference(args.store, args.lesson_id)
         comparison = comparator.compare(reference, args.section_id, extraction)
 
@@ -220,8 +225,13 @@ def command_append(args: argparse.Namespace) -> int:
         elapsed_seconds=elapsed_seconds, rigor=rigor, target_concept_ids=args.concept,
         elapsed_source=elapsed_source, at=args.at,
     )
+    if chain is not None:
+        event["chain"] = chain
     append_event(args.store, args.lesson_id, event)
     summary = f"OK: appended {args.kind} attempt #{attempt_number} for {args.lesson_id}/{args.section_id}"
+    if chain is not None:
+        summary += (f" (chain rebuild {len(chain['matched'])}/{chain['reference_edges']} edges; "
+                    f"{len(chain['missing'])} missing, {len(chain['direction_reversed'])} reversed, {len(chain['wrong_type'])} wrong type)")
     if elapsed_seconds is not None:
         summary += f" (elapsed {elapsed_seconds}s from {elapsed_source})"
     if comparison is not None:
@@ -243,6 +253,10 @@ def command_show(args: argparse.Namespace) -> int:
         verdicts = ",".join(e["verdict"] for e in items)
         conflicts = sum(len(e.get("diff", {}).get("conflict", [])) for e in items)
         print(f"- {section_id}: {len(items)} attempts [{kinds}] verdicts {verdicts} | depth {depths} | conflicts {conflicts}")
+    chains = [e for e in attempts if isinstance(e.get("chain"), dict)]
+    if chains:
+        last = chains[-1]["chain"]
+        print(f"chain rebuild: {len(last.get('matched') or [])}/{last.get('reference_edges')} edges at {chains[-1].get('at')}")
     return 0
 
 
@@ -262,6 +276,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--depth", choices=learning_state.DEPTHS)
     p.add_argument("--extraction", type=Path, help="Model extraction JSON; triggers the comparator")
     p.add_argument("--no-compare", action="store_true", help="Store the extraction without running the comparator")
+    p.add_argument("--chain", action="store_true", help="End-of-course chain rebuild: compare extraction.relations as a set against the reference edges (--kind final)")
     p.add_argument("--progress", type=Path, help="learning-progress.json to mirror the attempt into")
     p.add_argument("--elapsed-seconds", type=int, help="Your own measurement of this section step; default: seconds since the lesson's previous record (max 3 h)")
     p.add_argument("--rigor", choices=RIGORS, help="full|fast; defaults to the progress file's mode, else full")

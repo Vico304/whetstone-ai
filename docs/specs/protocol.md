@@ -68,7 +68,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **记录**：每次产生 verdict 都记录。不开知识库：`learning_state.py record --state … --section-id … --response-file … --verdict … [--confidence] [--criteria-met c1,c3] [--depth …]`，只追加，不覆盖首次回答。开知识库：`lrg_record.py append`（字段见 [knowledge-store.md](knowledge-store.md) §4）。两个命令都拒绝同一节里回答原文相同的记录（`--force` 才追加），回填用 `--at`；每节用时由脚本按与上一条记录的间隔算。
 
-**resume**：先不进未完成的节。从已完成的节里选一个概念出一道变式题——换情境或换角度考同一机制，禁止复用原 `checkpoint` 措辞；作答记 `record --review`（知识库：`--kind review`），当前位置不变；变式失败的节回到 `in_progress`，在后续节完成后再重做。开启知识库时可改从 `review_pool.py` 取一条匿名命题："有一种说法是「…」。这个说法哪里有问题？"——不说是学习者自己说的，不引用原文，纠正在同一轮给出。然后一两句重建上下文，进入未完成节的 READY。
+**resume**：先不进未完成的节。从已完成的节里选一个概念出一道变式题——换情境或换角度考同一机制，禁止复用原 `checkpoint` 措辞；作答记 `record --review`（知识库：`--kind review`），当前位置不变；变式失败的节回到 `in_progress`，在后续节完成后再重做。开启知识库时先 `learner_state_build.py build`，再按 `review_pool.py` 给出的顺序取题：假性掌握的概念 → 匿名命题（"有一种说法是「…」。这个说法哪里有问题？"——不说是学习者自己说的，不引用原文，纠正在同一轮给出）→ 链重建漏掉的边（"X 和 Y 之间是什么关系"）→ 过期的概念。然后一两句重建上下文，进入未完成节的 READY。
 
 **探测轮**（骨架课）：见 [domain-skeleton.md](domain-skeleton.md) §5。
 

@@ -306,6 +306,17 @@ class LessonValidationTests(unittest.TestCase):
             self.assertTrue(any("deferred" in w for w in warnings))
 
 
+class OrphanConceptTests(unittest.TestCase):
+    def test_orphan_core_concepts_are_counted_not_rejected(self):
+        plan = load_template()
+        self.assertEqual(validate_lesson.orphan_concepts(plan), {"orphans": [], "total": 2})
+        plan["sections"][0]["concepts"].append({"id": "learning-design.lonely", "name": "孤概念", "explanation": "没有关系的核心概念",
+                                                "layer": "mechanism", "role": "core", "domain_path": ["学习设计"],
+                                                "source_refs": plan["sections"][0]["source_refs"]})
+        self.assertEqual(validate_lesson.orphan_concepts(plan)["orphans"], ["learning-design.lonely"])
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+
+
 class LearningStateTests(unittest.TestCase):
     def test_attempts_are_appended_without_losing_history(self):
         plan_path = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
@@ -685,6 +696,99 @@ class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
         with self.assertRaises(ValueError):
             learner_state_build.parse_offset("Asia/Shanghai")
 
+    def test_fringe_and_summary_come_from_prerequisite_edges_and_latest_verdicts(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            a, b, c = "chain.a", "chain.b", "chain.c"
+            mrg_export.write_json(store / "mrg" / "chain-lesson.json", {
+                "lesson_id": "chain-lesson", "layers": ["fact", "mechanism"],
+                "sections": [{"id": s, "concept_ids": [cid]} for s, cid in (("s01", a), ("s02", b), ("s03", c))],
+                "nodes": [{"id": cid, "name": cid, "layer": "mechanism"} for cid in (a, b, c)],
+                "edges": [{"id": "e1", "from": a, "to": b, "type": "prerequisite_for", "layer": "mechanism"},
+                          {"id": "e2", "from": c, "to": b, "type": "depends_on", "layer": "mechanism"},
+                          {"id": "e3", "from": a, "to": c, "type": "contrasts_with", "layer": "mechanism"}],
+            })
+
+            def attempt(at, section, verdict, confidence=None):
+                event = lrg_record.build_event(
+                    lesson_id="chain-lesson", section_id=section, kind="checkpoint", attempt_number=1, response="r", feedback="",
+                    verdict=verdict, confidence=confidence, criteria_met=[], depth_reached="mechanism", extraction=None,
+                    comparison=None, elapsed_seconds=None)
+                event["at"] = at
+                lrg_record.append_event(store, "chain-lesson", event)
+
+            attempt("2026-09-01T10:00:00Z", "s01", "mastered", confidence=5)
+            attempt("2026-09-01T10:30:00Z", "s01", "retry", confidence=5)      # a ends weak, and overconfident
+            attempt("2026-09-01T11:00:00Z", "s02", "mastered", confidence=3)   # b mastered on top of weak a
+            state = learner_state_build.build(store, now=datetime(2026, 9, 2, tzinfo=timezone.utc), tz=timezone.utc)
+            fringe = state["fringe"]
+            self.assertEqual(fringe["suspect"], [{"id": b, "weak_prerequisites": [a]}])
+            self.assertEqual(fringe["suspect_edges"], [{"from": a, "to": b, "type": "prerequisite_for", "lesson_id": "chain-lesson", "from_verdict": "retry"}])
+            self.assertEqual(fringe["outer"], [{"id": c, "status": "untested", "prerequisites": [b]}])  # b mastered, c untested
+            summary = state["summary"]
+            self.assertEqual((summary["mastered"], summary["suspect"], summary["outer"]), (1, 1, 1))
+            self.assertEqual((summary["overconfident_attempts"], summary["high_confidence_attempts"]), (1, 2))
+            self.assertEqual(summary["delayed_or_transfer"], 0)
+            self.assertEqual(learner_state_build.concept_status(None), "untested")
+            # once a is mastered again nothing is suspect; b stays mastered so c is still next
+            attempt("2026-09-01T12:00:00Z", "s01", "mastered")
+            state = learner_state_build.build(store, now=datetime(2026, 9, 2, tzinfo=timezone.utc), tz=timezone.utc)
+            self.assertEqual(state["fringe"]["suspect"], [])
+            self.assertEqual([o["id"] for o in state["fringe"]["outer"]], [c])
+            pools = review_pool.suspect_pool(state, "chain-lesson", 5)
+            self.assertEqual(pools, [])
+            self.assertEqual(review_pool.stale_pool(state, None, 5), [])
+
+    def test_chain_rebuild_compares_relation_sets_and_feeds_state_and_review_pool(self):
+        import argparse, io, contextlib
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            store = self._store(root)
+            reference = comparator.load_reference(store, "sample-guided-lesson")
+            boundary, macro = "learning-design.system-boundary", "learning-design.macro-map"
+            exact = comparator.compare_relations(reference, [{"from": "系统边界", "to": "宏观地图", "type": "depends_on"}])
+            self.assertEqual((exact["ratio"], exact["reference_edges"], exact["matched"][0]["id"]), (1.0, 1, "r01"))
+            self.assertEqual(exact["missing"], [])
+            reversed_ = comparator.compare_relations(reference, [{"from": macro, "to": boundary, "type": "depends_on"}])
+            self.assertEqual((reversed_["ratio"], len(reversed_["direction_reversed"])), (0.0, 1))
+            wrong = comparator.compare_relations(reference, [{"from": boundary, "to": macro, "type": "causes"},
+                                                             {"from": boundary, "to": "未知概念", "type": "enables"}])
+            self.assertEqual(wrong["wrong_type"][0]["reference_type"], "depends_on")
+            self.assertEqual((len(wrong["beyond_reference"]), wrong["unresolved_refs"]), (1, ["未知概念"]))
+            empty = comparator.compare_relations(reference, [])
+            self.assertEqual((empty["ratio"], [m["id"] for m in empty["missing"]]), (0.0, ["r01"]))
+            with self.assertRaises(ValueError):
+                comparator.compare_relations(reference, ["not an object"])
+
+            (root / "final.txt").write_text("整体重述", encoding="utf-8")
+            (root / "chain.json").write_text(json.dumps({"extracted_by": "model", "concepts": [], "propositions": [],
+                                                         "relations": [{"from": macro, "to": boundary, "type": "depends_on"}]}), encoding="utf-8")
+            args = dict(store=store, lesson_id="sample-guided-lesson", section_id="s01", kind="final", response_file=root / "final.txt",
+                        feedback_file=None, verdict="partial", confidence=None, criteria_met=None, depth=None, extraction=root / "chain.json",
+                        no_compare=False, progress=None, elapsed_seconds=None, rigor=None, concept=None, at="2026-09-05T10:00:00+08:00",
+                        force=False, chain=True)
+            with contextlib.redirect_stdout(io.StringIO()):
+                lrg_record.command_append(argparse.Namespace(**args))
+            with self.assertRaises(ValueError):
+                lrg_record.command_append(argparse.Namespace(**dict(args, kind="checkpoint")))
+            event = lrg_record.read_events(store, "sample-guided-lesson")[-1]
+            self.assertEqual((event["chain"]["ratio"], len(event["chain"]["direction_reversed"])), (0.0, 1))
+            self.assertNotIn("diff", event)
+            state = learner_state_build.build(store, now=datetime(2026, 9, 6, tzinfo=timezone.utc), tz=timezone.utc)
+            rebuild = state["lessons"]["sample-guided-lesson"]["chain_rebuild"]
+            self.assertEqual((rebuild["ratio"], rebuild["matched"], rebuild["reference_edges"], rebuild["missing"]), (0.0, 0, 1, []))
+            self.assertEqual(rebuild["direction_reversed"], [{"from": boundary, "to": macro, "type": "depends_on"}])  # the reference direction
+            edges = review_pool.missing_edges(state, "sample-guided-lesson", 5)
+            self.assertEqual((edges[0]["lesson_id"], edges[0]["status"]), ("sample-guided-lesson", "direction_reversed"))
+            self.assertEqual(review_pool.missing_edges(state, "other", 5), [])
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                lrg_record.command_show(argparse.Namespace(store=store, lesson_id="sample-guided-lesson"))
+            self.assertIn("chain rebuild: 0/1", buffer.getvalue())
+            self.assertNotIn("整体重述", buffer.getvalue())
+
     def test_lrg_append_measures_elapsed_backfills_and_refuses_duplicates(self):
         import argparse, io, contextlib
         with tempfile.TemporaryDirectory() as temporary:
@@ -696,7 +800,8 @@ class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
             def append(response, kind="checkpoint", **overrides):
                 args = dict(store=store, lesson_id="sample-guided-lesson", section_id="s01", kind=kind, response_file=root / response,
                             feedback_file=None, verdict="partial", confidence=None, criteria_met=None, depth=None, extraction=None,
-                            no_compare=False, progress=None, elapsed_seconds=None, rigor=None, concept=None, at=None, force=False)
+                            no_compare=False, progress=None, elapsed_seconds=None, rigor=None, concept=None, at=None, force=False,
+                            chain=False)
                 args.update(overrides)
                 with contextlib.redirect_stdout(io.StringIO()):
                     lrg_record.command_append(argparse.Namespace(**args))
