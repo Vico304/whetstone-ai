@@ -5,6 +5,11 @@ mirror it into the lesson pack's learning-progress.json in the same command.
 The log is append-only and is never shown to the learner. `show` prints counts and
 layers only; it never prints response text. The raw response stays in the log so the
 system can later derive de-personalised propositions — it must not be quoted back.
+
+Events carry `kind` (what was asked) but no evidence tier: the tier is derived per
+concept from the interval since its previous record when learner-state.json is built.
+`elapsed_seconds` is measured from the previous event of the same lesson unless the
+caller passes its own measurement.
 """
 
 from __future__ import annotations
@@ -22,9 +27,8 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 KINDS = ("checkpoint", "supporting", "probe", "diagnostic", "review", "variant", "transfer", "bridge", "final")
 RIGORS = ("full", "fast")
-IMMEDIATE_KINDS = {"checkpoint", "supporting", "probe", "diagnostic", "bridge"}
-DELAYED_KINDS = {"review", "variant"}
-TRANSFER_KINDS = {"transfer", "final"}
+ELAPSED_SOURCES = ("log", "model")
+ELAPSED_CAP_SECONDS = 3 * 3600  # a longer gap is a break, not the time spent on the section
 
 
 def _load(name: str):
@@ -44,12 +48,32 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def evidence_tier(kind: str) -> str:
-    if kind in TRANSFER_KINDS:
-        return "transfer"
-    if kind in DELAYED_KINDS:
-        return "delayed"
-    return "immediate"
+normalize_time = learning_state.normalize_time  # ISO 8601 with offset -> UTC 'Z', so log lines sort as strings
+
+
+def previous_event(events: list[dict], at: str) -> dict | None:
+    """The latest attempt recorded before `at` in this lesson's log."""
+    earlier = [e for e in events if e.get("event") == "attempt" and (e.get("at") or "") < at]
+    return max(earlier, key=lambda e: e["at"]) if earlier else None
+
+
+def elapsed_from_log(events: list[dict], at: str) -> int | None:
+    """Seconds since the previous attempt of the lesson, or None when there is none or the gap exceeds the cap."""
+    previous = previous_event(events, at)
+    if previous is None:
+        return None
+    seconds = int((datetime.fromisoformat(at.replace("Z", "+00:00")) - datetime.fromisoformat(previous["at"].replace("Z", "+00:00"))).total_seconds())
+    return seconds if 0 <= seconds <= ELAPSED_CAP_SECONDS else None
+
+
+def find_duplicate(events: list[dict], section_id: str, kind: str, response: str) -> dict | None:
+    """An earlier attempt with the same section, kind and response text — almost always a double record."""
+    wanted = response.strip()
+    for event in events:
+        if event.get("event") == "attempt" and event.get("section_id") == section_id and event.get("kind") == kind \
+                and (event.get("response") or "").strip() == wanted:
+            return event
+    return None
 
 
 def log_path(store: Path, lesson_id: str) -> Path:
@@ -94,6 +118,8 @@ def build_event(
     elapsed_seconds: int | None,
     rigor: str = "full",
     target_concept_ids: list[str] | None = None,
+    elapsed_source: str | None = None,
+    at: str | None = None,
 ) -> dict:
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {list(KINDS)}")
@@ -109,14 +135,17 @@ def build_event(
         raise ValueError("confidence must be between 1 and 5")
     if extraction is not None and extraction.get("extracted_by") not in {"model", "learner"}:
         raise ValueError("extraction.extracted_by must be 'model' or 'learner'")
+    if elapsed_seconds is not None and elapsed_seconds < 0:
+        raise ValueError("elapsed_seconds must not be negative")
+    if elapsed_source is not None and elapsed_source not in ELAPSED_SOURCES:
+        raise ValueError(f"elapsed_source must be one of {list(ELAPSED_SOURCES)}")
     event: dict[str, Any] = {
-        "at": utc_now(),
+        "at": normalize_time(at) if at else utc_now(),
         "event": "attempt",
         "lesson_id": lesson_id,
         "section_id": section_id,
         "kind": kind,
         "rigor": rigor,
-        "evidence_tier": evidence_tier(kind),
         "attempt_number": attempt_number,
         "confidence": confidence,
         "verdict": verdict,
@@ -125,10 +154,13 @@ def build_event(
         "response": response,
         "feedback": feedback,
     }
+    if at:
+        event["recorded_at"] = utc_now()  # backfilled: `at` is the learner's time, this is when it was written
     if target_concept_ids:
         event["target_concept_ids"] = list(target_concept_ids)
     if elapsed_seconds is not None:
         event["elapsed_seconds"] = elapsed_seconds
+        event["elapsed_source"] = elapsed_source or "model"
     if extraction is not None:
         event["extraction"] = extraction
     if comparison is not None:
@@ -150,6 +182,16 @@ def command_append(args: argparse.Namespace) -> int:
         reference = comparator.load_reference(args.store, args.lesson_id)
         comparison = comparator.compare(reference, args.section_id, extraction)
 
+    events = read_events(args.store, args.lesson_id)
+    duplicate = find_duplicate(events, args.section_id, args.kind, response)
+    if duplicate is not None and not args.force:
+        raise ValueError(f"an identical {args.kind} response for {args.section_id} is already recorded "
+                         f"(attempt #{duplicate.get('attempt_number')} at {duplicate.get('at')}); pass --force to append anyway")
+    at = normalize_time(args.at) if args.at else utc_now()
+    elapsed_seconds, elapsed_source = args.elapsed_seconds, "model"
+    if elapsed_seconds is None:
+        elapsed_seconds, elapsed_source = elapsed_from_log(events, at), "log"
+
     rigor = args.rigor
     attempt_number = None
     if args.progress:
@@ -162,25 +204,26 @@ def command_append(args: argparse.Namespace) -> int:
             learning_state.append_attempt(
                 state, args.section_id, response, feedback, args.verdict, args.confidence,
                 review=(args.kind == "review"), criteria_met=criteria_met, depth_reached=args.depth,
+                at=at, force=args.force,
             )
             attempt_number = learning_state.find_section(state, args.section_id)["attempts"][-1]["attempt_number"]
             learning_state.atomic_write(args.progress, state)
     if rigor is None:
         rigor = "full"
     if attempt_number is None:
-        attempt_number = 1 + sum(
-            1 for e in read_events(args.store, args.lesson_id)
-            if e.get("event") == "attempt" and e.get("section_id") == args.section_id
-        )
+        attempt_number = 1 + sum(1 for e in events if e.get("event") == "attempt" and e.get("section_id") == args.section_id)
 
     event = build_event(
         lesson_id=args.lesson_id, section_id=args.section_id, kind=args.kind, attempt_number=attempt_number,
         response=response, feedback=feedback, verdict=args.verdict, confidence=args.confidence,
         criteria_met=criteria_met, depth_reached=args.depth, extraction=extraction, comparison=comparison,
-        elapsed_seconds=args.elapsed_seconds, rigor=rigor, target_concept_ids=args.concept,
+        elapsed_seconds=elapsed_seconds, rigor=rigor, target_concept_ids=args.concept,
+        elapsed_source=elapsed_source, at=args.at,
     )
     append_event(args.store, args.lesson_id, event)
     summary = f"OK: appended {args.kind} attempt #{attempt_number} for {args.lesson_id}/{args.section_id}"
+    if elapsed_seconds is not None:
+        summary += f" (elapsed {elapsed_seconds}s from {elapsed_source})"
     if comparison is not None:
         summary += f" (feedback priority: {', '.join(comparison['feedback_priority']) or 'none'})"
     print(summary)
@@ -220,9 +263,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--extraction", type=Path, help="Model extraction JSON; triggers the comparator")
     p.add_argument("--no-compare", action="store_true", help="Store the extraction without running the comparator")
     p.add_argument("--progress", type=Path, help="learning-progress.json to mirror the attempt into")
-    p.add_argument("--elapsed-seconds", type=int, help="Wall-clock time for this section step (interaction-cost metric)")
+    p.add_argument("--elapsed-seconds", type=int, help="Your own measurement of this section step; default: seconds since the lesson's previous record (max 3 h)")
     p.add_argument("--rigor", choices=RIGORS, help="full|fast; defaults to the progress file's mode, else full")
     p.add_argument("--concept", action="append", metavar="ID", help="Target concept id(s); required for --kind supporting")
+    p.add_argument("--at", metavar="TIME", help="Backfill: when the attempt really happened (ISO 8601 with offset); recorded_at keeps the write time")
+    p.add_argument("--force", action="store_true", help="Append even if an identical response for this section and kind exists")
     p.set_defaults(handler=command_append)
     s = sub.add_parser("show", help="Counts and layers only; never prints responses")
     s.add_argument("--store", type=Path, required=True)

@@ -321,6 +321,18 @@ class LearningStateTests(unittest.TestCase):
         self.assertEqual(state["status"], "completed")
         self.assertIsNone(state["current_section_id"])
 
+    def test_identical_responses_are_refused_and_backfill_keeps_the_learner_time(self):
+        state = learning_state.create_state(load_template())
+        learning_state.append_attempt(state, "s01", "同一段回答", "", "partial", 3, at="2026-09-12T20:00:00+08:00")
+        self.assertEqual(state["sections"][0]["attempts"][0]["at"], "2026-09-12T12:00:00Z")
+        with self.assertRaises(ValueError):
+            learning_state.append_attempt(state, "s01", "同一段回答 ", "", "partial", 3)  # same text, whitespace aside
+        learning_state.append_attempt(state, "s01", "同一段回答", "", "mastered", 3, review=True)  # a review may repeat it
+        learning_state.append_attempt(state, "s01", "同一段回答", "", "mastered", 3, force=True)
+        self.assertEqual(len(state["sections"][0]["attempts"]), 3)
+        with self.assertRaises(ValueError):
+            learning_state.append_attempt(state, "s02", "x", "", "partial", None, at="2026-09-12T20:00")  # no offset
+
     def test_criteria_met_and_depth_are_persisted_and_validated(self):
         state = learning_state.create_state(load_template())
         learning_state.append_attempt(state, "s01", "a", "", "partial", 3, criteria_met=["c1", " c2 "], depth_reached="mechanism")
@@ -529,10 +541,9 @@ class KnowledgeStoreTests(unittest.TestCase):
                 lrg_record.append_event(store, "sample-guided-lesson", event)
             events = lrg_record.read_events(store, "sample-guided-lesson")
             self.assertEqual([e["attempt_number"] for e in events], [1, 2])
-            self.assertEqual(events[0]["evidence_tier"], "immediate")
+            self.assertNotIn("evidence_tier", events[0])  # derived per concept at build time, not stored per event
+            self.assertEqual((events[0]["elapsed_seconds"], events[0]["elapsed_source"]), (120, "model"))
             self.assertEqual(events[0]["diff"]["missing"], ["learning-design.system-boundary"])
-            self.assertEqual(lrg_record.evidence_tier("review"), "delayed")
-            self.assertEqual(lrg_record.evidence_tier("transfer"), "transfer")
             with self.assertRaises(ValueError):
                 lrg_record.build_event(lesson_id="l", section_id="s", kind="quiz", attempt_number=1, response="", feedback="",
                                        verdict="partial", confidence=None, criteria_met=[], depth_reached=None,
@@ -638,6 +649,80 @@ class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
             self.assertAlmostEqual(macro["mastery_estimate"], 0.08)
             self.assertEqual(learner_state_build.freshness_window(1).days, 7)
             self.assertEqual(learner_state_build.freshness_window(4).days, 56)
+
+    def test_evidence_tier_comes_from_the_interval_not_the_kind(self):
+        from datetime import datetime, timedelta, timezone
+        utc, cst = timezone.utc, timezone(timedelta(hours=8))
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            self._append(store, "2026-09-12T12:00:00Z", "checkpoint", "mastered", depth="mechanism")
+            self._append(store, "2026-09-12T12:30:00Z", "review", "mastered", depth="mechanism")   # same sitting
+            self._append(store, "2026-09-12T12:40:00Z", "final", "mastered", depth="mechanism")    # same sitting
+            state = learner_state_build.build(store, now=datetime(2026, 9, 13, tzinfo=utc), tz=cst)
+            macro = state["concepts"]["learning-design.macro-map"]
+            self.assertEqual((macro["evidence_tier"], macro["freshness"]), ("immediate", "unknown"))
+            self.assertEqual(macro["stability"], 1)
+            # 20 h 51 min later: an earlier local day (Sept 12 evening -> Sept 13 afternoon in UTC+8) and > 8 h
+            self._append(store, "2026-09-13T09:16:00Z", "variant", "mastered", depth="mechanism")
+            state = learner_state_build.build(store, now=datetime(2026, 9, 13, 10, tzinfo=utc), tz=cst)
+            macro = state["concepts"]["learning-design.macro-map"]
+            self.assertEqual((macro["evidence_tier"], macro["freshness"], macro["stability"]), ("delayed", "fresh", 2))
+            # a transfer question after a real interval counts as transfer; a checkpoint never does
+            self._append(store, "2026-09-15T09:00:00Z", "transfer", "mastered", depth="rationale")
+            state = learner_state_build.build(store, now=datetime(2026, 9, 16, tzinfo=utc), tz=cst)
+            self.assertEqual(state["concepts"]["learning-design.macro-map"]["evidence_tier"], "transfer")
+            self.assertIn("earlier local day", state["tier_rule"])
+            self._append(store, "2026-09-17T09:00:00Z", "checkpoint", "mastered", depth="rationale")
+            state = learner_state_build.build(store, now=datetime(2026, 9, 17, 10, tzinfo=utc), tz=cst)
+            self.assertEqual(state["concepts"]["learning-design.macro-map"]["evidence_tier"], "immediate")
+        # the day boundary is local: 18:00 -> 04:00 next day in UTC+8 is a night apart, but one UTC day (10:00 -> 20:00)
+        prev, cur = datetime(2026, 9, 12, 10, tzinfo=utc), datetime(2026, 9, 12, 20, tzinfo=utc)
+        self.assertTrue(learner_state_build.is_delayed(prev, cur, cst))
+        self.assertFalse(learner_state_build.is_delayed(prev, cur, utc))
+        self.assertFalse(learner_state_build.is_delayed(prev, prev + timedelta(hours=1), cst))  # midnight straddled, no night
+        self.assertEqual(learner_state_build.tier_for("review", None, cur, cst), "immediate")
+        self.assertEqual(learner_state_build.parse_offset("+08:00").utcoffset(None), timedelta(hours=8))
+        with self.assertRaises(ValueError):
+            learner_state_build.parse_offset("Asia/Shanghai")
+
+    def test_lrg_append_measures_elapsed_backfills_and_refuses_duplicates(self):
+        import argparse, io, contextlib
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            store = self._store(root)
+            (root / "r1.txt").write_text("第一次回答", encoding="utf-8")
+            (root / "r2.txt").write_text("第二次回答", encoding="utf-8")
+
+            def append(response, kind="checkpoint", **overrides):
+                args = dict(store=store, lesson_id="sample-guided-lesson", section_id="s01", kind=kind, response_file=root / response,
+                            feedback_file=None, verdict="partial", confidence=None, criteria_met=None, depth=None, extraction=None,
+                            no_compare=False, progress=None, elapsed_seconds=None, rigor=None, concept=None, at=None, force=False)
+                args.update(overrides)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    lrg_record.command_append(argparse.Namespace(**args))
+
+            append("r1.txt", at="2026-09-12T20:00:00+08:00")
+            append("r2.txt", at="2026-09-12T20:04:00+08:00")
+            append("r1.txt", kind="review", at="2026-09-13T02:00:00+08:00")  # 5 h 56 min later: beyond the cap
+            events = lrg_record.read_events(store, "sample-guided-lesson")
+            self.assertEqual([e["at"] for e in events], ["2026-09-12T12:00:00Z", "2026-09-12T12:04:00Z", "2026-09-12T18:00:00Z"])
+            self.assertTrue(all("recorded_at" in e for e in events))
+            self.assertNotIn("elapsed_seconds", events[0])
+            self.assertEqual((events[1]["elapsed_seconds"], events[1]["elapsed_source"]), (240, "log"))
+            self.assertNotIn("elapsed_seconds", events[2])
+            with self.assertRaises(ValueError):
+                append("r1.txt", at="2026-09-12T20:05:00+08:00")  # same section, kind and text
+            append("r1.txt", at="2026-09-12T20:05:00+08:00", force=True)
+            append("r1.txt", kind="variant", at="2026-09-12T20:06:00+08:00", elapsed_seconds=30)  # another kind is not a duplicate
+            events = lrg_record.read_events(store, "sample-guided-lesson")
+            self.assertEqual(len(events), 5)
+            self.assertEqual((events[-1]["elapsed_seconds"], events[-1]["elapsed_source"]), (30, "model"))
+            with self.assertRaises(ValueError):
+                append("r2.txt", at="2026-09-12 20:07")  # no offset
+            with self.assertRaises(ValueError):
+                lrg_record.build_event(lesson_id="l", section_id="s", kind="checkpoint", attempt_number=1, response="", feedback="",
+                                       verdict="partial", confidence=None, criteria_met=[], depth_reached=None,
+                                       extraction=None, comparison=None, elapsed_seconds=-1)
             self.assertEqual(learner_state_build.freshness_window(9).days, 180)
 
 
@@ -646,8 +731,9 @@ class VariantAndReviewTests(_StoreHelpers, unittest.TestCase):
         from datetime import datetime, timezone
         with tempfile.TemporaryDirectory() as temporary:
             store = self._store(Path(temporary))
+            self._append(store, "2026-01-10T10:00:00Z", "checkpoint", "mastered", depth="mechanism")  # the teaching day
             self._append(store, "2026-01-20T10:00:00Z", "review", "mastered", depth="mechanism")
-            state = learner_state_build.build(store, now=datetime(2026, 1, 25, tzinfo=timezone.utc))
+            state = learner_state_build.build(store, now=datetime(2026, 1, 25, tzinfo=timezone.utc), tz=timezone.utc)
             store_init.atomic_write(store / "learner-state.json", state)
             plan = {"prerequisites": [{"id": "p01", "name": "macro map"}, {"id": "p02", "name": "哈希函数"}]}
 
@@ -655,7 +741,7 @@ class VariantAndReviewTests(_StoreHelpers, unittest.TestCase):
 
             self.assertEqual([(d["prerequisite_id"], d["action"]) for d in decisions], [("p01", "variant"), ("p02", "diagnose")])
             self.assertEqual(decisions[0]["concept_id"], "learning-design.macro-map")
-            stale = learner_state_build.build(store, now=datetime(2026, 6, 1, tzinfo=timezone.utc))
+            stale = learner_state_build.build(store, now=datetime(2026, 6, 1, tzinfo=timezone.utc), tz=timezone.utc)
             decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, stale["concepts"])
             self.assertEqual(decisions[0]["action"], "variant_then_diagnose")
             with self.assertRaises(ValueError):
@@ -768,7 +854,6 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
                 target_concept_ids=["learning-design.problem-chain"],
             )
             self.assertEqual(event["rigor"], "fast")
-            self.assertEqual(event["evidence_tier"], "immediate")
             self.assertEqual(event["target_concept_ids"], ["learning-design.problem-chain"])
             with self.assertRaises(ValueError):
                 lrg_record.build_event(lesson_id="l", section_id="s", kind="supporting", attempt_number=1, response="", feedback="",
@@ -794,9 +879,10 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
                 verdict="mastered", confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
                 comparison=None, elapsed_seconds=None, rigor="fast",
             )
+            lrg_record.append_event(store, "sample-guided-lesson", dict(event, kind="checkpoint", at="2026-01-10T10:00:00Z"))  # the teaching day, fast too
             event["at"] = "2026-01-20T10:00:00Z"
             lrg_record.append_event(store, "sample-guided-lesson", event)
-            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc))
+            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc), tz=timezone.utc)
             self.assertEqual(state["concepts"]["learning-design.macro-map"]["freshness"], "fresh")
             plan = {"prerequisites": [{"id": "p01", "name": "macro map"}]}
             decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
@@ -806,7 +892,7 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
             # a later full-rigor success restores full credit
             event2 = dict(event, rigor="full", at="2026-01-21T10:00:00Z", attempt_number=2)
             lrg_record.append_event(store, "sample-guided-lesson", event2)
-            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc))
+            state = learner_state_build.build(store, now=datetime(2026, 1, 22, tzinfo=timezone.utc), tz=timezone.utc)
             decisions = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
             self.assertEqual(decisions[0]["action"], "variant")
 
@@ -1158,7 +1244,7 @@ class SkeletonCourseTests(unittest.TestCase):
             verdict="mastered", confidence=None, criteria_met=["p1", "p2"], depth_reached="rationale",
             extraction=None, comparison=None, elapsed_seconds=None,
         )
-        self.assertEqual(event["evidence_tier"], "immediate")
+        self.assertEqual(event["kind"], "probe")
 
     def test_unit_must_show_checkpoint_not_probe(self):
         plan = load_skeleton()
@@ -1396,9 +1482,11 @@ class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
             learning_state.unblock_section(state, "s01")
 
     def test_diagnostic_answers_are_immediate_evidence(self):
-        self.assertEqual(lrg_record.evidence_tier("diagnostic"), "immediate")
+        from datetime import datetime, timezone
+        long_ago = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        self.assertEqual(learner_state_build.tier_for("diagnostic", long_ago, datetime(2026, 2, 1, tzinfo=timezone.utc), timezone.utc), "immediate")
         event = lrg_record.build_event(
             lesson_id="sample-guided-lesson", section_id="s01", kind="diagnostic", attempt_number=1, response="r", feedback="",
             verdict="partial", confidence=None, criteria_met=[], depth_reached="fact", extraction=None, comparison=None, elapsed_seconds=None,
         )
-        self.assertEqual(event["evidence_tier"], "immediate")
+        self.assertEqual(event["kind"], "diagnostic")

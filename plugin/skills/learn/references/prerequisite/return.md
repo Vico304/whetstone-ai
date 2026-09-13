@@ -9,7 +9,7 @@
 
 父课 resume 时（[../protocol/resume.md](../protocol/resume.md)）：
 
-- 开启知识库：`index_match.py prerequisites --store <工作区>/store --lesson-id <父课> --prerequisite-plan …`，前置课里学过的概念返回 `action: variant`、`via_prerequisite_course` 为本课 id——对被卡簇各出一道变式题，作答记 `--kind variant`（延迟证据），`prerequisite_state.py record` 记 verdict；答错的簇不再建课，按 [../protocol/feedback.md](../protocol/feedback.md) 给一个针对性追问后继续。
+- 开启知识库：`index_match.py prerequisites --store <工作区>/store --lesson-id <父课> --prerequisite-plan …`，前置课里学过的概念返回 `action: variant`、`via_prerequisite_course` 为本课 id——对被卡簇各出一道变式题，作答记 `--kind variant`（隔夜再答才算延迟证据），`prerequisite_state.py record` 记 verdict；答错的簇不再建课，按 [../protocol/feedback.md](../protocol/feedback.md) 给一个针对性追问后继续。
 - 未开知识库：对被卡簇各出一道靠近父课材料的桥接题，`prerequisite_state.py bridge` 记 `ready | retry | skipped`。
 - 然后从 `blocked_at` 那节的 READY 继续。就绪的前置在正课里压缩为一句提醒；仍脆弱的关系嵌入相关节重复检查。
 

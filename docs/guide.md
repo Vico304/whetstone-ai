@@ -287,7 +287,7 @@ python3 $S/store_init.py init --store whetstone/store --domain-root 计算机科
 | `whetstone/store/mrg/<课程>.json` | `whetstone/store/mrg/*.deep.json`（后两层，看了就变成背诵材料） |
 | `whetstone/store/concepts/index.json`、`learner-state.json`、`~/.whetstone/` 整个目录 | `whetstone/store/lrg/*.jsonl`（作答日志） |
 
-看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨工作区的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：`python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store`，看三个数——来源定位的命中率、每节用时的中位数（模型在提问前后各运行一次 `date +%s`，不是估的）、你的回答到达过哪些层；`--baseline` 可与上次结果逐项比较。
+看进度：`python3 $S/lrg_record.py show --store whetstone/store --lesson-id <课程>`，只显示计数、判定和层，不显示回答；跨工作区的汇总看 `python3 $S/store_sync.py show`。三节之后可以打分：`python3 whetstone-ai/plugin/evals/score_pack.py whetstone/courses/x --sources-root . --store whetstone/store`，看三个数——来源定位的命中率、每节用时的中位数（脚本按两条记录的间隔算，不是估的）、你的回答到达过哪些层；`--baseline` 可与上次结果逐项比较。
 
 ## 9. 学习时的纪律
 
@@ -340,7 +340,7 @@ python3 $S/learning_state.py defer --state whetstone/courses/x/learning-progress
 # 记一次作答（知识库）
 python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --kind checkpoint --response-file /tmp/r.txt \
   --verdict partial --confidence 4 --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
-  --progress whetstone/courses/x/learning-progress.json --elapsed-seconds 240
+  --progress whetstone/courses/x/learning-progress.json
 # 重建掌握状态（模型通常自动运行）
 python3 $S/learner_state_build.py build --store store
 # 概念笔记扫描；打包插件

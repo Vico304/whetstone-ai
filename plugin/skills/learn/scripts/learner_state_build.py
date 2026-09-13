@@ -6,6 +6,10 @@ Per concept it keeps several dimensions apart (consensus §11): evidence tier of
 success, freshness (a deliberately simple window, not a forgetting model), stability, depth
 reached, error propositions (de-personalised text only), calibration counts — and one
 scalar `mastery_estimate` that exists solely for visualisation colour.
+
+The evidence tier is derived here, per concept, from the *interval* since the concept's
+previous record — not from the question kind: a "review" asked minutes after the
+teaching is still immediate evidence. `kind` only says what was asked.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ import argparse
 import importlib.util
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import Any
 
@@ -39,10 +43,29 @@ FRESHNESS_WEIGHT = {"fresh": 1.0, "stale": 0.5, "unknown": 0.2}
 SUCCESS_VERDICTS = {"mastered"}
 BASE_WINDOW_DAYS = 7
 MAX_WINDOW_DAYS = 180
+TEACHING_KINDS = {"checkpoint", "probe", "diagnostic"}  # asked in the same sitting as the teaching: never delayed
+TRANSFER_KINDS = {"transfer", "final"}
+DELAYED_MIN_HOURS = 8  # together with a local day boundary: "a night in between"
 
 
 def parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def local_day(at: datetime, tz: tzinfo) -> date:
+    return at.astimezone(tz).date()
+
+
+def is_delayed(previous: datetime, current: datetime, tz: tzinfo) -> bool:
+    """True when `current` is on a later local day than `previous` and at least DELAYED_MIN_HOURS after it."""
+    return current - previous >= timedelta(hours=DELAYED_MIN_HOURS) and local_day(current, tz) > local_day(previous, tz)
+
+
+def tier_for(kind: str, previous_at: datetime | None, at: datetime, tz: tzinfo) -> str:
+    """Evidence tier of one attempt for one concept: immediate unless a real retention interval precedes it."""
+    if kind in TEACHING_KINDS or previous_at is None or not is_delayed(previous_at, at, tz):
+        return "immediate"
+    return "transfer" if kind in TRANSFER_KINDS else "delayed"
 
 
 def freshness_window(stability: int) -> timedelta:
@@ -110,25 +133,31 @@ def new_state() -> dict:
     }
 
 
-def build(store: Path, now: datetime | None = None) -> dict:
+def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) -> dict:
+    """Derive the state. `tz` fixes the local day boundary (defaults to this machine's zone)."""
     now = now or datetime.now(timezone.utc)
+    tz = tz or datetime.now().astimezone().tzinfo or timezone.utc
     section_concepts = load_section_concepts(store)
     events = load_events(store)
     states: dict[str, dict] = {}
     success_days: dict[str, set[str]] = {}
     latest_success: dict[str, tuple[str, str]] = {}  # cid -> (at, tier) of the most recent success
+    last_seen: dict[str, datetime] = {}  # cid -> time of the concept's previous record, any verdict
 
     for event in events:
         verdict = event.get("verdict")
-        tier = event.get("evidence_tier", "immediate")
+        kind = event.get("kind", "checkpoint")
         depth = event.get("depth_reached")
         confidence = event.get("confidence")
         at = event.get("at")
+        at_time = parse_time(at) if at else now
         conflicts_high = any(c.get("confidence_high") for c in (event.get("diff") or {}).get("conflict", []))
         rigor = event.get("rigor", "full")
         for cid in concepts_for_event(event, section_concepts):
             state = states.setdefault(cid, new_state())
             state["attempts"] += 1
+            tier = tier_for(kind, last_seen.get(cid), at_time, tz)
+            last_seen[cid] = at_time
             if verdict in SUCCESS_VERDICTS and (state["rigor_max"] is None or rigor == "full"):
                 state["rigor_max"] = rigor
             state["last_evidence_at"] = at
@@ -142,7 +171,7 @@ def build(store: Path, now: datetime | None = None) -> dict:
             if verdict in SUCCESS_VERDICTS:
                 state["last_success_at"] = at
                 latest_success[cid] = (at, tier)
-                success_days.setdefault(cid, set()).add(at[:10] if at else "")
+                success_days.setdefault(cid, set()).add(local_day(at_time, tz).isoformat())
                 if confidence is not None and confidence <= 2:
                     state["calibration"]["underconfident"] += 1
             elif verdict == "retry" or conflicts_high:
@@ -174,15 +203,24 @@ def build(store: Path, now: datetime | None = None) -> dict:
     return {
         "schema_version": store_init.STORE_SCHEMA,
         "generated_at": now.isoformat().replace("+00:00", "Z"),
+        "tier_rule": f"delayed/transfer only if the concept's previous record is on an earlier local day (UTC{now.astimezone(tz).strftime('%z')}) and at least {DELAYED_MIN_HOURS} h earlier; checkpoint/probe/diagnostic are always immediate",
         "freshness_rule": f"fresh if latest delayed/transfer success is within {BASE_WINDOW_DAYS}*2^(stability-1) days (max {MAX_WINDOW_DAYS}); immediate-only evidence is 'unknown'",
         "concepts": dict(sorted(states.items())),
     }
 
 
+def parse_offset(value: str) -> tzinfo:
+    """'+08:00' / '-0500' -> a fixed-offset zone for the local day boundary."""
+    try:
+        return datetime.strptime(value.replace(":", ""), "%z").tzinfo  # type: ignore[return-value]
+    except ValueError:
+        raise ValueError("--tz must be a UTC offset such as +08:00") from None
+
+
 def command_build(args: argparse.Namespace) -> int:
     store_init.load_store(args.store)
     now = parse_time(args.now) if args.now else None
-    state = build(args.store, now)
+    state = build(args.store, now, tz=parse_offset(args.tz) if args.tz else None)
     store_init.atomic_write(args.store / "learner-state.json", state)
     counts: dict[str, int] = {}
     for concept in state["concepts"].values():
@@ -209,6 +247,7 @@ def parse_args() -> argparse.Namespace:
     b = sub.add_parser("build", help="Rebuild learner-state.json from lrg/ and mrg/")
     b.add_argument("--store", type=Path, required=True)
     b.add_argument("--now", help="ISO timestamp to evaluate freshness against (tests)")
+    b.add_argument("--tz", metavar="OFFSET", help="UTC offset for the local day boundary, e.g. +08:00 (default: this machine's zone)")
     b.set_defaults(handler=command_build)
     s = sub.add_parser("show", help="Summarise learner state (no response text)")
     s.add_argument("--store", type=Path, required=True)

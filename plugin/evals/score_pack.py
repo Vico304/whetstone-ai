@@ -152,7 +152,6 @@ def teach_metrics(store: Path, lesson_id: str) -> dict:
     return {
         "attempts": len(attempts),
         "kinds": dict(Counter(e.get("kind") for e in attempts)),
-        "evidence_tiers": dict(Counter(e.get("evidence_tier") for e in attempts)),
         "verdicts": dict(Counter(e.get("verdict") for e in attempts)),
         "depths": dict(Counter(e.get("depth_reached") or "unset" for e in attempts)),
         "median_checkpoint_elapsed_s": statistics.median(elapsed) if elapsed else None,
