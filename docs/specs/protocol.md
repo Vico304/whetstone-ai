@@ -1,6 +1,6 @@
 # 教学协议
 
-模型在规划、前置检查、逐节教学时遵守的规则，以及这些规则怎样加载。实现：`plugin/skills/learn/references/` 下的 `stages/`、`prerequisite/`、`protocol/`；评测在 `plugin/evals/`。本文是这些文件的索引与摘要，规则原文以它们为准。
+模型在规划、前置检查、逐节教学时遵守的规则，以及这些规则怎样加载。实现：入口 `plugin/skills/learn/SKILL.md`（约 50 行：技能目录、工作区判断、信任边界、四种模式、启动判断、教学入口）；`references/` 下按需读取的 `hosts.md`（各宿主的路径）、`workspace.md`（布局）、`store.md`（知识库命令与硬约束）、`build.md`（建课 §1–§5 与默认值）、`stages/`、`prerequisite/`、`protocol/`；评测在 `plugin/evals/`。本文是这些文件的索引与摘要，规则原文以它们为准。
 
 ## 1. 加载规则
 

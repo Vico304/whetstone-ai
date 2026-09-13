@@ -1,6 +1,6 @@
 # 进度记录
 
-文件模式使用（路径按 SKILL.md 的路径解析约定取技能目录绝对路径）：
+文件模式使用（技能目录的绝对路径按 [../hosts.md](../hosts.md) 取）：
 
 ```bash
 python3 scripts/learning_state.py init \
