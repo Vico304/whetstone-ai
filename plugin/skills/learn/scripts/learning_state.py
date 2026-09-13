@@ -15,6 +15,7 @@ from typing import Any
 VERDICTS = {"mastered", "partial", "retry", "skipped"}
 DEPTHS = ("fact", "mechanism", "rationale", "principle")
 DONE_STATUSES = {"completed", "deferred"}
+MARK_TYPES = {"probe_completed", "probe_skipped"}
 
 
 def utc_now() -> str:
@@ -205,6 +206,26 @@ def command_record(args: argparse.Namespace) -> int:
     return 0
 
 
+def mark_event(state: dict, event_type: str, note: str | None = None) -> None:
+    """Append a milestone that has no other trace in the file (the probe round is one)."""
+    if event_type not in MARK_TYPES:
+        raise ValueError(f"event type must be one of {sorted(MARK_TYPES)}")
+    now = utc_now()
+    event: dict[str, Any] = {"at": now, "type": event_type}
+    if note and note.strip():
+        event["note"] = note.strip()
+    state.setdefault("events", []).append(event)
+    state["updated_at"] = now
+
+
+def command_mark(args: argparse.Namespace) -> int:
+    state = read_json(args.state)
+    mark_event(state, args.type, args.note)
+    atomic_write(args.state, state)
+    print(f"OK: marked {args.type} in {args.state}")
+    return 0
+
+
 def defer_section(state: dict, section_id: str, reason: str) -> None:
     """Mark a not-yet-started section deferred (probe passed, or the learner chose to skip).
 
@@ -362,6 +383,12 @@ def parse_args() -> argparse.Namespace:
     unblock_parser.add_argument("--state", type=Path, required=True)
     unblock_parser.add_argument("--section-id", required=True)
     unblock_parser.set_defaults(handler=command_unblock)
+
+    mark_parser = subparsers.add_parser("mark", help="Append a free event to the progress file (e.g. probe_completed)")
+    mark_parser.add_argument("--state", type=Path, required=True)
+    mark_parser.add_argument("--type", required=True, choices=sorted(MARK_TYPES))
+    mark_parser.add_argument("--note", help="Optional one-line note")
+    mark_parser.set_defaults(handler=command_mark)
 
     show_parser = subparsers.add_parser("show", help="Show current progress")
     show_parser.add_argument("--state", type=Path, required=True)

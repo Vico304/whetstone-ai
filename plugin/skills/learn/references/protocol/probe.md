@@ -10,7 +10,7 @@
 4. 记录：开启知识库时 `lrg_record.py append --kind probe --section-id <id> --verdict … --criteria-met … --depth …`（即时证据，`rigor` 照常）。
 5. `mastered` 的 unit 标为 **skip_candidate**。**不自动跳过**：全部探测结束后一次性列出候选，问学习者"这几个 unit 探测通过，跳过还是照学？"；学习者选跳过的运行
    `learning_state.py defer --state learning-progress.json --section-id <id> --reason "原理探测通过，学习者选择跳过"`，并把它写进 `lesson-plan.json` 的 `deferred[]`（`reason` 同上），更新 outline.md 状态列。
-6. 学习者也可以说"全部照学"或"跳过探测"——照办，记一句到进度事件里。**档案自述"基础薄弱"时不接受"跳过探测"**：探测量的是地板在哪，不是用来略过的；向学习者说明后照常做。
+6. 学习者也可以说"全部照学"或"跳过探测"——照办，跳过记 `learning_state.py mark --state learning-progress.json --type probe_skipped`。**档案自述"基础薄弱"时不接受"跳过探测"**：探测量的是地板在哪，不是用来略过的；向学习者说明后照常做。
 7. 多数 unit 探测未通过、且学习者表示题目里的术语本身陌生时，不进正课：转 [../prerequisite/diagnose.md](../prerequisite/diagnose.md) 诊断这些簇，再按 [../prerequisite/course.md](../prerequisite/course.md) 建前置课，父课在第一个未 deferred 的 unit 上 `block`。
 
 ## 不做
@@ -19,4 +19,4 @@
 - 不把探测结果当能力标签：它只决定这门课里跳不跳，知识库里是一次 `probe` 证据；
 - 不用探测题替代 unit 的 checkpoint：跳过的 unit 之后仍可通过 resume 的变式检索补证据。
 
-探测轮结束后进入第一个未 deferred 的 unit 的 READY。
+探测轮结束后运行 `learning_state.py mark --state learning-progress.json --type probe_completed`（`next_step.py` 据此不再提示探测），进入第一个未 deferred 的 unit 的 READY。
