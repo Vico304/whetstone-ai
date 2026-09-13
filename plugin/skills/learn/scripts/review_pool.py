@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""List de-personalised error propositions for review questions.
+"""What to ask first when a course resumes, from learner-state.json only — never the raw log.
 
-Reads learner-state.json only — never the raw log — so nothing it prints can quote the
-learner. Each item is a claim the learner once made wrongly or partially, rewritten by the
-model at extraction time without any subject ("你说 / 我认为"). Present it as an anonymous
-claim ("有一种说法是……，这个说法哪里有问题？") and close the loop with the correction in the
-same turn (hypercorrection needs immediate feedback).
+Four pools in the order the opener should draw from them: `suspect` (mastered on top of a
+weak prerequisite), `items` (de-personalised error propositions), `missing_edges` (relations
+the last chain rebuild left out), `stale` (delayed evidence past its window). Error items are
+claims the learner once made wrongly or partially, rewritten by the model at extraction time
+without any subject ("你说 / 我认为"): present them as anonymous claims ("有一种说法是……，这个说法
+哪里有问题？") and close the loop with the correction in the same turn.
 """
 
 from __future__ import annotations
@@ -72,6 +73,38 @@ def pool(state: dict, lesson_id: str | None, concept_ids: list[str] | None, sect
     return ordered[:limit]
 
 
+def concept_in_lesson(concept: dict, lesson_id: str | None) -> bool:
+    return not lesson_id or lesson_id in (concept.get("lessons") or [])
+
+
+def suspect_pool(state: dict, lesson_id: str | None, limit: int) -> list[dict]:
+    items = [dict(s, freshness=(state["concepts"].get(s["id"]) or {}).get("freshness"))
+             for s in (state.get("fringe") or {}).get("suspect", [])
+             if concept_in_lesson(state["concepts"].get(s["id"]) or {}, lesson_id)]
+    return items[:limit]
+
+
+def missing_edges(state: dict, lesson_id: str | None, limit: int) -> list[dict]:
+    edges: list[dict] = []
+    for lid, lesson in (state.get("lessons") or {}).items():
+        if lesson_id and lid != lesson_id:
+            continue
+        rebuild = lesson.get("chain_rebuild") or {}
+        for edge in rebuild.get("missing", []):
+            edges.append(dict(edge, lesson_id=lid, status="missing"))
+        for edge in rebuild.get("direction_reversed", []):
+            edges.append(dict(edge, lesson_id=lid, status="direction_reversed"))
+    return edges[:limit]
+
+
+def stale_pool(state: dict, lesson_id: str | None, limit: int) -> list[dict]:
+    items = [{"id": cid, "last_success_at": c.get("last_success_at"), "stability": c.get("stability")}
+             for cid, c in state.get("concepts", {}).items()
+             if c.get("freshness") == "stale" and concept_in_lesson(c, lesson_id)]
+    items.sort(key=lambda i: i.get("last_success_at") or "")
+    return items[:limit]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--store", type=Path, help="a local store (this workspace)")
@@ -97,8 +130,14 @@ def main() -> int:
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
-    print(json.dumps({"items": items, "presentation": "有一种说法是「{claim}」，这个说法哪里有问题？——纠正须在同一轮内给出"},
-                     ensure_ascii=False, indent=2))
+    print(json.dumps({
+        "order": ["suspect", "items", "missing_edges", "stale"],
+        "suspect": suspect_pool(state, args.lesson_id, args.limit),
+        "items": items,
+        "missing_edges": missing_edges(state, args.lesson_id, args.limit),
+        "stale": stale_pool(state, args.lesson_id, args.limit),
+        "presentation": "有一种说法是「{claim}」，这个说法哪里有问题？——纠正须在同一轮内给出",
+    }, ensure_ascii=False, indent=2))
     return 0
 
 

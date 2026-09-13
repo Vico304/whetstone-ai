@@ -117,6 +117,8 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 
 `feedback_priority` 的顺序：`conflict:high_confidence` → `conflict` → `missing` → `partial` → `weak_reference:do_not_judge_wrong` → `beyond_reference:record_only`。
 
+**链重建** `comparator.py --chain --extraction …`（不带 `--section-id`）把抽取里的 `relations[]` 当作一个关系集，与该课参考图的公开边逐条匹配，`status` 忽略：同一对概念且类型、方向都对为 `matched`；类型对、方向反为 `direction_reversed`（`contrasts_with` 无方向）；同一对概念但类型不同为 `wrong_type`；参考里没有这对概念，或只对上高层边，为 `beyond_reference`；没被任何断言对上的公开边为 `missing`。每条公开边最多对上一次。`reference_edges` 是公开边数，`ratio` = `matched` / `reference_edges`。`lrg_record.py append --kind final --chain --extraction …` 用它代替按节的比较，结果写进事件的 `chain` 字段。
+
 `lrg_record.py show --store <目录> --lesson-id <id>` 只打印计数与层，不打印回答。
 
 ## 5. 掌握状态：`learner-state.json`
@@ -138,13 +140,24 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 
 时效窗口是刻意简单的规则，不是遗忘模型。
 
+概念之外还有三块，都从同一次重建派生：
+
+| 键 | 规则 |
+|---|---|
+| `fringe.outer` | 前沿：自身最近判定不是 `mastered`（或没作答过）、有前置、且每个前置最近判定都是 `mastered` 的概念。前置关系取公开导出里的 `prerequisite_for` 与 `depends_on` 边（`A prerequisite_for B` 与 `B depends_on A` 都表示 A 在 B 之前） |
+| `fringe.suspect`、`fringe.suspect_edges` | 假性掌握：最近判定 `mastered`、但某个前置最近判定是 `partial / retry` 的概念，以及这些边（带 `from_verdict`）。这条边的先后顺序在数据里没有得到支持 |
+| `summary` | `concepts`、`mastered`、`delayed_or_transfer`（证据等级为延迟或迁移的概念数）、`high_confidence_attempts` 与 `overconfident_attempts`（信心 ≥ 4 的作答次数，及其中 `retry` 或高信心冲突的次数）、`suspect`、`outer`。`build` 打印这几个数，不设阈值 |
+| `lessons.<id>.chain_rebuild` | 该课最近一次链重建：`at`、`ratio`、`matched`、`reference_edges`、`missing[]`、`direction_reversed[]`（记参考方向）、`wrong_type` 计数 |
+
+汇总到主目录时只合并概念；`fringe`、`summary`、`lessons` 是工作区内的派生物。
+
 ## 6. 错误复习：`review_pool.py`
 
 ```bash
 python3 scripts/review_pool.py --store <目录> --lesson-id <id> [--progress learning-progress.json]
 ```
 
-只读 `learner-state.json`，返回 `error_propositions` 里的命题（`claim`、`status`、`at`、`lesson_id`、`section_id`），`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节。呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
+只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
 
 ## 7. 不可见的实现
 

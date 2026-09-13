@@ -391,6 +391,20 @@ def validate_v14(plan: dict, errors: list[str]) -> None:
         errors.append("root.prerequisite_of and root.parent_course are mutually exclusive (prerequisite course vs branch course)")
 
 
+def orphan_concepts(plan: dict) -> dict:
+    """Core concepts (by id) that no relation touches. No threshold: a printed number for the learner to judge."""
+    core: set[str] = set()
+    for section in plan.get("sections", []) or []:
+        for concept in (section.get("concepts", []) or []) if isinstance(section, dict) else []:
+            if isinstance(concept, dict) and concept.get("role", "core") == "core" and nonempty(concept.get("id")):
+                core.add(concept["id"])
+    related: set[str] = set()
+    for relation in plan.get("relations", []) or []:
+        if isinstance(relation, dict):
+            related.update(r for r in (relation.get("from"), relation.get("to")) if isinstance(r, str))
+    return {"orphans": sorted(core - related), "total": len(core)}
+
+
 def fact_ratio(plan: dict) -> dict:
     """Fact-layer concepts / all concepts (unique by id, else name). No threshold: when nearly everything is a
     convention, the next level down is cards, not another course."""
@@ -918,6 +932,11 @@ def main() -> int:
             f = fact_ratio(plan)
             print(f"INFO: prerequisite course of {plan.get('prerequisite_of')} (depth {plan.get('depth')}, blocked at {plan.get('blocked_at')}); "
                   f"fact ratio {f['fact']}/{f['total']} concepts are fact-layer — no threshold; when nearly all are conventions, the next level is cards, not a course")
+        if schema_version(plan) != "1.0":
+            o = orphan_concepts(plan)
+            if o["orphans"]:
+                print(f"INFO: orphan concepts {len(o['orphans'])}/{o['total']} core concepts appear in no relation "
+                      f"({', '.join(o['orphans'])}) — no threshold; a chain rebuild cannot reach them")
         x = external_refs(plan)
         if x["external"]:
             print(f"INFO: external refs {x['external']}/{x['total']} source refs come from outside the learner's materials "

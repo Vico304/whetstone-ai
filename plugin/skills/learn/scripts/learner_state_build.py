@@ -10,6 +10,11 @@ scalar `mastery_estimate` that exists solely for visualisation colour.
 The evidence tier is derived here, per concept, from the *interval* since the concept's
 previous record — not from the question kind: a "review" asked minutes after the
 teaching is still immediate evidence. `kind` only says what was asked.
+
+Besides the per-concept states the file carries a `fringe` (knowledge-space view over
+the public prerequisite edges: what is learnable next, what is mastered on top of a weak
+prerequisite), a `summary` of health numbers, and per-lesson `lessons` (latest chain
+rebuild). None of it is a score; nothing here decides teaching on its own.
 """
 
 from __future__ import annotations
@@ -46,6 +51,9 @@ MAX_WINDOW_DAYS = 180
 TEACHING_KINDS = {"checkpoint", "probe", "diagnostic"}  # asked in the same sitting as the teaching: never delayed
 TRANSFER_KINDS = {"transfer", "final"}
 DELAYED_MIN_HOURS = 8  # together with a local day boundary: "a night in between"
+PREREQUISITE_EDGE_TYPES = {"prerequisite_for", "depends_on"}  # public-layer edges that order learning
+WEAK_VERDICTS = {"partial", "retry"}
+HIGH_CONFIDENCE = 4
 
 
 def parse_time(value: str) -> datetime:
@@ -85,6 +93,62 @@ def load_section_concepts(store: Path) -> dict[str, dict[str, list[str]]]:
         data = json.loads(path.read_text(encoding="utf-8"))
         mapping[data.get("lesson_id")] = {s["id"]: list(s.get("concept_ids", [])) for s in data.get("sections", [])}
     return mapping
+
+
+def load_prerequisite_edges(store: Path) -> list[dict]:
+    """[{prerequisite, dependent, type, lesson_id}] from the public MRG exports.
+
+    `A prerequisite_for B` and `B depends_on A` both mean A comes before B."""
+    edges: list[dict] = []
+    mrg_dir = store / "mrg"
+    if not mrg_dir.is_dir():
+        return edges
+    for path in sorted(mrg_dir.glob("*.json")):
+        if path.name.endswith(".deep.json"):
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for edge in data.get("edges", []) or []:
+            if edge.get("type") not in PREREQUISITE_EDGE_TYPES or not edge.get("from") or not edge.get("to"):
+                continue
+            first, second = (edge["from"], edge["to"]) if edge["type"] == "prerequisite_for" else (edge["to"], edge["from"])
+            edges.append({"prerequisite": first, "dependent": second, "type": edge["type"], "lesson_id": data.get("lesson_id")})
+    return edges
+
+
+def concept_status(state: dict | None) -> str:
+    """mastered / weak / untested, by the concept's latest verdict."""
+    if state is None or not state.get("attempts"):
+        return "untested"
+    if state.get("last_verdict") == "mastered":
+        return "mastered"
+    if state.get("last_verdict") in WEAK_VERDICTS:
+        return "weak"
+    return "untested"
+
+
+def build_fringe(states: dict[str, dict], edges: list[dict]) -> dict:
+    """outer: not mastered, every prerequisite mastered (the next things to learn);
+    suspect: mastered on top of a prerequisite whose latest verdict is partial/retry;
+    suspect_edges: those edges — the reference's ordering is not supported by the data there."""
+    prerequisites: dict[str, list[dict]] = {}
+    for edge in edges:
+        prerequisites.setdefault(edge["dependent"], []).append(edge)
+    outer: list[dict] = []
+    suspect: list[dict] = []
+    suspect_edges: list[dict] = []
+    for cid, incoming in sorted(prerequisites.items()):
+        status = concept_status(states.get(cid))
+        statuses = {e["prerequisite"]: concept_status(states.get(e["prerequisite"])) for e in incoming}
+        if status != "mastered" and all(s == "mastered" for s in statuses.values()):
+            outer.append({"id": cid, "status": status, "prerequisites": sorted(statuses)})
+        if status == "mastered":
+            weak = [e for e in incoming if statuses[e["prerequisite"]] == "weak"]
+            if weak:
+                suspect.append({"id": cid, "weak_prerequisites": sorted({e["prerequisite"] for e in weak})})
+                for e in weak:
+                    suspect_edges.append({"from": e["prerequisite"], "to": cid, "type": e["type"], "lesson_id": e["lesson_id"],
+                                          "from_verdict": states[e["prerequisite"]].get("last_verdict")})
+    return {"outer": outer, "suspect": suspect, "suspect_edges": suspect_edges}
 
 
 def load_events(store: Path) -> list[dict]:
@@ -143,6 +207,8 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
     success_days: dict[str, set[str]] = {}
     latest_success: dict[str, tuple[str, str]] = {}  # cid -> (at, tier) of the most recent success
     last_seen: dict[str, datetime] = {}  # cid -> time of the concept's previous record, any verdict
+    high_confidence_attempts = overconfident_attempts = 0
+    lessons: dict[str, dict] = {}
 
     for event in events:
         verdict = event.get("verdict")
@@ -153,6 +219,20 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
         at_time = parse_time(at) if at else now
         conflicts_high = any(c.get("confidence_high") for c in (event.get("diff") or {}).get("conflict", []))
         rigor = event.get("rigor", "full")
+        if confidence is not None and confidence >= HIGH_CONFIDENCE:
+            high_confidence_attempts += 1
+            if verdict == "retry" or conflicts_high:
+                overconfident_attempts += 1
+        chain = event.get("chain")
+        if isinstance(chain, dict) and event.get("lesson_id"):
+            lessons.setdefault(event["lesson_id"], {})["chain_rebuild"] = {
+                "at": at, "ratio": chain.get("ratio"), "matched": len(chain.get("matched") or []),
+                "reference_edges": chain.get("reference_edges"),
+                "missing": [{"from": m.get("from"), "to": m.get("to"), "type": m.get("type")} for m in chain.get("missing") or []],
+                "direction_reversed": [{"from": m.get("reference_from"), "to": m.get("reference_to"), "type": m.get("type")}
+                                       for m in chain.get("direction_reversed") or []],
+                "wrong_type": len(chain.get("wrong_type") or []),
+            }
         for cid in concepts_for_event(event, section_concepts):
             state = states.setdefault(cid, new_state())
             state["attempts"] += 1
@@ -175,7 +255,7 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
                 if confidence is not None and confidence <= 2:
                     state["calibration"]["underconfident"] += 1
             elif verdict == "retry" or conflicts_high:
-                if confidence is not None and confidence >= 4:
+                if confidence is not None and confidence >= HIGH_CONFIDENCE:
                     state["calibration"]["overconfident"] += 1
             for prop in event.get("propositions", []) or []:
                 if prop.get("status") in {"wrong", "partial"} and cid in (prop.get("concept_ids") or []):
@@ -200,11 +280,25 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
             state["freshness"] = "unknown"
         state["mastery_estimate"] = round(TIER_WEIGHT[state["evidence_tier"]] * FRESHNESS_WEIGHT[state["freshness"]], 3)
 
+    fringe = build_fringe(states, load_prerequisite_edges(store))
+    summary = {
+        "concepts": len(states),
+        "mastered": sum(1 for s in states.values() if concept_status(s) == "mastered"),
+        "delayed_or_transfer": sum(1 for s in states.values() if s["evidence_tier"] in {"delayed", "transfer"}),
+        "high_confidence_attempts": high_confidence_attempts,
+        "overconfident_attempts": overconfident_attempts,
+        "suspect": len(fringe["suspect"]),
+        "outer": len(fringe["outer"]),
+        "note": "delayed_or_transfer/concepts is retrievability; overconfident/high_confidence is calibration; no threshold on any of them",
+    }
     return {
         "schema_version": store_init.STORE_SCHEMA,
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "tier_rule": f"delayed/transfer only if the concept's previous record is on an earlier local day (UTC{now.astimezone(tz).strftime('%z')}) and at least {DELAYED_MIN_HOURS} h earlier; checkpoint/probe/diagnostic are always immediate",
         "freshness_rule": f"fresh if latest delayed/transfer success is within {BASE_WINDOW_DAYS}*2^(stability-1) days (max {MAX_WINDOW_DAYS}); immediate-only evidence is 'unknown'",
+        "summary": summary,
+        "fringe": fringe,
+        "lessons": dict(sorted(lessons.items())),
         "concepts": dict(sorted(states.items())),
     }
 
@@ -227,6 +321,11 @@ def command_build(args: argparse.Namespace) -> int:
         counts[concept["freshness"]] = counts.get(concept["freshness"], 0) + 1
     print(f"OK: learner-state.json rebuilt for {len(state['concepts'])} concepts "
           f"(fresh={counts.get('fresh', 0)}, stale={counts.get('stale', 0)}, unknown={counts.get('unknown', 0)})")
+    s = state["summary"]
+    print(f"delayed evidence {s['delayed_or_transfer']}/{s['concepts']} concepts; "
+          f"overconfident {s['overconfident_attempts']}/{s['high_confidence_attempts']} high-confidence attempts; "
+          f"suspect {s['suspect']}, next {s['outer']}"
+          + "".join(f"; chain rebuild {lid} {l['chain_rebuild']['ratio']}" for lid, l in state["lessons"].items() if l.get("chain_rebuild")))
     return 0
 
 
@@ -238,6 +337,11 @@ def command_show(args: argparse.Namespace) -> int:
     for cid, concept in state["concepts"].items():
         print(f"- {cid}: {concept['freshness']}/{concept['evidence_tier']} depth_max={concept['depth_max']} "
               f"stability={concept['stability']} errors={len(concept['error_propositions'])} est={concept['mastery_estimate']}")
+    fringe = state.get("fringe") or {}
+    for item in fringe.get("suspect", []):
+        print(f"suspect: {item['id']} rests on weak {', '.join(item['weak_prerequisites'])}")
+    for item in fringe.get("outer", []):
+        print(f"next: {item['id']} ({item['status']}; prerequisites mastered)")
     return 0
 
 

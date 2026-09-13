@@ -10,7 +10,7 @@
 
 ## 开启知识库时：去主体化的错误复习
 
-开场变式题之外（或代替之），可以从学习者过去的错误主张里取一条做复习：
+开场变式题之外（或代替之），先重建掌握状态，再按 `review_pool.py` 输出的 `order` 取题：`suspect`（假性掌握——已掌握但前置薄弱的概念，对它出变式题）→ `items`（错误主张，见下）→ `missing_edges`（链重建漏掉或反向的边，问"X 和 Y 之间是什么关系"）→ `stale`（过期概念）。取错误主张时：
 
 ```bash
 python3 scripts/learner_state_build.py build --store whetstone/store
