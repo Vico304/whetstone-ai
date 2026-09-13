@@ -21,6 +21,17 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def normalize_time(value: str) -> str:
+    """ISO 8601 with a zone offset -> UTC 'Z' form, the only form written to state files."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"--at must be an ISO 8601 time such as 2026-09-12T20:25:00+08:00 ({error})") from None
+    if parsed.tzinfo is None:
+        raise ValueError("--at needs a timezone offset, e.g. 2026-09-12T20:25:00+08:00")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -117,7 +128,11 @@ def append_attempt(
     review: bool = False,
     criteria_met: list[str] | None = None,
     depth_reached: str | None = None,
+    at: str | None = None,
+    force: bool = False,
 ) -> None:
+    """Append one attempt. `at` backfills the learner's time (ISO 8601 with offset); an identical
+    response for the same section and kind is refused unless `force`."""
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
     if confidence is not None and not 1 <= confidence <= 5:
@@ -133,11 +148,16 @@ def append_attempt(
     if section.get("blocked_by") and not review:
         raise ValueError(f"section {section_id} is blocked by prerequisite course '{section['blocked_by']}'; "
                          f"finish that course (or `unblock`) before recording an attempt here")
-    now = utc_now()
+    kind = "review" if review else "checkpoint"
+    for earlier in section.get("attempts", []):
+        if earlier.get("kind") == kind and (earlier.get("response") or "").strip() == response.strip() and not force:
+            raise ValueError(f"section {section_id} already has an identical {kind} response "
+                             f"(attempt #{earlier.get('attempt_number')} at {earlier.get('at')}); pass --force to append anyway")
+    now = normalize_time(at) if at else utc_now()
     attempt = {
         "attempt_number": len(section.get("attempts", [])) + 1,
         "at": now,
-        "kind": "review" if review else "checkpoint",
+        "kind": kind,
         "response": response,
         "feedback": feedback,
         "verdict": verdict,
@@ -178,7 +198,7 @@ def command_record(args: argparse.Namespace) -> int:
     criteria_met = [item for chunk in (args.criteria_met or []) for item in chunk.split(",")]
     append_attempt(
         state, args.section_id, response, feedback, args.verdict, args.confidence,
-        review=args.review, criteria_met=criteria_met, depth_reached=args.depth,
+        review=args.review, criteria_met=criteria_met, depth_reached=args.depth, at=args.at, force=args.force,
     )
     atomic_write(args.state, state)
     print(f"OK: appended {'review' if args.review else 'checkpoint'} attempt for {args.section_id}")
@@ -311,6 +331,8 @@ def parse_args() -> argparse.Namespace:
         metavar="IDS",
         help="Comma-separated checkpoint criteria ids the answer satisfied (e.g. c1,c3); repeatable",
     )
+    record_parser.add_argument("--at", metavar="TIME", help="Backfill: when the attempt really happened (ISO 8601 with offset)")
+    record_parser.add_argument("--force", action="store_true", help="Append even if an identical response for this section exists")
     record_parser.add_argument(
         "--depth",
         choices=DEPTHS,

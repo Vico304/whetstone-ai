@@ -36,7 +36,7 @@
 1. **最小前置地图**：只列会阻断主线的概念簇，记名称、为何是前置、支撑哪段主线、材料位置、确定性；写 `prerequisite-plan.json`，`validate_prerequisites.py` 校验。开启知识库时先 `index_match.py prerequisites --lesson-id <本课>`，按 `variant / variant_then_diagnose / diagnose` 处理（见 [knowledge-store.md](knowledge-store.md) §3）；本课的前置课里学过的概念一律 `variant`。
 2. **诊断**：一次一题，提问后交还对话，不给参考答案；问题优先暴露能否生成概念、说明边界、说明关系与方向、应用到新情境；对每个簇记 `ready / fragile / gap / misconception / skipped` 与判断置信度；证据够就停，不凑题数；`prerequisite_state.py` 追加原始回答，开启知识库时同时记 `kind: diagnostic`。只说"这个簇对本材料尚未就绪"，不作能力概括。`build + teach` 模式下写完计划、提出第一题就停。
 3. **建前置课**：对全部非 `ready` 的簇建一门课（簇多、有依赖时按依赖拆成几门串成栈）。来源按外部存档规则检索、存档、整目录作 `pool`；`lesson-plan.json` 写 `schema_version: "1.4"`、`prerequisite_of`、`blocked_at`、`depth`，`mode` 与父课相同；每节"当前问题"用删除思想实验；`final_challenge` 出成靠近父课材料的桥接题。父课 `learning_state.py block --section-id <blocked_at> --by <本课>`；学习计划的"前置栈"加一行。之后与普通课程完全相同：确认大纲、生成 units、逐节教学、记录。前置课自己暴露缺口时同一协议递归。
-4. **回程**：前置课结课后登记概念、重建掌握状态、`unblock` 父课、更新前置栈、报告回到父课哪一节。父课 resume 时对被卡簇各出一道变式题（知识库：`kind: variant`，延迟证据；未开知识库：`prerequisite_state.py bridge`），答错的簇不再建课，给一个针对性追问后继续；然后从 `blocked_at` 那节的 READY 继续。学习者中途放弃前置课时 `unblock` 父课并在栈里标"未完成"，不清零记录。
+4. **回程**：前置课结课后登记概念、重建掌握状态、`unblock` 父课、更新前置栈、报告回到父课哪一节。父课 resume 时对被卡簇各出一道变式题（知识库：`kind: variant`，隔夜再答才算延迟证据；未开知识库：`prerequisite_state.py bridge`），答错的簇不再建课，给一个针对性追问后继续；然后从 `blocked_at` 那节的 READY 继续。学习者中途放弃前置课时 `unblock` 父课并在栈里标"未完成"，不清零记录。
 
 小缺口也建课，不再生成 `prerequisite-guide.md`（旧课程的这份文档校验器仍接受）。
 
@@ -58,7 +58,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **DEEPEN**：提出主问题前问一句"本节还有 {listed 概念} 等衍生概念，想先深入哪一个，还是直接回答"，候选取本节 `listed` 概念，没有就不问。学习者选择细化时生成 `zoom/<id>-guide.md`（只覆盖本节衍生概念，每个概念至少两个例子，一个贴材料语境、一个换情境；来源约束同讲义；不含本节 checkpoint 的答案），读完回到本节主问题；一节最多细化一次；不在建课阶段预生成。
 
-**MAIN**：主问题要求两到三项——用自己的话解释、说明前一步为什么不足、描述输入如何变输出、指出关系与理由、给例子或失败条件、预测移除某组件的后果；不问"你理解了吗"、判断题、能从标题抄出的答案。作答前请学习者报 1–5 的信心，不愿标注不坚持。提出主问题前运行 `date +%s` 记起点。学习者说"验收 X"且 X 是本节或已完成节的 `supporting` 概念时，用 `check.prompt` 出题，按 ASSESS 评估，记 `--kind supporting --concept <id>`，不加 `--progress`，追问最多一层。
+**MAIN**：主问题要求两到三项——用自己的话解释、说明前一步为什么不足、描述输入如何变输出、指出关系与理由、给例子或失败条件、预测移除某组件的后果；不问"你理解了吗"、判断题、能从标题抄出的答案。作答前请学习者报 1–5 的信心，不愿标注不坚持。学习者说"验收 X"且 X 是本节或已完成节的 `supporting` 概念时，用 `check.prompt` 出题，按 ASSESS 评估，记 `--kind supporting --concept <id>`，不加 `--progress`，追问最多一层。
 
 **ASSESS**：按 `criteria` 的含义判，不看措辞；分别看核心问题是否识别、机制是否因果连贯、前后关系是否正确、边界或代价是否理解、有无高信心误解、新增联系是否有依据。`verdict`：`mastered`（核心概念与关系已解释清楚）、`partial`（主线对但缺一项重要机制或关系）、`retry`（有会影响后续理解的误解）、`skipped`。`depth_reached` 与 verdict 分开：取回答自发到达的最高层，追问引导后才到达的记在追问那次；同时记满足的 criteria id。怀疑参考本身有错时暂停判分，回到来源，标为材料或参考不确定。开启知识库时判定前先写抽取 JSON，`lrg_record.py append --extraction` 调用比较器，按 `feedback_priority` 的顺序反馈。
 
@@ -66,7 +66,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **快速模式**（`mode: fast`）：评估维度与 `depth_reached` 不变，判定放宽一档——方向对、缺细节记 `partial`，给一句修正（带定位）直接下一节，不追问；只有会断掉后续因果链的误解才 `retry`，最多一层追问。高信心错误仍要指出。记录带 `--rigor fast`。
 
-**记录**：每次产生 verdict 都记录。不开知识库：`learning_state.py record --state … --section-id … --response-file … --verdict … [--confidence] [--criteria-met c1,c3] [--depth …]`，只追加，不覆盖首次回答。开知识库：`lrg_record.py append`（字段见 [knowledge-store.md](knowledge-store.md) §4），`--elapsed-seconds` 用记录前再运行一次 `date +%s` 减去起点得到。
+**记录**：每次产生 verdict 都记录。不开知识库：`learning_state.py record --state … --section-id … --response-file … --verdict … [--confidence] [--criteria-met c1,c3] [--depth …]`，只追加，不覆盖首次回答。开知识库：`lrg_record.py append`（字段见 [knowledge-store.md](knowledge-store.md) §4）。两个命令都拒绝同一节里回答原文相同的记录（`--force` 才追加），回填用 `--at`；每节用时由脚本按与上一条记录的间隔算。
 
 **resume**：先不进未完成的节。从已完成的节里选一个概念出一道变式题——换情境或换角度考同一机制，禁止复用原 `checkpoint` 措辞；作答记 `record --review`（知识库：`--kind review`），当前位置不变；变式失败的节回到 `in_progress`，在后续节完成后再重做。开启知识库时可改从 `review_pool.py` 取一条匿名命题："有一种说法是「…」。这个说法哪里有问题？"——不说是学习者自己说的，不引用原文，纠正在同一轮给出。然后一两句重建上下文，进入未完成节的 READY。
 

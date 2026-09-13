@@ -77,19 +77,21 @@ python3 scripts/index_match.py prerequisites --store <目录> --lesson-id <本�
 ```bash
 python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section-id s02 --kind checkpoint \
   --response-file r.txt --feedback-file f.txt --verdict partial --confidence 4 --criteria-met c1,c3 \
-  --depth mechanism --extraction extraction.json --progress learning-progress.json --elapsed-seconds 240
+  --depth mechanism --extraction extraction.json --progress learning-progress.json
 ```
+
+同一节、同一 `kind`、回答原文相同的记录被拒绝（多半是重复写入），`--force` 才追加。`--at <ISO 8601，带时区>` 回填过去的作答，写入时统一转成 UTC。
 
 | 字段 | 含义 |
 |---|---|
 | `at`、`event: attempt`、`lesson_id`、`section_id`、`attempt_number` | 时间与位置 |
 | `kind` | `checkpoint`（主问题与追问）、`supporting`（辅助概念验收，需 `--concept <id>`，不加 `--progress`）、`probe`、`diagnostic`（前置检查的诊断作答）、`bridge`、`review`（resume 变式）、`variant`（跨课或前置课回程的变式题）、`transfer`（迁移题）、`final`（结课整体重述） |
-| `evidence_tier` | 由 `kind` 决定：`checkpoint / supporting / probe / diagnostic / bridge` 为 `immediate`，`review / variant` 为 `delayed`，`transfer / final` 为 `transfer` |
+| `recorded_at` | 只在 `--at` 回填时出现：`at` 是作答时间，`recorded_at` 是写入时间 |
 | `rigor` | `full / fast`，默认取进度文件的 `mode` |
 | `confidence`、`verdict`、`criteria_met[]`、`depth_reached` | 1–5 的信心；`mastered / partial / retry / skipped`；满足的 criteria id；到达的层 |
 | `response`、`feedback` | 原文。永不进入任何面向学习者的输出 |
 | `target_concept_ids[]` | `--concept` 指定的概念 |
-| `elapsed_seconds` | 从提出主问题到判定的墙钟秒数，由模型在前后各运行一次 `date +%s` 得到 |
+| `elapsed_seconds`、`elapsed_source` | 本节用时（秒）。默认由脚本取与本课上一条记录的间隔（`log`），超过 3 小时不记；调用者自己计了时传 `--elapsed-seconds`（`model`） |
 | `extraction` | 模型对回答的结构化读取，见下 |
 | `propositions[]`、`diff`、`feedback_priority[]` | 比较器输出 |
 
@@ -123,7 +125,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 
 | 字段 | 规则 |
 |---|---|
-| `evidence_tier` | 最近一次 `mastered` 的 `evidence_tier`；没有则 `none` |
+| `evidence_tier` | 最近一次 `mastered` 的证据等级；没有成功则 `none`。等级按间隔判定，不按题型：`checkpoint / probe / diagnostic` 与教学同场，一律 `immediate`；其余题型，若该概念的上一条记录（任何判定）在更早的本地日期且至少 8 小时前——中间隔了一夜——则 `review / variant / supporting / bridge` 记 `delayed`、`transfer / final` 记 `transfer`，否则 `immediate`。事件里不存等级，每次重建按概念重算；本地日期按运行机器的时区，`build --tz +08:00` 可指定 |
 | `last_evidence_at`、`last_success_at`、`last_verdict` | 时间与最近判定 |
 | `depth_latest`、`depth_max` | 最近一次与历史最高的 `depth_reached` |
 | `stability` | 成功过的不同日期数 |
