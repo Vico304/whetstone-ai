@@ -1310,6 +1310,30 @@ class ScanWikilinksTests(unittest.TestCase):
             unresolved = {item["concept"] for item in result["unresolved_links"]}
             self.assertEqual(unresolved, {"命中率"})
 
+    def test_scan_scope_defaults_to_the_course_studied_most_recently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "courses"
+            for name, updated, link in (("old-1", "2026-09-01T10:00:00Z", "[[旧概念]]"), ("new-2", "2026-09-13T10:00:00Z", "[[新概念]]")):
+                course = root / "目标" / name
+                (course / "concepts").mkdir(parents=True)
+                (course / "lesson-plan.json").write_text("{}", encoding="utf-8")
+                (course / "learning-progress.json").write_text(json.dumps({"updated_at": updated}), encoding="utf-8")
+                (course / "outline.md").write_text(f"提到 {link}。\n", encoding="utf-8")
+                (course / "concepts" / "_inbox.md").write_text("- 待办\n" if name == "old-1" else "", encoding="utf-8")
+            result = scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=None)
+            self.assertTrue(result["current_course"].endswith("new-2"))
+            self.assertEqual([i["concept"] for i in result["scanned"][0]["unresolved_links"]], ["新概念"])
+            self.assertEqual(len(result["scanned"]), 1)
+            self.assertEqual([(o["pack_dir"].split("/")[-1], o["inbox_pending"]) for o in result["other_courses"]], [("old-1", 1)])
+            everything = scan_wikilinks.scan_scope(root, None, scan_all=True, chosen=None)
+            self.assertEqual(len(everything["scanned"]), 2)
+            self.assertEqual(everything["other_courses"], [])
+            picked = scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=root / "目标" / "old-1")
+            self.assertTrue(picked["current_course"].endswith("old-1"))
+            with self.assertRaises(ValueError):
+                scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=root / "目标")
+            self.assertIn("error", scan_wikilinks.scan_scope(Path(temporary) / "empty", None, False, None))
+
 
 if __name__ == "__main__":
     unittest.main()

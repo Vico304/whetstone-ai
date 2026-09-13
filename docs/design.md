@@ -145,7 +145,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `store_init.py`、`mrg_export.py`、`index_match.py`、`store_sync.py` | 知识库初始化与登记；导出公开层与高层；别名召回、登记、前置判定（`--home` 读汇总）；结课时把本目录快照推进学习者主目录并重算汇总 |
 | `comparator.py` | 学习者作答抽取对照 MRG：`missing / partial / conflict / weak_reference / representation_only / beyond_reference`，给出反馈顺序，不打分 |
 | `lrg_record.py`、`learner_state_build.py`、`review_pool.py` | 追加学习记录；派生掌握状态；取匿名复习题 |
-| `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify） |
+| `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify）；给工作区时只扫最近更新过进度的那门课，其他课只报 inbox 计数 |
 | `evals/score_pack.py` | 给一个课程目录打分：校验错误、概念数、support 分布、locator 命中率、角色与覆盖表指标、每节耗时与 `depth_reached` |
 
 **两种布局，一套规则。** 独立布局：在材料目录就地学，工作区是 `<材料根>/whetstone/`；统一布局：一个总目录管所有材料和课程（`material/`、`courses/<目标>/`、`store/`），工作区就是总目录。判断规则：宿主打开的目录里已有 `courses/`、`store/` 或档案之一时，工作区就是它；否则是材料根下的 `whetstone/`。课程目录自包含——`sources.json` 的 `base_path` 记录材料根相对课程目录的位置，校验与评分据此找到来源。
