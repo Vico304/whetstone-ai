@@ -25,7 +25,8 @@ from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-KINDS = ("checkpoint", "supporting", "probe", "diagnostic", "review", "variant", "transfer", "bridge", "final")
+KINDS = ("checkpoint", "supporting", "probe", "diagnostic", "review", "variant", "transfer", "bridge", "final", "recall")
+CONCEPT_KINDS = {"supporting", "recall"}  # aimed at one concept: --concept required, --progress not used
 RIGORS = ("full", "fast")
 ELAPSED_SOURCES = ("log", "model")
 ELAPSED_CAP_SECONDS = 3 * 3600  # a longer gap is a break, not the time spent on the section
@@ -125,8 +126,8 @@ def build_event(
         raise ValueError(f"kind must be one of {list(KINDS)}")
     if rigor not in RIGORS:
         raise ValueError(f"rigor must be one of {list(RIGORS)}")
-    if kind == "supporting" and not target_concept_ids:
-        raise ValueError("a supporting check needs --concept <id>")
+    if kind in CONCEPT_KINDS and not target_concept_ids:
+        raise ValueError(f"a {kind} attempt needs --concept <id>")
     if verdict not in learning_state.VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(learning_state.VERDICTS)}")
     if depth_reached is not None and depth_reached not in learning_state.DEPTHS:
@@ -203,8 +204,8 @@ def command_append(args: argparse.Namespace) -> int:
         state = learning_state.read_json(args.progress)
         if rigor is None:
             rigor = state.get("mode", "full")
-        if args.kind == "supporting":
-            pass  # supporting checks do not change section progress
+        if args.kind in CONCEPT_KINDS:
+            pass  # supporting checks and card recalls do not change section progress
         else:
             learning_state.append_attempt(
                 state, args.section_id, response, feedback, args.verdict, args.confidence,
@@ -280,7 +281,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--progress", type=Path, help="learning-progress.json to mirror the attempt into")
     p.add_argument("--elapsed-seconds", type=int, help="Your own measurement of this section step; default: seconds since the lesson's previous record (max 3 h)")
     p.add_argument("--rigor", choices=RIGORS, help="full|fast; defaults to the progress file's mode, else full")
-    p.add_argument("--concept", action="append", metavar="ID", help="Target concept id(s); required for --kind supporting")
+    p.add_argument("--concept", action="append", metavar="ID", help="Target concept id(s); required for --kind supporting / recall")
     p.add_argument("--at", metavar="TIME", help="Backfill: when the attempt really happened (ISO 8601 with offset); recorded_at keeps the write time")
     p.add_argument("--force", action="store_true", help="Append even if an identical response for this section and kind exists")
     p.set_defaults(handler=command_append)

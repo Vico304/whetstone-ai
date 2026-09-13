@@ -33,6 +33,7 @@
 | 子节 | `sections[].parent_section` | 深化某一节的节，在原节稳固之后学 |
 | 依赖类型 | `dependency_kind: def / mech / tool` | 前置缺口缺的是定义、机制还是表征或操作，决定补法 |
 | 复习课 | `shape: review`、`review_of[]`、`review_kind: repeat / deepen` | 为已学过的一门或几门课建的课，侧重薄弱处，先作答再揭示；子节在这里学 |
+| 事实卡 | `cards/<lesson-id>.json`、`kind: recall` | 事实层与仅列出的概念的名字对定义，按到期复习；只落在那个概念上，不给机制、本质、思想做卡 |
 | 接缝题 | 复习课结课的迁移题（`review_of` 多于一门时） | 一个必须同时用到两门课机制的情境 |
 
 规则：

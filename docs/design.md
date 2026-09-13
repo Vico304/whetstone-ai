@@ -130,6 +130,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 - **变式题代替诊断**：新课前置阶段查索引与掌握状态。`fresh` 的概念出一道变式题代替诊断；`stale` 先变式题、失败再诊断；`unknown` 正常诊断。快速模式留下的 `fresh` 证据按 `stale` 处理。复用因此同时是间隔复习。
 - **掌握状态** `learner-state.json` 由 `learner_state_build.py` 从日志派生，随时可重建，不手改。每个概念分开记：最近成功的证据等级（`immediate < delayed < transfer`）、时效、稳定性（成功过的不同日期数）、到达过的层、错误命题、信心校准计数。等级按间隔判定而不按题型：与教学同场的作答一律即时，与该概念上一条记录隔了一夜（更早的本地日期且至少 8 小时）之后答对才算延迟，换情境的题在此基础上算迁移——否则同一天里的"复习"和结课题会把刚学的东西记成已保持。时效窗口 = 7 × 2^(稳定性 − 1) 天，上限 180 天；只有即时证据记 `unknown`。唯一的标量 `mastery_estimate` = 证据等级权重 × 时效权重，只供可视化着色，不参与任何教学决策。
 - **前沿与假性掌握**：掌握状态把公开层的前置边和每个概念的最近判定放在一起算——前置全部已掌握而自身未掌握的概念是下一步清单；自身已掌握而某个前置最近判定是 `partial / retry` 的概念是假性掌握，它比不会更危险，对应的边在数据里没有得到支持。另有汇总数（延迟证据占比、高信心作答里的判错次数、假性掌握数）和每门课最近一次链重建的比例，都只打印，不设阈值。
+- **事实卡** `cards.py` 只为 `fact` 层与 `listed` 概念做卡（约定要熟记，不是要理解），作答记 `recall`，只落在那一个概念上；到期规则与时效同一条占位规则，不接 FSRS；resume 和复习课开场先过到期卡。不给机制、本质、思想做卡。
 - **错误复习** `review_pool.py` 只读派生状态，按顺序给出四个池：假性掌握的概念、匿名化的错误命题、链重建漏掉的边、过期的概念；答对后命题仍留在池里，由时效自然淘汰。
 
 ## 8. 工程
@@ -147,7 +148,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `next_step.py`、`lesson_section.py` | 从进度文件判断当前状态，打印该读的协议文件与下一条命令；按节打印课程数据，模型不整份读 `lesson-plan.json` |
 | `store_init.py`、`mrg_export.py`、`index_match.py`、`store_sync.py` | 知识库初始化与登记；导出公开层与高层；别名召回、登记、前置判定（`--home` 读汇总）；结课时把本目录快照推进学习者主目录并重算汇总 |
 | `comparator.py` | 学习者作答抽取对照 MRG：`missing / partial / conflict / weak_reference / representation_only / beyond_reference`，给出反馈顺序，不打分 |
-| `lrg_record.py`、`learner_state_build.py`、`review_pool.py` | 追加学习记录；派生掌握状态；取匿名复习题 |
+| `lrg_record.py`、`learner_state_build.py`、`review_pool.py`、`review_outline.py`、`cards.py` | 追加学习记录；派生掌握状态；取匿名复习题；复习课原料；事实卡 |
 | `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify）；给工作区时只扫最近更新过进度的那门课，其他课只报 inbox 计数 |
 | `evals/score_pack.py` | 给一个课程目录打分：校验错误、概念数、support 分布、locator 命中率、角色与覆盖表指标、每节耗时与 `depth_reached` |
 

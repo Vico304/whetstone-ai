@@ -10,7 +10,7 @@
 
 ## 开启知识库时：去主体化的错误复习
 
-开场变式题之外（或代替之），先重建掌握状态，再按 `review_pool.py` 输出的 `order` 取题：`suspect`（假性掌握——已掌握但前置薄弱的概念，对它出变式题）→ `items`（错误主张，见下）→ `missing_edges`（链重建漏掉或反向的边，问"X 和 Y 之间是什么关系"）→ `stale`（过期概念）。取错误主张时：
+开场变式题之外（或代替之），先重建掌握状态，先过到期的事实卡——`cards.py due --store whetstone/store --lesson-id <lesson-id> --limit 5`，一张一问，只要名字对定义或定义对名字，作答记 `lrg_record.py append --kind recall --concept <id> --section-id <节>`（不加 `--progress`；卡片证据只落在这个概念上）——再按 `review_pool.py` 输出的 `order` 取题：`suspect`（假性掌握——已掌握但前置薄弱的概念，对它出变式题）→ `items`（错误主张，见下）→ `missing_edges`（链重建漏掉或反向的边，问"X 和 Y 之间是什么关系"）→ `stale`（过期概念）。取错误主张时：
 
 ```bash
 python3 scripts/learner_state_build.py build --store whetstone/store
