@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Scan a course directory for unresolved [[wikilinks]] and inbox entries.
+"""Scan a course directory for unresolved [[wikilinks]] and inbox entries, grouped by unit.
+
+Each pending concept is assigned to the unit it belongs to (the units/<id>.md it was marked
+in, else the lesson plan section that lists it, else the unit document that mentions it);
+one marked concept in a unit is `isolated`, two or more are a `cluster` — the note for that
+unit then deepens the unit from those concepts instead of only defining them.
 
 Given a workspace or plan directory instead of a course, scan only the course whose
 learning-progress.json was updated most recently (the one being studied) and list the
@@ -27,8 +32,14 @@ def normalize(name: str) -> str:
 
 
 def note_names(concepts_dir: Path) -> set[str]:
-    """Known targets: note filenames (stem) plus frontmatter aliases."""
+    """Known targets: note filenames (stem) plus frontmatter aliases, and every other .md stem in the
+    course (Obsidian resolves [[u01]] to units/u01.md), so only concept links without a note count."""
     known: set[str] = set()
+    course = concepts_dir.parent
+    if course.is_dir():
+        for other in course.rglob("*.md"):
+            if "__pycache__" not in other.parts and not other.name.startswith("_") and other.parent != concepts_dir:
+                known.add(normalize(other.stem))
     if not concepts_dir.is_dir():
         return known
     for note in concepts_dir.glob("*.md"):
@@ -100,6 +111,81 @@ def course_dirs(root: Path) -> list[Path]:
     return sorted(found, key=lambda c: (updated(c), str(c)), reverse=True)
 
 
+UNIT_FILE = re.compile(r"^(?:units|zoom)/([^/]+?)(?:-guide)?\.md$")
+
+
+def load_plan(pack_dir: Path) -> dict:
+    path = pack_dir / "lesson-plan.json"
+    if not path.is_file():
+        return {}
+    try:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return plan if isinstance(plan, dict) else {}
+
+
+def plan_units(plan: dict) -> list[dict]:
+    """[{id, title, names: {normalized name/alias}}] per section of the lesson plan."""
+    units = []
+    for section in plan.get("sections", []) or []:
+        if not isinstance(section, dict) or not isinstance(section.get("id"), str):
+            continue
+        names: set[str] = set()
+        for concept in section.get("concepts", []) or []:
+            if isinstance(concept, dict):
+                for name in [concept.get("name"), *(concept.get("aliases") or [])]:
+                    if isinstance(name, str) and name.strip():
+                        names.add(normalize(name))
+        units.append({"id": section["id"], "title": section.get("title") or "", "names": names})
+    return units
+
+
+def unit_texts(pack_dir: Path) -> dict[str, str]:
+    """{unit id: normalized text of units/<id>.md} for mention lookup."""
+    texts = {}
+    units_dir = pack_dir / "units"
+    if units_dir.is_dir():
+        for path in sorted(units_dir.glob("*.md")):
+            texts[path.stem] = normalize(strip_code(path.read_text(encoding="utf-8", errors="replace")))
+    return texts
+
+
+def assign_unit(concept: str, found_in: list[str], units: list[dict], texts: dict[str, str]) -> str | None:
+    """The unit a concept belongs to: where it was marked, else where the plan lists it, else where a unit mentions it."""
+    for path in found_in:
+        match = UNIT_FILE.match(path.replace("\\", "/"))
+        if match:
+            return match.group(1)
+    key = normalize(concept)
+    for unit in units:
+        if key in unit["names"]:
+            return unit["id"]
+    for unit_id, text in texts.items():
+        if key and key in text:
+            return unit_id
+    return None
+
+
+def group_by_unit(pending: dict[str, list[str]], plan: dict, pack_dir: Path) -> list[dict]:
+    units = plan_units(plan)
+    texts = unit_texts(pack_dir)
+    titles = {u["id"]: u["title"] for u in units}
+    groups: dict[str | None, list[str]] = {}
+    for concept, found_in in pending.items():
+        groups.setdefault(assign_unit(concept, found_in, units, texts), []).append(concept)
+    order = {u["id"]: index for index, u in enumerate(units)}
+    result = []
+    for unit_id, concepts in sorted(groups.items(), key=lambda item: (item[0] is None, order.get(item[0], 10**6), str(item[0]))):
+        concepts = sorted(set(concepts))
+        result.append({
+            "unit": unit_id, "title": titles.get(unit_id, ""), "concepts": concepts,
+            "scope": "cluster" if len(concepts) >= 2 else "isolated",
+            "note_file": f"concepts/{unit_id}.md" if unit_id else "concepts/<主题>.md",
+        })
+    return result
+
+
 def scan(pack_dir: Path, inbox: Path | None) -> dict:
     concepts_dir = pack_dir / "concepts"
     known = note_names(concepts_dir)
@@ -119,6 +205,9 @@ def scan(pack_dir: Path, inbox: Path | None) -> dict:
         for entry in inbox_entries(inbox or pack_dir / "concepts" / "_inbox.md")
         if normalize(entry) not in known
     ]
+    pending = {concept: sorted(set(paths)) for concept, paths in occurrences.items()}
+    for entry in inbox_pending:
+        pending.setdefault(entry, [])
     return {
         "pack_dir": str(pack_dir),
         "known_notes": sorted(known),
@@ -127,6 +216,8 @@ def scan(pack_dir: Path, inbox: Path | None) -> dict:
             for concept, paths in sorted(occurrences.items())
         ],
         "inbox_pending": inbox_pending,
+        "by_unit": group_by_unit(pending, load_plan(pack_dir), pack_dir),
+        "rule": "one note per unit (concepts/<unit>.md, aliases = its concepts); isolated: explain those concepts only; cluster: also deepen the unit from them",
     }
 
 

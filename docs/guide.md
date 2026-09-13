@@ -59,7 +59,7 @@ claude plugin install whetstone@whetstone-ai
     │   ├── outline.md         路线图、全部概念、覆盖表 —— 读
     │   ├── units/s01.md …     每节的讲义 —— 读
     │   ├── zoom/              按需细化的文档
-    │   ├── concepts/          clarify 生成的概念笔记
+    │   ├── concepts/          clarify 生成的按节概念解释
     │   ├── lesson-plan.json   机器计划，含不展示的判定标准
     │   ├── sources.json       来源清单
     │   └── learning-progress.json   进度和你的原始回答 —— 不要打开
@@ -166,13 +166,13 @@ claude plugin install whetstone@whetstone-ai
 
 > **模型**：已生成 `zoom/s02-guide.md`：NACL 解决的问题、机制、两个例子、边界。读完回来答本节主问题——细化是准备，不代替检验。
 
-### 5.5 概念笔记
+### 5.5 概念解释
 
 在任何文档里写 `[[证书链]]`，或把它写进 `concepts/_inbox.md`，然后：
 
 > **你**：/whetstone:clarify
 
-> **模型**：只看你正在学的这门课，扫描到 2 个未解决的链接：证书链（units/s04.md）、DICE（outline.md）；另一门课还有 1 条待处理，点名再做。为每个生成 `concepts/<名>.md`：解决什么问题、机制、两个例子、边界与误解、相关概念的链接、回链到所在的节。材料里没有依据的部分标为外部知识并附来源。inbox 已清空。
+> **模型**：只看你正在学的这门课，第 4 节标了 2 个概念：证书链、DICE；两个都不懂，这一节的基础不牢——写 `concepts/s04.md`：先各自解释（是什么、在这节机制里的位置、一个材料里的例子、来源），再从它们出发把这一节重讲一遍。另一门课还有 1 条待处理，点名再做。第 2 节只标了 1 个概念，`concepts/s02.md` 只解释它，不扩展。
 
 ### 5.6 继续课程
 
@@ -344,7 +344,7 @@ python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --k
   --verdict partial --confidence 4 --criteria-met c1,c3 --depth mechanism --extraction /tmp/extraction.json \
   --progress whetstone/courses/x/learning-progress.json
 python3 $S/learner_state_build.py build --store store   # 重建掌握状态（模型通常自动运行）
-# 概念笔记扫描；打包插件
+# 概念解释扫描（按节归组）；打包插件
 python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone   # 只扫最近在学的课；--all 全部
 python3 whetstone-ai/package_plugin.py
 ```

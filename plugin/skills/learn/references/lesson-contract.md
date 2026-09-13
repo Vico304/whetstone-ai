@@ -16,7 +16,7 @@
 │   └── <section-id>.md
 ├── zoom/                        # 按需细化文档（教学中学习者选择细化时创建）
 │   └── <section-id>-guide.md
-├── concepts/                    # 概念笔记（clarify 技能维护）
+├── concepts/                    # 按节的概念解释（clarify 技能维护）
 │   ├── _inbox.md
 │   └── <概念名>.md
 └── learning-progress.json   # 进入教学或需要恢复时创建
@@ -32,9 +32,9 @@
 - 来源约束与主讲义相同：`explicit / entailed` 用材料内定位，`external` 附出处；
 - 概念用 `[[概念名]]` 链接；值得独立成篇的概念交给 clarify 技能写入 `concepts/`，细化文档只保留该概念在本节语境中的角色。
 
-## 概念笔记目录（`concepts/`）
+## 概念解释目录（`concepts/`）
 
-由 clarify 技能维护（契约见该技能的 SKILL.md）。本技能只需遵守：生成的所有文档中允许使用 `[[概念名]]` 双链；不改写、不覆盖 `concepts/` 下已有笔记。
+由 clarify 技能维护（契约见该技能的 SKILL.md）：一节一份 `concepts/<节 id>.md`，`aliases` 列出它解释的概念。本技能只需遵守：生成的所有文档中允许使用 `[[概念名]]` 双链；不改写、不覆盖 `concepts/` 下已有文档。
 
 ## 前置产物契约
 

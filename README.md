@@ -49,7 +49,7 @@ Type `/` and you should see `guide / outline / learn / clarify`. Everything the 
 | **learn** | Main entry. Fills in whatever is missing (your profile, a survey of the materials, a course-by-course plan, this course's outline), then generates one lesson document per section, checks prerequisites and tutors section by section |
 | **guide** | Wizard. Asks whether you want a tour or a plan; planning records your background and goals, surveys a directory of materials, and confirms the course sequence one course at a time. Plans only |
 | **outline** | Generate, discuss or revise one course's outline; writes it back after you confirm |
-| **clarify** | Turns `[[wikilinks]]` you leave in the lesson documents into source-grounded, example-rich concept notes (Obsidian-compatible) |
+| **clarify** | Groups the `[[wikilinks]]` you leave in the lesson documents by unit and writes one source-grounded note per unit: a single unclear concept is just explained, several in one unit get the unit re-taught from them (Obsidian-compatible) |
 
 Two choices are made while planning: **full** or **fast** (fast narrows the scope and relaxes judging, but still predicts before revealing); **by material** or **by domain** (by domain starts with a skeleton course of basic principles, with your materials as examples, and you pick branches to go deeper afterwards).
 

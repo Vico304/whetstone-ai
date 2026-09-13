@@ -5,6 +5,7 @@
 - 事实卡：`cards.py build` 为 `fact` 层与 `listed` 概念生成卡（`store/cards/<课程>.json`），`cards.py due` 按与时效同一条规则列到期卡；作答记 `kind: recall`，只落在该概念上；resume 与复习课开场先过到期卡；前置检查里的定义类缺口进父课 `listed` 后由事实卡复习。不给机制、本质、思想做卡，不接 FSRS。
 - 复习课：说"复习 <课程>"进入 `stages/review.md`；`review_outline.py` 从掌握状态取薄弱项按被复习课的节归簇，并列出可长子节的稳固节（每个核心概念至少两次延迟证据且到过本质层）；节带 `review_kind: repeat / deepen` 与 `parent_section`；先作答再揭示，`next_step.py` 认得；校验器 `--reviewed` 做反向泄漏检查；`review_of` 多于一门时结课出接缝题；掌握状态加每个概念的 `delayed_successes`。
 - 协议五处：结课第一题改为链重建（只给打乱的概念名，学习者写出关系，`--chain` 比对，反馈只说漏了哪对、哪条反了）；把握改三档（有把握 / 没把握 / 不知道，记 5 / 3 / 1，高把握阈值改为 5）；概念带 `cases` 时先摆两个案例请学习者写共同点再揭示，带 `contrast` 时揭示后点出近邻；前置缺口按 `dependency_kind` 分流（定义进父课 `listed`，机制建课，操作建课但主问题改为做一遍）；第六种追问“重新归类”。设计文档立场改为五条。模板课程升到 1.5 并示范易混对与两个案例。
+- clarify 改为一节一份文档 `concepts/<节 id>.md`（`aliases` 列出它解释的概念，讲义里的双链仍能解析）：扫描脚本把待处理概念按所属的节归组并判孤立或成簇——一节只标了一个概念就只解释它，两个以上则逐条解释后从它们出发把这一节重讲一遍；模板换成按节的版本。
 - clarify 只处理当前课程：`scan_wikilinks.py` 收到工作区或计划目录时，只扫最近更新过进度的那门课，其他课程只报告 inbox 待处理数；`--course` 指定一门，`--all` 全部。
 - schema 1.5（1.4 的超集，新字段都可选）：概念 `contrast`（易混对）、`cases[2]`（对比案例）、`ontology`（本体类别）；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`（子节）；复习课 `shape: review` 与 `review_of[]`（覆盖表可为空）；前置计划的簇可带 `dependency_kind`；学习计划每门课一行“够用的标志”。校验器、导出、按节打印跟进；校验器打印有易混对与案例的核心概念比例，不设阈值。协议与讲义模板怎么用这些字段，随后两步。
 - `SKILL.md` 从 189 行拆到 52 行：各宿主的路径解析、工作区布局、知识库命令、建课规则（§1–§5、默认值、完成标准）原文搬到 `references/hosts.md`、`workspace.md`、`store.md`、`build.md`，进入对应阶段才读；教学一轮载入的入口文本从 24.5 KB 降到 6.2 KB。
