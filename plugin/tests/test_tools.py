@@ -1308,9 +1308,33 @@ class ScanWikilinksTests(unittest.TestCase):
 
             result = scan_wikilinks.scan(pack, None)
 
-            self.assertEqual({"cache layer", "cache", "缓存"}, set(result["known_notes"]))
+            self.assertTrue({"cache layer", "cache", "缓存"} <= set(result["known_notes"]))  # plus the other .md stems of the course
             unresolved = {item["concept"] for item in result["unresolved_links"]}
             self.assertEqual(unresolved, {"命中率"})
+
+    def test_scan_groups_pending_concepts_by_unit_and_resolves_unit_notes_by_alias(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            course = Path(temporary) / "course"
+            (course / "units").mkdir(parents=True)
+            (course / "concepts").mkdir()
+            plan = load_template()
+            plan["sections"] = [dict(plan["sections"][0], id="s01"), dict(plan["sections"][0], id="s02", title="第二节")]
+            (course / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            (course / "units" / "s01.md").write_text("讲到 [[前馈网络]] 与 [[词元]]，还有 [[s02]]。\n", encoding="utf-8")
+            (course / "units" / "s02.md").write_text("这里提到向量空间。\n", encoding="utf-8")
+            (course / "outline.md").write_text("大纲提到 [[宏观地图]]。\n", encoding="utf-8")
+            (course / "concepts" / "_inbox.md").write_text("- 向量空间\n- 完全无关的词\n", encoding="utf-8")
+            result = scan_wikilinks.scan(course, None)
+            units = {u["unit"]: u for u in result["by_unit"]}
+            self.assertEqual((units["s01"]["concepts"], units["s01"]["scope"], units["s01"]["note_file"]), (["前馈网络", "宏观地图", "词元"], "cluster", "concepts/s01.md"))  # 宏观地图: marked in the outline, listed by s01 in the plan
+            self.assertEqual((units["s02"]["concepts"], units["s02"]["scope"]), (["向量空间"], "isolated"))   # inbox entry, matched by the unit text
+            self.assertEqual(units[None]["concepts"], ["完全无关的词"])
+            self.assertNotIn("s02", [l["concept"] for l in result["unresolved_links"]])                   # [[s02]] resolves to units/s02.md
+            self.assertIn("宏观地图", [l["concept"] for l in result["unresolved_links"]])                   # a plan concept marked in the outline
+            # a per-unit note whose aliases list its concepts resolves them
+            (course / "concepts" / "s01.md").write_text("---\nunit: s01\naliases: [前馈网络, 词元]\nscope: cluster\n---\n# 第一节\n", encoding="utf-8")
+            result = scan_wikilinks.scan(course, None)
+            self.assertEqual(units_after := {u["unit"]: u["concepts"] for u in result["by_unit"]}, {"s01": ["宏观地图"], "s02": ["向量空间"], None: ["完全无关的词"]})
 
     def test_scan_scope_defaults_to_the_course_studied_most_recently(self):
         with tempfile.TemporaryDirectory() as temporary:

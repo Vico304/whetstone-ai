@@ -15,7 +15,7 @@
 ├── prerequisite-progress.json  前置作答与回程复测（条件产物）；缺口建成前置课，是同级的另一个课程目录
 ├── prerequisite-guide.md       旧课程的补充文档；1.4 起不再生成
 ├── zoom/<section-id>-guide.md  学习者选择细化时生成，一节最多一份
-└── concepts/                   clarify 技能维护的概念笔记与 _inbox.md
+└── concepts/                   clarify 技能维护的按节概念解释（<节 id>.md）与 _inbox.md
 ```
 
 旧课程的单文档 `teaching-guide.md`（schema 1.0 / 1.1）仍被校验器接受（`--guide`），新课程不再生成。
