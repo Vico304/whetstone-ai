@@ -38,6 +38,9 @@ def require_text_list(
         errors.append(f"{location}.{key} must be a list of non-empty strings{suffix}")
 
 
+DEPENDENCY_KINDS = {"def", "mech", "tool"}
+
+
 def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
@@ -85,6 +88,10 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
                 if manifest_paths is not None and nonempty(ref.get("path")) and ref["path"] not in manifest_paths:
                     errors.append(f"{ref_location}.path '{ref['path']}' is absent from the source manifest")
 
+        kind = prerequisite.get("dependency_kind")
+        if kind is not None and kind not in DEPENDENCY_KINDS:
+            errors.append(f"{location}.dependency_kind must be one of {sorted(DEPENDENCY_KINDS)} (def: a definition to supply; "
+                          f"mech: a mechanism to understand; tool: a representation or skill to practise)")
         diagnostic = prerequisite.get("diagnostic")
         if not isinstance(diagnostic, dict):
             errors.append(f"{location}.diagnostic must be an object")

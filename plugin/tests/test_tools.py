@@ -1685,3 +1685,95 @@ class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
             verdict="partial", confidence=None, criteria_met=[], depth_reached="fact", extraction=None, comparison=None, elapsed_seconds=None,
         )
         self.assertEqual(event["kind"], "diagnostic")
+
+
+class Schema15Tests(unittest.TestCase):
+    """Schema 1.5: contrast / cases / ontology, contested tradeoffs, sub-sections, review courses."""
+
+    @staticmethod
+    def plan15():
+        plan = load_template()
+        plan["schema_version"] = "1.5"
+        refs = plan["sections"][0]["source_refs"]
+        boundary = plan["sections"][0]["concepts"][0]
+        boundary["contrast"] = {"with": "learning-design.macro-map", "differs_in": "边界说的是范围，地图说的是范围内的关系"}
+        boundary["cases"] = [{"summary": "一份 REST 服务的输入与输出", "source_refs": refs},
+                             {"summary": "一条数据流水线的输入与输出", "source_refs": refs}]
+        boundary["ontology"] = "constraint"
+        plan["sections"][0]["tradeoffs"] = [
+            "边界画得越窄，地图越准，但越容易漏掉外部依赖",
+            {"text": "材料对是否先画边界说法不一", "contested": True,
+             "sides": [{"claim": "先画边界再画地图", "source_refs": refs}, {"claim": "先画地图再收边界", "source_refs": refs}]},
+        ]
+        return plan
+
+    def test_variation_fields_validate_and_export(self):
+        plan = self.plan15()
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+        self.assertEqual(validate_lesson.variation_ratio(plan), {"contrast": 1, "cases": 1, "total": 2})
+        public, deep = mrg_export.export(plan)
+        node = next(n for n in public["nodes"] if n["id"] == "learning-design.system-boundary")
+        self.assertEqual((node["ontology"], node["contrast"]["with"], len(node["cases"])), ("constraint", "learning-design.macro-map", 2))
+        self.assertEqual(deep["sections"][0]["tradeoffs"][1]["contested"], True)
+        view = lesson_section.render_section(plan, "s01")
+        self.assertIn("易混对: learning-design.macro-map", view)
+        self.assertIn("案例 2: 一条数据流水线", view)
+        self.assertIn("材料在此处不一致", view)
+        # the leak check reads the text of an object tradeoff like a string one
+        pairs = validate_lesson.hidden_pairs(plan["sections"][0]) if hasattr(validate_lesson, "hidden_pairs") else None
+        errors = validate_lesson.validate_units(PLUGIN_ROOT / "skills" / "learn" / "assets" / "units-template", plan)[0]
+        self.assertTrue(all("tradeoff" not in e for e in errors), errors)
+
+    def test_variation_field_errors(self):
+        plan = self.plan15()
+        boundary = plan["sections"][0]["concepts"][0]
+        boundary["contrast"] = {"with": "learning-design.system-boundary", "differs_in": "x"}
+        boundary["cases"] = [boundary["cases"][0]]
+        boundary["ontology"] = "thing"
+        plan["sections"][0]["tradeoffs"][1]["sides"] = plan["sections"][0]["tradeoffs"][1]["sides"][:1]
+        errors = "\n".join(validate_lesson.validate_plan(plan))
+        for needle in ("contrast.with must name another concept", "exactly 2 cases", "ontology must be one of", "exactly 2 sides"):
+            self.assertIn(needle, errors)
+        old = self.plan15()
+        old["schema_version"] = "1.4"
+        errors = "\n".join(validate_lesson.validate_plan(old))
+        self.assertIn("require schema_version '1.5'", errors)
+        self.assertIn("objects need schema 1.5", errors)
+
+    def test_sub_sections_and_review_courses(self):
+        plan = self.plan15()
+        second = json.loads(json.dumps(plan["sections"][0]))
+        second["id"], second["depends_on"] = "s01.1", ["s01"]
+        second["parent_section"] = {"lesson_id": plan["lesson_id"], "section_id": "s01"}
+        plan["sections"][0]["new_problem"], second["new_problem"] = "边界之内还有什么要深化", None
+        plan["sections"].append(second)
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+        self.assertIn("子节，深化 sample-guided-lesson 的 s01", lesson_section.render_section(plan, "s01.1"))
+        self.assertEqual(mrg_export.export(plan)[0]["sections"][1]["parent_section"]["section_id"], "s01")
+        plan["sections"][0]["parent_section"] = {"lesson_id": plan["lesson_id"], "section_id": "s01.1"}
+        self.assertTrue(any("cycle" in e for e in validate_lesson.validate_plan(plan)))
+        plan["sections"][0].pop("parent_section")
+        second["parent_section"] = {"lesson_id": "other-course", "section_id": "u02"}
+        self.assertTrue(any("neither this course nor one listed in review_of" in e for e in validate_lesson.validate_plan(plan)))
+
+        review = self.plan15()
+        review["shape"], review["review_of"], review["coverage"] = "review", ["tee-skeleton-1", "other-course"], []
+        review["sections"][0]["parent_section"] = {"lesson_id": "other-course", "section_id": "u02"}
+        self.assertEqual(validate_lesson.validate_plan(review), [])   # empty coverage is fine: the material is the reviewed courses
+        self.assertEqual(mrg_export.export(review)[0]["review_of"], ["tee-skeleton-1", "other-course"])
+        review["review_of"] = [review["lesson_id"]]
+        self.assertTrue(any("must not contain this course" in e for e in validate_lesson.validate_plan(review)))
+        review["review_of"] = ["other-course"]
+        review["probe"] = None
+        review["sections"][0]["probe"] = {"prompt": "p", "criteria": [{"id": "p1", "text": "t", "layer": "mechanism"}]}
+        self.assertTrue(any("probe is only allowed in skeleton courses" in e for e in validate_lesson.validate_plan(review)))
+        linear = self.plan15()
+        linear["review_of"] = ["x"]
+        self.assertTrue(any("only allowed when shape = review" in e for e in validate_lesson.validate_plan(linear)))
+
+    def test_prerequisite_clusters_may_carry_a_dependency_kind(self):
+        plan = json.loads((PLUGIN_ROOT / "skills" / "learn" / "assets" / "prerequisite-plan-template.json").read_text(encoding="utf-8"))
+        plan["prerequisites"][0]["dependency_kind"] = "tool"
+        self.assertEqual(validate_prerequisites.validate_plan(plan), [])
+        plan["prerequisites"][0]["dependency_kind"] = "skill"
+        self.assertTrue(any("dependency_kind must be one of" in e for e in validate_prerequisites.validate_plan(plan)))

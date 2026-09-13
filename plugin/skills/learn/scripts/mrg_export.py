@@ -90,6 +90,9 @@ def build_nodes(plan: dict) -> dict[str, dict]:
                         node["aliases"].append(alias)
             if section["id"] not in node["section_ids"]:
                 node["section_ids"].append(section["id"])
+            for key in ("contrast", "cases", "ontology"):
+                if key in concept and key not in node:
+                    node[key] = concept[key]
             anchor = concept.get("anchor")
             if isinstance(anchor, dict):
                 ref = {"path": anchor.get("path"), "locator": anchor.get("locator"),
@@ -134,6 +137,7 @@ def section_skeleton(plan: dict) -> list[dict]:
                 "deferred": section["id"] in deferred_ids,
                 "title": section.get("title"),
                 "depends_on": list(section.get("depends_on", [])),
+                "parent_section": section.get("parent_section"),
                 "problem": section.get("problem"),
                 "solution": section.get("solution"),
                 "mechanism": section.get("mechanism"),
@@ -193,6 +197,7 @@ def export(plan: dict) -> tuple[dict, dict]:
         "prerequisite_of": plan.get("prerequisite_of"),
         "blocked_at": plan.get("blocked_at"),
         "depth": plan.get("depth"),
+        "review_of": list(plan.get("review_of") or []),
         "branch_candidates": [dict(item) for item in (plan.get("branch_candidates") or []) if isinstance(item, dict)],
         "grounding": validate_lesson.grounding(plan) if validate_lesson.plan_shape(plan) == "skeleton" else None,
         "source_schema_version": validate_lesson.schema_version(plan),

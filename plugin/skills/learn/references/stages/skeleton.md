@@ -11,7 +11,7 @@
 5. 每个 unit 写 `probe`：一道**无提示、原理层、不依赖材料细节**的问题，criteria 与 checkpoint 一样对学习者隐藏；**`probe` 与 `checkpoint` 是两道不同的题**：probe 在教学前不看材料作答，checkpoint 在读完 unit 后作答——unit 文档的"轮到你"只放 `checkpoint.prompt`，探测题不写进任何文档（校验器报错）；
 6. 填 `branch_candidates[]`：骨架概念 → 材料里的文件/模块（`pool` 或 `reserve` 之下）→ `work_relevance`（对应实际工作的哪一部分，没有就省略）；每个 unit 至少落到一个候选，多个 unit 可共用；没有落点的概念在表里标 no-anchor；`status` 一律 `candidate`；
 7. `final_challenge` 与迁移题**只用学习者的实际材料**出题（这是第三道相关性锚）；
-8. 写 `lesson-plan.json`（`schema_version: "1.3"`, `shape: "skeleton"`, `outline_confirmed_at: null`）与 `outline.md`（模板：`assets/skeleton-example/`），运行
+8. 写 `lesson-plan.json`（`schema_version: "1.5"`, `shape: "skeleton"`, `outline_confirmed_at: null`）与 `outline.md`（模板：`assets/skeleton-example/`），运行
    `validate_lesson.py <plan> --outline outline.md --sources-root <材料根>`；把它打印的 `INFO: grounding …` 原样写进 outline 的"落点比例"。
 
 ## 呈现时额外说明

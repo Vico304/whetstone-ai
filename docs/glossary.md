@@ -25,6 +25,13 @@
 | 前置课、前置栈 | 前置课（`prerequisite_of / blocked_at / depth`，schema 1.4）；前置栈（`learning-plan.md` §3a） | 为父课的缺口建的一门普通课，父课在被卡的节等它；栈记录每一层与回程 |
 | 下一步清单、假性掌握 | `fringe.outer / fringe.suspect`（`learner-state.json`） | 由前置关系和掌握状态算出：前置都已掌握而自身未掌握的概念，是下一步；自身已掌握而某个前置薄弱的概念，是假性掌握 |
 | 链重建 | `comparator.py --chain`、事件的 `chain`、`lessons.<id>.chain_rebuild` | 学习者说出概念之间的关系，与参考图的关系集逐条比对；对上的边占参考边的比例是链重建比例 |
+| 易混对 | `contrast: {with, differs_in}`（schema 1.5） | 一个概念最容易与之混淆的近邻，以及差在哪个变量 |
+| 对比案例 | `cases[2]` | 两个表面不同、结构相同的例子，讲义先摆它们再揭示机制 |
+| 本体类别 | `ontology: entity / process / constraint / relation` | 一个概念是东西、过程、约束还是关系；答错类别时要重新归类，不是反驳 |
+| 有争议的取舍 | `tradeoffs[].contested` 与 `sides[]` | 材料在这一点上说法不一，两方各有来源 |
+| 子节 | `sections[].parent_section` | 深化某一节的节，在原节稳固之后学 |
+| 依赖类型 | `dependency_kind: def / mech / tool` | 前置缺口缺的是定义、机制还是表征或操作，决定补法 |
+| 复习课 | `shape: review`、`review_of[]` | 为已学过的一门或几门课建的课，侧重薄弱处，子节在这里学 |
 
 规则：
 

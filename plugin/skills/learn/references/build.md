@@ -36,7 +36,7 @@
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
 3. 根据学习者的原始回答判断当前材料所需的概念生成、边界、关系和应用证据，不扩大为一般能力画像；
-4. 有任何 `fragile | gap | misconception` 的簇，就为它们建**一门前置课**（[references/prerequisite/course.md](prerequisite/course.md)）：外部存档作来源、`schema 1.4`、模式跟随本课、大纲照常确认、逐节教学与记录；本课在当前节 `learning_state.py block`；
+4. 有任何 `fragile | gap | misconception` 的簇，就为它们建**一门前置课**（[prerequisite/course.md](prerequisite/course.md)）：外部存档作来源、`schema 1.4`、模式跟随本课、大纲照常确认、逐节教学与记录；本课在当前节 `learning_state.py block`；
 5. 前置课结课后回程（[references/prerequisite/return.md](prerequisite/return.md)）：`unblock`、对被卡簇出变式题，再从被卡的节继续。
 
 小缺口也建课，不再生成补充文档。前置课自己暴露缺口时同一协议递归；`learning-plan.md` 的"前置栈"随时可见。在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
@@ -55,7 +55,7 @@
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-产出 `lesson-plan.json`（schema `1.2`；骨架课与分支课用 `1.3`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [references/stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [references/stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ## 4. 生成教学包：按 unit 逐份生成
 

@@ -11,11 +11,17 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
-SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3", "1.4"}
-ROLE_AWARE_VERSIONS = {"1.2", "1.3", "1.4"}  # course-planning (spec C) fields
-SHAPE_AWARE_VERSIONS = {"1.3", "1.4"}  # shape / pool / anchor / probe / branch candidates
+SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3", "1.4", "1.5"}
+ROLE_AWARE_VERSIONS = {"1.2", "1.3", "1.4", "1.5"}  # course-planning (spec C) fields
+SHAPE_AWARE_VERSIONS = {"1.3", "1.4", "1.5"}  # shape / pool / anchor / probe / branch candidates
+PREREQUISITE_VERSIONS = {"1.4", "1.5"}
 PREREQUISITE_KEYS = ("prerequisite_of", "blocked_at", "depth")  # 1.4: a course spawned to fill a parent course's gap
-SHAPES = {"linear", "skeleton", "branch"}
+SHAPES = {"linear", "skeleton", "branch", "review"}
+# 1.5: variation fields on concepts, contested tradeoffs, sub-sections, review courses
+ONTOLOGY_TYPES = {"entity", "process", "constraint", "relation"}
+CASES_PER_CONCEPT = 2
+CONTESTED_SIDES = 2
+V15_CONCEPT_KEYS = ("contrast", "cases", "ontology")
 ANCHOR_MARKERS = {"external", "no-anchor"}
 BRANCH_STATUSES = {"candidate", "chosen", "declined"}
 MODES = {"full", "fast"}
@@ -176,6 +182,131 @@ def validate_concept_v12(concept: dict, location: str, errors: list[str]) -> Non
             validate_criteria(check, f"{location}.check", errors, "1.2")
 
 
+def validate_concept_v15(concept: dict, location: str, errors: list[str], manifest_paths: set[str] | None) -> None:
+    """Variation fields: the nearest confusable neighbour, two structurally alike cases, the ontological category."""
+    contrast = concept.get("contrast")
+    if contrast is not None:
+        if not isinstance(contrast, dict):
+            errors.append(f"{location}.contrast must be an object {{with, differs_in}}")
+        else:
+            with_id = contrast.get("with")
+            if not nonempty(with_id) or not CONCEPT_ID.match(with_id):
+                errors.append(f"{location}.contrast.with must be a concept id")
+            elif with_id == concept.get("id"):
+                errors.append(f"{location}.contrast.with must name another concept")
+            require_text(contrast, "differs_in", f"{location}.contrast", errors)
+    cases = concept.get("cases")
+    if cases is not None:
+        if not isinstance(cases, list) or len(cases) != CASES_PER_CONCEPT:
+            errors.append(f"{location}.cases must be a list of exactly {CASES_PER_CONCEPT} cases (surface-different, structure-alike)")
+        else:
+            for index, case in enumerate(cases):
+                c_location = f"{location}.cases[{index}]"
+                if not isinstance(case, dict):
+                    errors.append(f"{c_location} must be an object {{summary, source_refs[]}}")
+                    continue
+                require_text(case, "summary", c_location, errors)
+                validate_source_refs(case.get("source_refs"), c_location, errors, manifest_paths)
+    ontology = concept.get("ontology")
+    if ontology is not None and ontology not in ONTOLOGY_TYPES:
+        errors.append(f"{location}.ontology must be one of {sorted(ONTOLOGY_TYPES)}")
+
+
+def tradeoff_text(item: Any) -> str | None:
+    """The text of a tradeoff entry: a string (1.0) or an object {text, contested?, sides?} (1.5)."""
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict) and isinstance(item.get("text"), str):
+        return item["text"]
+    return None
+
+
+def validate_tradeoffs(section: dict, location: str, errors: list[str], version: str, manifest_paths: set[str] | None) -> None:
+    items = section.get("tradeoffs")
+    if not isinstance(items, list):
+        errors.append(f"{location}.tradeoffs must be a list (empty allowed)")
+        return
+    for index, item in enumerate(items):
+        t_location = f"{location}.tradeoffs[{index}]"
+        if nonempty(item):
+            continue
+        if not isinstance(item, dict) or version != "1.5":
+            errors.append(f"{t_location} must be a non-empty string" + ("" if version == "1.5" else " (objects need schema 1.5)"))
+            continue
+        require_text(item, "text", t_location, errors)
+        contested = item.get("contested", False)
+        if not isinstance(contested, bool):
+            errors.append(f"{t_location}.contested must be true or false")
+        sides = item.get("sides")
+        if contested or sides is not None:
+            if not isinstance(sides, list) or len(sides) != CONTESTED_SIDES:
+                errors.append(f"{t_location}.sides must list exactly {CONTESTED_SIDES} sides when the tradeoff is contested")
+            else:
+                for s_index, side in enumerate(sides):
+                    s_location = f"{t_location}.sides[{s_index}]"
+                    if not isinstance(side, dict):
+                        errors.append(f"{s_location} must be an object {{claim, source_refs[]}}")
+                        continue
+                    require_text(side, "claim", s_location, errors)
+                    validate_source_refs(side.get("source_refs"), s_location, errors, manifest_paths)
+
+
+def validate_v15(plan: dict, section_ids: set[str], errors: list[str]) -> None:
+    """Schema 1.5: review courses (shape review + review_of) and sub-sections (parent_section)."""
+    shape = plan_shape(plan)
+    review_of = plan.get("review_of")
+    if shape == "review":
+        if not isinstance(review_of, list) or not review_of or not all(nonempty(item) for item in review_of):
+            errors.append("root.review_of must list the lesson ids this review course revisits (shape = review)")
+        elif plan.get("lesson_id") in review_of:
+            errors.append("root.review_of must not contain this course")
+    elif review_of is not None:
+        errors.append("root.review_of is only allowed when shape = review")
+    reviewed = set(review_of) if isinstance(review_of, list) else set()
+    parents: dict[str, str] = {}
+    for index, section in enumerate(plan.get("sections") or []):
+        if not isinstance(section, dict):
+            continue
+        location = f"sections[{index}]"
+        parent = section.get("parent_section")
+        if parent is None:
+            continue
+        if not isinstance(parent, dict) or not nonempty(parent.get("lesson_id")) or not nonempty(parent.get("section_id")):
+            errors.append(f"{location}.parent_section must be an object {{lesson_id, section_id}}")
+            continue
+        if parent["lesson_id"] == plan.get("lesson_id"):
+            if parent["section_id"] == section.get("id"):
+                errors.append(f"{location}.parent_section must not be the section itself")
+            elif parent["section_id"] not in section_ids:
+                errors.append(f"{location}.parent_section.section_id '{parent['section_id']}' is not a section of this course")
+            else:
+                parents[section.get("id")] = parent["section_id"]
+        elif parent["lesson_id"] not in reviewed:
+            errors.append(f"{location}.parent_section.lesson_id '{parent['lesson_id']}' is neither this course nor one listed in review_of")
+    for start in parents:
+        seen, node = set(), start
+        while node in parents:
+            if node in seen:
+                errors.append(f"sections parent_section chain starting at '{start}' forms a cycle")
+                break
+            seen.add(node)
+            node = parents[node]
+
+
+def variation_ratio(plan: dict) -> dict:
+    """Core concepts with a contrast pair / with two cases, out of all core concepts (unique by id). No threshold."""
+    seen: dict[str, dict] = {}
+    for section in plan.get("sections", []) or []:
+        for concept in (section.get("concepts", []) or []) if isinstance(section, dict) else []:
+            if isinstance(concept, dict) and concept.get("role", "core") == "core":
+                key = concept.get("id") or concept.get("name")
+                if isinstance(key, str):
+                    entry = seen.setdefault(key, {"contrast": False, "cases": False})
+                    entry["contrast"] = entry["contrast"] or isinstance(concept.get("contrast"), dict)
+                    entry["cases"] = entry["cases"] or isinstance(concept.get("cases"), list)
+    return {"contrast": sum(1 for e in seen.values() if e["contrast"]), "cases": sum(1 for e in seen.values() if e["cases"]), "total": len(seen)}
+
+
 def validate_deferred(plan: dict, section_ids: set[str], concept_ids: set[str], errors: list[str]) -> set[str]:
     """Returns the set of deferred section ids."""
     deferred_sections: set[str] = set()
@@ -209,7 +340,7 @@ def validate_coverage(plan: dict, section_ids: set[str], errors: list[str], allo
     if not isinstance(coverage, list):
         errors.append("root.coverage must be a list (schema 1.2)")
         return
-    if not coverage and not allow_empty:
+    if not coverage and not allow_empty and shape != "review":
         errors.append("root.coverage is empty; every source heading needs a disposition (or pass --allow-empty-coverage)")
     for index, item in enumerate(coverage):
         location = f"coverage[{index}]"
@@ -565,7 +696,7 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         if nonempty(section_id):
             seen.add(section_id)
 
-        require_text_list(section, "tradeoffs", location, errors, allow_empty=True)
+        validate_tradeoffs(section, location, errors, version, manifest_paths)
         new_problem = section.get("new_problem")
         if index < len(sections) - 1 and not nonempty(new_problem):
             errors.append(f"{location}.new_problem must lead into the next section")
@@ -587,6 +718,10 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
                     validate_concept_v11(concept, concept_location, errors, names_by_id)
                 if version in ROLE_AWARE_VERSIONS:
                     validate_concept_v12(concept, concept_location, errors)
+                if version == "1.5":
+                    validate_concept_v15(concept, concept_location, errors, manifest_paths)
+                elif any(key in concept for key in V15_CONCEPT_KEYS):
+                    errors.append(f"{concept_location}.contrast / cases / ontology require schema_version '1.5'")
 
         if "principle" in section and not nonempty(section.get("principle")):
             errors.append(f"{location}.principle must be a non-empty string when present")
@@ -618,12 +753,20 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         for key in ("shape", "parent_course", "branch_candidates"):
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.3'")
-    if version == "1.4":
+    if version in PREREQUISITE_VERSIONS:
         validate_v14(plan, errors)
     else:
         for key in PREREQUISITE_KEYS:
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.4'")
+    if version == "1.5":
+        validate_v15(plan, seen, errors)
+    else:
+        if "review_of" in plan or plan.get("shape") == "review":
+            errors.append("root.review_of / shape review require schema_version '1.5'")
+        for index, section in enumerate(sections):
+            if isinstance(section, dict) and "parent_section" in section:
+                errors.append(f"sections[{index}].parent_section requires schema_version '1.5'")
 
     final_challenge = plan.get("final_challenge")
     if not isinstance(final_challenge, dict):
@@ -711,8 +854,9 @@ def hidden_texts(section: dict) -> list[tuple[str, str]]:
     if nonempty(section.get("meaning")):
         pairs.append(("rationale-layer meaning", section["meaning"]))
     for tradeoff in section.get("tradeoffs") or []:
-        if nonempty(tradeoff):
-            pairs.append(("rationale-layer tradeoff", tradeoff))
+        text = tradeoff_text(tradeoff)
+        if nonempty(text):
+            pairs.append(("rationale-layer tradeoff", text))
     return pairs
 
 
@@ -932,6 +1076,10 @@ def main() -> int:
             f = fact_ratio(plan)
             print(f"INFO: prerequisite course of {plan.get('prerequisite_of')} (depth {plan.get('depth')}, blocked at {plan.get('blocked_at')}); "
                   f"fact ratio {f['fact']}/{f['total']} concepts are fact-layer — no threshold; when nearly all are conventions, the next level is cards, not a course")
+        if schema_version(plan) == "1.5":
+            v = variation_ratio(plan)
+            print(f"INFO: variation {v['contrast']}/{v['total']} core concepts have a contrast pair, {v['cases']}/{v['total']} have two cases "
+                  f"— no threshold; a concept without them is taught from one example")
         if schema_version(plan) != "1.0":
             o = orphan_concepts(plan)
             if o["orphans"]:
