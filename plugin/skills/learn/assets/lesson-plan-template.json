@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.5",
   "lesson_id": "sample-guided-lesson",
   "title": "示例：从总体问题理解系统设计",
   "learning_goal": "能解释每个方案为何出现，以及它如何引出下一步",
@@ -46,7 +46,36 @@
             "结构分析"
           ],
           "explanation": "本次解释纳入和排除的输入、过程与输出",
-          "role": "core"
+          "role": "core",
+          "ontology": "constraint",
+          "contrast": {
+            "with": "learning-design.macro-map",
+            "differs_in": "边界回答“哪些东西算在内”，地图回答“算在内的东西怎么连”"
+          },
+          "cases": [
+            {
+              "summary": "一个只读文件的转换脚本：输入是文件路径，输出是转换结果，中间只有解析与写出",
+              "source_refs": [
+                {
+                  "path": "examples/source.md",
+                  "locator": "## Architecture",
+                  "support": "explicit",
+                  "note": "来源在 Architecture 节先列了输入与输出"
+                }
+              ]
+            },
+            {
+              "summary": "一条多阶段的数据流水线：输入是原始事件，输出是报表，中间是清洗、聚合、渲染",
+              "source_refs": [
+                {
+                  "path": "examples/source.md",
+                  "locator": "## Architecture",
+                  "support": "explicit",
+                  "note": "同一节把多步流程压成输入到输出"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "learning-design.macro-map",

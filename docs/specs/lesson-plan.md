@@ -113,7 +113,7 @@
 
 ## 10. `units/<section-id>.md`
 
-每个非 deferred 的节一份，独立生成，只带本节的来源定位读原文。必含：当前问题、解决方案、工作机制、引出的新问题、本节概念（core / supporting / listed 三块可见；supporting 各一段"在本节机制里的位置"；listed 只有名 + 一句 + 定位，不讲机制）、来源、"轮到你"检查点。不含 `meaning`、`tradeoffs`、`principle`、`criteria`。
+每个非 deferred 的节一份，独立生成，只带本节的来源定位读原文。必含：当前问题、（core 概念带 `cases` 时）两个案例并列并请学习者先写共同点、解决方案、工作机制、引出的新问题、本节概念（core / supporting / listed 三块可见；带 `contrast` 的一句点出近邻与差在哪个变量；supporting 各一段"在本节机制里的位置"；listed 只有名 + 一句 + 定位，不讲机制）、来源、"轮到你"检查点。不含 `meaning`、`tradeoffs`、`principle`、`criteria`。
 
 校验：文件存在；含本节标题、`checkpoint.prompt` 原文、每个概念名；`criteria` 或 `principle` 泄漏为错误；`meaning`、`tradeoffs` 逐字出现为警告；supporting 概念旁的"验收 X"提醒为警告——只在 outline 的使用说明里写一次。模板 `assets/units-template/s01.md`。
 

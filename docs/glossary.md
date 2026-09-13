@@ -18,6 +18,7 @@
 | 探测题 | `probe` | 骨架课每节一道无提示的原理题，教学前作答；答对的节由你决定是否跳过 |
 | 主问题 | `checkpoint` | 每节读完后要回答的问题；判定标准 `criteria` 不展示 |
 | 来源类型：原文明示、可推出、外部知识、教学推断、无依据 | `support: explicit / entailed / external / pedagogical_inference / unsupported` | 一条主张的依据从哪来。教学推断在评估时降权，与它冲突不判错 |
+| 把握：有把握、没把握、不知道 | `confidence: 5 / 3 / 1` | 作答前学习者自报的三档；只作诊断信号，有把握且错的优先反馈 |
 | 时效：有效、过期、未知 | `freshness: fresh / stale / unknown` | 一个概念的掌握证据是否还在有效期内。只有当场答对的证据记为未知 |
 | 概念索引 | `concepts/index.json` | 跨课程的概念 id、别名、出现记录 |
 | 掌握状态 | `learner-state.json` | 从学习记录派生的每个概念的状态：证据强弱、时效、到达过的层、错误说法、信心校准 |

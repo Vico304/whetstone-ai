@@ -83,7 +83,7 @@ class LessonValidationTests(unittest.TestCase):
         assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
         plan = load_template()
 
-        self.assertEqual(plan["schema_version"], "1.2")
+        self.assertEqual(plan["schema_version"], "1.5")
         self.assertEqual(validate_lesson.validate_plan(plan), [])
         self.assertEqual(validate_lesson.collect_warnings(plan), [])
         self.assertEqual(validate_lesson.validate_outline((assets / "outline-template.md").read_text(encoding="utf-8"), plan), [])
@@ -1388,7 +1388,9 @@ class SkeletonCourseTests(unittest.TestCase):
         errors = validate_lesson.validate_plan(plan)
         self.assertTrue(any("parent_course must name the skeleton course" in e for e in errors), errors)
         old = load_template()
-        old["shape"] = "skeleton"
+        old["schema_version"], old["shape"] = "1.2", "skeleton"
+        for key in ("contrast", "cases", "ontology"):
+            old["sections"][0]["concepts"][0].pop(key, None)
         self.assertTrue(any("requires schema_version '1.3'" in e for e in validate_lesson.validate_plan(old)))
 
     def test_external_archive_pool_rows_are_allowed_in_any_shape(self):
@@ -1597,6 +1599,8 @@ class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
     def _prerequisite_plan(self):
         plan = load_template()
         plan["schema_version"] = "1.4"
+        for key in ("contrast", "cases", "ontology"):
+            plan["sections"][0]["concepts"][0].pop(key, None)  # a 1.4 plan has no 1.5 fields
         plan["lesson_id"] = "linear-algebra-min-0"
         plan["prerequisite_of"] = "sample-guided-lesson"
         plan["blocked_at"] = "s01"
@@ -1611,8 +1615,8 @@ class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
         self.assertEqual(ratio["total"], len({c.get("id") or c["name"] for s in plan["sections"] for c in s["concepts"]}))
         self.assertGreaterEqual(ratio["fact"], 1)
 
-        old = load_template()
-        old["prerequisite_of"] = "x"
+        old = self._prerequisite_plan()
+        old["schema_version"] = "1.2"
         self.assertTrue(any("requires schema_version '1.4'" in e for e in validate_lesson.validate_plan(old)), "1.2 must reject 1.4 keys")
 
         for broken, needle in (

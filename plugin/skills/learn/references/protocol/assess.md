@@ -45,7 +45,7 @@
 
 - `concepts[]`：回答提到了哪些概念（可用 id、名称或别名），各自 `correct | partial | wrong | missing`；本节概念没提到的写 `missing` 或不写；
 - `relations[]`：回答断言的概念关系 `{from, to, type, status}`，`status ∈ correct | direction_reversed | wrong_type | missing | extra`；
-- `propositions[]`：回答拆成的原子命题，**去主体化**（不含"你说""我认为"，不引用原句），各自 `correct | partial | wrong | representation_only`，附涉及的概念与是否高信心。
+- `propositions[]`：回答拆成的原子命题，**去主体化**（不含"你说""我认为"，不引用原句），各自 `correct | partial | wrong | representation_only`，附涉及的概念；`confidence_high` 只在学习者说"有把握"时为真。
 
 抽取是模型对回答的读取，标 `extracted_by: "model"`；学习者不确认、不修改。`lrg_record.py append --extraction` 会调用比较器，输出 `feedback_priority`（`conflict:high_confidence` → `conflict` → `missing` → `partial`；`weak_reference` 不判学习者错，`beyond_reference` 只记录）。按这个顺序做 [feedback.md](feedback.md) 的"一次只处理一个问题"。
 

@@ -32,7 +32,7 @@ python3 scripts/index_match.py prerequisites --store <工作区>/store --lesson-
 1. 简短说明将评估哪些"针对当前材料的准备能力"，允许学习者回答"不知道"或跳过。
 2. 一次只问一个主问题。提问后交还对话，不同时给参考答案或检索补充。
 3. 问题优先暴露：能否用自己的话生成概念而不只是识别名称；能否说明边界、反例或失效条件；能否说明概念之间的关系、方向和理由；能否应用到一个简单的新情境。
-4. 不用文本相似度判分。对每个簇记 `ready | fragile | gap | misconception | skipped`，单独记判断置信度。
+4. 不用文本相似度判分。对每个簇记 `ready | fragile | gap | misconception | skipped`，单独记判断置信度；非 `ready` 的簇再记依赖类型 `dependency_kind`：`def` 缺的是定义或约定，`mech` 缺的是机制，`tool` 缺的是表征或操作。
 5. 证据够就停，不为凑题数继续。
 6. `scripts/prerequisite_state.py` 追加原始回答与修订，生成 `prerequisite-progress.json`；不用后续回答覆盖首次证据。开启知识库时每次诊断作答同时 `lrg_record.py append --kind diagnostic --concept <id>`（即时证据，不加 `--progress`）。
 
