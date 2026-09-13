@@ -1,6 +1,6 @@
 # 逐节教学协议：状态机与加载表
 
-协议按状态拆分。**只读当前状态对应的文件**，不要一次加载全部。
+协议按状态拆分。**只读当前状态对应的文件**，不要一次加载全部。每一轮先运行 `scripts/next_step.py --progress <learning-progress.json> [--store <库>]`：它打印当前状态、该读的那一份文件和填好路径的命令；下面的状态图与加载表是它的依据。本节数据用 `scripts/lesson_section.py <lesson-plan.json> --section <id>` 取，不整份读 `lesson-plan.json`。
 
 ```text
 READY

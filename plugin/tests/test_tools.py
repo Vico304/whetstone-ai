@@ -34,6 +34,8 @@ lrg_record = load_module("lrg_record")
 index_match = load_module("index_match")
 learner_state_build = load_module("learner_state_build")
 review_pool = load_module("review_pool")
+lesson_section = load_module("lesson_section")
+next_step = load_module("next_step")
 store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
@@ -304,6 +306,94 @@ class LessonValidationTests(unittest.TestCase):
             errors, warnings = validate_lesson.validate_units(units, plan)
             self.assertEqual(errors, [])
             self.assertTrue(any("deferred" in w for w in warnings))
+
+
+class SectionViewAndNextStepTests(unittest.TestCase):
+    def test_lesson_section_prints_one_section_with_hidden_layers_and_final_view(self):
+        plan = load_template()
+        listing = lesson_section.render_list(plan)
+        self.assertIn("- s01 ", listing)
+        self.assertIn("core=2", listing)
+        view = lesson_section.render_section(plan, "s01")
+        section = plan["sections"][0]
+        for text in (section["problem"], section["solution"], section["mechanism"], section["checkpoint"]["prompt"], section["meaning"]):
+            self.assertIn(text, view)
+        for criterion in section["checkpoint"]["criteria"]:
+            self.assertIn(criterion["text"], view)
+        self.assertIn("验收题", view)          # the supporting concept's own check
+        self.assertLess(len(view), len(json.dumps(plan, ensure_ascii=False)))
+        with self.assertRaises(ValueError):
+            lesson_section.render_section(plan, "s99")
+        final = lesson_section.render_final(plan)
+        names = lesson_section.shuffled_concept_names(plan)
+        self.assertEqual(sorted(names), sorted({c["name"] for c in section["concepts"] if c.get("role", "core") in {"core", "supporting"}}))
+        self.assertEqual(names, lesson_section.shuffled_concept_names(plan))  # fixed order per lesson id
+        for name in names:
+            self.assertIn(f"- {name}", final)
+        self.assertNotIn(section["title"], final.split("## 本课概念名")[1])  # no section titles next to the names
+
+    def test_next_step_decides_the_state_from_the_progress_file(self):
+        from datetime import datetime, timedelta, timezone
+        plan = load_template()
+        state = learning_state.create_state(plan)
+        now = datetime(2026, 9, 13, 10, tzinfo=timezone.utc)
+
+        def decide(**kwargs):
+            return next_step.decide(state, kwargs.pop("plan", plan), kwargs.pop("now", now), kwargs.pop("resume", False))
+
+        first = decide()
+        self.assertEqual((first["state"], first["section_id"], first["read"]), ("READY", "s01", "ready.md"))
+        self.assertIsNone(first["opener"])  # nothing completed yet: no variant question to ask
+        learning_state.append_attempt(state, "s01", "a", "", "partial", 3)
+        retry = decide()
+        self.assertEqual((retry["state"], retry["read"], retry["last_verdict"]), ("AWAITING_RETRY", "feedback.md", "partial"))
+        learning_state.append_attempt(state, "s01", "b", "", "mastered", 4)
+        finish = decide()
+        self.assertEqual((finish["state"], finish["read"]), ("FINISH", "finish.md"))
+
+        # a second sitting on a longer course: opener first, then the current section
+        plan3 = load_template()
+        plan3["sections"] = [dict(plan3["sections"][0], id=f"s0{i}") for i in (1, 2, 3)]
+        state = learning_state.create_state(plan3)
+        learning_state.append_attempt(state, "s01", "a", "", "mastered", None)
+        state["updated_at"] = "2026-09-12T10:00:00Z"
+        later = decide(plan=plan3)
+        self.assertEqual((later["state"], later["section_id"], later["opener"], later["new_sitting"]), ("READY", "s02", "resume.md", True))
+        soon = decide(plan=plan3, now=datetime(2026, 9, 12, 10, 30, tzinfo=timezone.utc))
+        self.assertIsNone(soon["opener"])
+        self.assertEqual(decide(plan=plan3, now=datetime(2026, 9, 12, 10, 30, tzinfo=timezone.utc), resume=True)["opener"], "resume.md")
+        learning_state.block_section(state, "s02", "child-course-0")
+        blocked = decide(plan=plan3)
+        self.assertEqual((blocked["state"], blocked["blocked_by"], blocked["read"]), ("BLOCKED", "child-course-0", "../prerequisite/return.md"))
+
+        # skeleton course: probe round first, until it is marked
+        skeleton = dict(plan3, shape="skeleton")
+        state = learning_state.create_state(skeleton)
+        self.assertEqual(decide(plan=skeleton)["state"], "PROBE")
+        learning_state.mark_event(state, "probe_completed", "全部照学")
+        self.assertEqual(decide(plan=skeleton)["state"], "READY")
+        self.assertEqual(state["events"][-1]["type"], "probe_completed")
+        with self.assertRaises(ValueError):
+            learning_state.mark_event(state, "lunch")
+
+    def test_next_step_cli_prints_quoted_paths_and_the_record_command(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as temporary:
+            course = Path(temporary) / "my course"
+            course.mkdir()
+            plan = load_template()
+            (course / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            learning_state.atomic_write(course / "learning-progress.json", learning_state.create_state(plan))
+            script = PLUGIN_ROOT / "skills" / "learn" / "scripts" / "next_step.py"
+            out = subprocess.run([sys.executable, str(script), "--progress", str(course / "learning-progress.json")],
+                                 capture_output=True, text=True, check=True).stdout
+            self.assertIn("state: READY  section: s01", out)
+            self.assertIn("'lesson-plan.json' --section s01", out.replace(str(course), "").replace("'/", "'"))
+            self.assertIn("learning_state.py' record --state", out)
+            self.assertIn("ready.md", out)
+            out = subprocess.run([sys.executable, str(script), "--progress", str(course / "learning-progress.json"), "--store", "/tmp/s t"],
+                                 capture_output=True, text=True, check=True).stdout
+            self.assertIn("lrg_record.py' append --store '/tmp/s t'", out)
 
 
 class OrphanConceptTests(unittest.TestCase):

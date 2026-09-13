@@ -131,7 +131,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 
 ## 8. 工程
 
-**用结构换遵循。** 凡能用 schema、文件边界或校验器表达的约束，不写成提示词。教学协议按状态拆文件，任一时刻有效规则不超过 60 行；阶段之间的接口是文件，不是工作记忆；每个阶段附一个范例。校验器把真实运行里出过的错变成规则：URL 当本地路径、supporting 无验收题、`outline_confirmed_at` 写成午夜占位、探测题混进 unit 文档。
+**用结构换遵循。** 凡能用 schema、文件边界或校验器表达的约束，不写成提示词。教学协议按状态拆文件，任一时刻有效规则不超过 60 行；状态本身由 `next_step.py` 从进度文件算出并指出该读哪一份，模型不必记加载表；课程数据按节取，一节约 4 KB，整份 `lesson-plan.json` 是它的十几倍。阶段之间的接口是文件，不是工作记忆；每个阶段附一个范例。校验器把真实运行里出过的错变成规则：URL 当本地路径、supporting 无验收题、`outline_confirmed_at` 写成午夜占位、探测题混进 unit 文档。
 
 **确定性检查交给脚本，语义判断交给模型。**
 
@@ -140,7 +140,8 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `validate_lesson.py` | 校验 lesson-plan 1.0–1.3、outline、units：结构、角色上限、覆盖表对照真实标题、泄漏、骨架课的 anchor / probe / 分支候选、落点比例 |
 | `validate_prerequisites.py` | 校验前置阶段产物 |
 | `source_manifest.py`、`survey_materials.py` | 来源清单；混杂目录清点（仓库、文档、生成信号、噪声） |
-| `learning_state.py`、`prerequisite_state.py` | 进度文件的 init / record / defer / bridge |
+| `learning_state.py`、`prerequisite_state.py` | 进度文件的 init / record / defer / block / mark / bridge |
+| `next_step.py`、`lesson_section.py` | 从进度文件判断当前状态，打印该读的协议文件与下一条命令；按节打印课程数据，模型不整份读 `lesson-plan.json` |
 | `store_init.py`、`mrg_export.py`、`index_match.py`、`store_sync.py` | 知识库初始化与登记；导出公开层与高层；别名召回、登记、前置判定（`--home` 读汇总）；结课时把本目录快照推进学习者主目录并重算汇总 |
 | `comparator.py` | 学习者作答抽取对照 MRG：`missing / partial / conflict / weak_reference / representation_only / beyond_reference`，给出反馈顺序，不打分 |
 | `lrg_record.py`、`learner_state_build.py`、`review_pool.py` | 追加学习记录；派生掌握状态；取匿名复习题 |

@@ -52,6 +52,8 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
        └ paused   → 保存位置
 ```
 
+每一轮先运行 `next_step.py --progress <进度文件> [--store <库>] [--resume]`：它从进度文件判断状态——`BLOCKED`（等前置课）、`FINISH`（全部完成）、`PROBE`（骨架课未记 `probe_completed` 事件）、`AWAITING_RETRY`（最近判定是 `partial / retry`）、`READY`（本节还没作答）——打印该读的那一份协议文件和填好路径的命令；进度文件超过 1 小时未更新或加 `--resume` 时先给 resume 开场。本节数据用 `lesson_section.py <lesson-plan.json> --section <id>` 取（问题、方案、机制、新问题、概念、主问题、判定标准、提示、意义、取舍、思想、探测题），`--final` 取结课题、分支候选与打乱顺序的概念名，`--list` 列全部节；模型不整份读 `lesson-plan.json`。探测轮结束记 `learning_state.py mark --type probe_completed`。
+
 **READY**：只呈现 `problem`，问"你觉得应该怎么解决"或"难点在哪"。学习者已读过本节、节太短、学习者要求加快时跳过 PREDICT 直接进 MAIN。
 
 **PREDICT**：收到预测后呈现 `solution` 与 `mechanism`，一两句对照异同。预测不判分、不记录。`tradeoffs` 与 `new_problem` 留作主问题和追问的素材。
