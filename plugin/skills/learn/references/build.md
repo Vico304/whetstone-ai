@@ -31,7 +31,7 @@
 
 ## 2. 检查并补足前置知识
 
-**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[protocol/probe.md](protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [references/prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[protocol/probe.md](protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
@@ -55,7 +55,7 @@
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
-产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [references/stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ## 4. 生成教学包：按 unit 逐份生成
 

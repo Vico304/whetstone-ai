@@ -138,6 +138,7 @@ def merge_concept_states(states: list[tuple[str, dict]], now: datetime) -> dict:
         merged["workspaces"].append(slug)
         merged["attempts"] += int(state.get("attempts") or 0)
         merged["stability"] += int(state.get("stability") or 0)
+        merged["delayed_successes"] = merged.get("delayed_successes", 0) + int(state.get("delayed_successes") or 0)
         for lesson in state.get("lessons") or []:
             if lesson not in merged["lessons"]:
                 merged["lessons"].append(lesson)

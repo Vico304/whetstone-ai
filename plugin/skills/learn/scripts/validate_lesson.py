@@ -22,6 +22,8 @@ ONTOLOGY_TYPES = {"entity", "process", "constraint", "relation"}
 CASES_PER_CONCEPT = 2
 CONTESTED_SIDES = 2
 V15_CONCEPT_KEYS = ("contrast", "cases", "ontology")
+REVIEW_KINDS = {"repeat", "deepen"}
+REVIEW_LEAK_MIN_CHARS = 20  # a sentence of the reviewed section's solution/mechanism this long must not reappear verbatim
 ANCHOR_MARKERS = {"external", "no-anchor"}
 BRANCH_STATUSES = {"candidate", "chosen", "declined"}
 MODES = {"full", "fast"}
@@ -268,6 +270,14 @@ def validate_v15(plan: dict, section_ids: set[str], errors: list[str]) -> None:
         if not isinstance(section, dict):
             continue
         location = f"sections[{index}]"
+        kind = section.get("review_kind")
+        if shape == "review":
+            if kind not in REVIEW_KINDS:
+                errors.append(f"{location}.review_kind must be one of {sorted(REVIEW_KINDS)} in a review course (repeat: revisit; deepen: sub-section)")
+            if section.get("parent_section") is None:
+                errors.append(f"{location}.parent_section is required in a review course (the reviewed section it revisits or deepens)")
+        elif kind is not None:
+            errors.append(f"{location}.review_kind is only allowed in a review course")
         parent = section.get("parent_section")
         if parent is None:
             continue
@@ -887,11 +897,42 @@ def validate_outline(outline: str, plan: dict) -> list[str]:
     return errors
 
 
-def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
+def reviewed_sections(paths: list[Path] | None) -> dict[tuple[str, str], dict]:
+    """{(lesson_id, section_id): section} from the reviewed courses' lesson plans."""
+    found: dict[tuple[str, str], dict] = {}
+    for path in paths or []:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+        for section in plan.get("sections", []) or []:
+            if isinstance(section, dict) and nonempty(section.get("id")):
+                found[(plan.get("lesson_id"), section["id"])] = section
+    return found
+
+
+def review_leaks(section: dict, normalized: str, reviewed: dict[tuple[str, str], dict]) -> list[str]:
+    """Sentences of the reviewed section's solution/mechanism that reappear verbatim (a review is not a re-teaching)."""
+    parent = section.get("parent_section")
+    if not isinstance(parent, dict):
+        return []
+    source = reviewed.get((parent.get("lesson_id"), parent.get("section_id")))
+    if source is None:
+        return [f"reviewed section {parent.get('lesson_id')}/{parent.get('section_id')} not found in --reviewed plans"]
+    leaks = []
+    for key in ("solution", "mechanism"):
+        for sentence in re.split(r"[。；;.!?！？\n]", str(source.get(key) or "")):
+            piece = normalize_text(sentence)
+            if len(piece) >= REVIEW_LEAK_MIN_CHARS and piece in normalized:
+                leaks.append(f"{key}: “{sentence.strip()[:40]}…”")
+    return leaks
+
+
+def validate_units(units_dir: Path, plan: dict, reviewed_plans: list[Path] | None = None) -> tuple[list[str], list[str]]:
     """Each non-deferred section needs units/<id>.md with its title, checkpoint and every concept; no leaks."""
     errors: list[str] = []
     warnings: list[str] = []
     deferred = deferred_section_ids(plan)
+    reviewed = reviewed_sections(reviewed_plans) if plan_shape(plan) == "review" else {}
+    if plan_shape(plan) == "review" and not reviewed_plans:
+        warnings.append("review course: pass --reviewed <lesson-plan.json> of each reviewed course to check that unit documents do not repeat their solution/mechanism")
     for index, section in enumerate(plan.get("sections", []) or []):
         if not isinstance(section, dict) or not nonempty(section.get("id")):
             continue
@@ -926,6 +967,9 @@ def validate_units(units_dir: Path, plan: dict) -> tuple[list[str], list[str]]:
                     warnings.append(f"units/{section['id']}.md prints {label} verbatim; it should drive questions, not be shown")
             elif criterion_leaked(text_hidden, normalized):
                 errors.append(f"units/{section['id']}.md leaks {label}")
+        if reviewed:
+            for leak in review_leaks(section, normalized, reviewed):
+                errors.append(f"units/{section['id']}.md repeats the reviewed section ({leak}); a review section asks first and reveals in a new context")
     return errors, warnings
 
 
@@ -1035,6 +1079,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--guide", type=Path, help="teaching-guide.md (schema 1.0/1.1 packs)")
     parser.add_argument("--outline", type=Path, help="outline.md (schema 1.2+ packs)")
     parser.add_argument("--units-dir", type=Path, help="units/ directory (schema 1.2+ packs)")
+    parser.add_argument("--reviewed", type=Path, action="append", help="lesson-plan.json of a reviewed course (review courses; repeatable)")
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--sources-root", type=Path, help="Material root for the coverage check; defaults to sources.json base_path (relative to the pack)")
     parser.add_argument("--allow-empty-coverage", action="store_true")
@@ -1063,7 +1108,7 @@ def main() -> int:
         if args.outline:
             errors.extend(validate_outline(args.outline.read_text(encoding="utf-8"), plan))
         if args.units_dir:
-            unit_errors, unit_warnings = validate_units(args.units_dir, plan)
+            unit_errors, unit_warnings = validate_units(args.units_dir, plan, args.reviewed)
             errors.extend(unit_errors)
             warnings.extend(unit_warnings)
         if sources_root and schema_version(plan) in ROLE_AWARE_VERSIONS:

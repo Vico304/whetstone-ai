@@ -130,7 +130,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | `evidence_tier` | 最近一次 `mastered` 的证据等级；没有成功则 `none`。等级按间隔判定，不按题型：`checkpoint / probe / diagnostic` 与教学同场，一律 `immediate`；其余题型，若该概念的上一条记录（任何判定）在更早的本地日期且至少 8 小时前——中间隔了一夜——则 `review / variant / supporting / bridge` 记 `delayed`、`transfer / final` 记 `transfer`，否则 `immediate`。事件里不存等级，每次重建按概念重算；本地日期按运行机器的时区，`build --tz +08:00` 可指定 |
 | `last_evidence_at`、`last_success_at`、`last_verdict` | 时间与最近判定 |
 | `depth_latest`、`depth_max` | 最近一次与历史最高的 `depth_reached` |
-| `stability` | 成功过的不同日期数 |
+| `stability`、`delayed_successes` | 成功过的不同日期数；证据等级为延迟或迁移的成功次数（复习课的子节门槛用它） |
 | `rigor_max` | 成功证据里是否有过 `full` |
 | `attempts`、`lessons[]` | 次数与出现过的课程 |
 | `freshness` | 最近成功是 `delayed / transfer` 且距今 ≤ 7 × 2^(stability − 1) 天（上限 180）为 `fresh`，超过为 `stale`；只有 `immediate` 证据或无成功为 `unknown` |
@@ -157,7 +157,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 python3 scripts/review_pool.py --store <目录> --lesson-id <id> [--progress learning-progress.json]
 ```
 
-只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
+只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。`review_outline.py --store … --lesson-id <课程>…` 把同样的池按被复习课的节归簇、并列出可长子节的稳固节，供复习课出大纲（[protocol.md](protocol.md)）。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
 
 ## 7. 不可见的实现
 

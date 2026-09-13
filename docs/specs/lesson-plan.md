@@ -55,7 +55,8 @@
 | `source_refs[]` | 见 §8 |
 | `checkpoint` | `{prompt, criteria[], hint}`，见 §6 |
 | `probe` | 1.3，仅骨架课 |
-| `parent_section` | 1.5 可选。`{lesson_id, section_id}`：本节是子节，深化那一节。指向本课的节时不能是自身、不能成环；指向别的课时那门课必须在 `review_of` 里 |
+| `parent_section` | 1.5 可选；复习课必填。`{lesson_id, section_id}`：本节重访或深化那一节。指向本课的节时不能是自身、不能成环；指向别的课时那门课必须在 `review_of` 里 |
+| `review_kind` | 1.5，仅复习课，必填。`repeat`（重访原节，问题换情境）或 `deepen`（子节，`id` 用 `<原节>.1`）。`--units-dir` 加 `--reviewed <被复习课的 lesson-plan.json>` 时，节文档含被复习节 `solution / mechanism` 的整句原文报错 |
 
 一门课超过 9 节报警告（骨架课除外）。
 
@@ -140,4 +141,4 @@ python3 scripts/validate_lesson.py lesson-plan.json --guide teaching-guide.md
 | 1.2 | `mode`、`outline_confirmed_at`、概念 `role` 与 `check`、`deferred[]`、`coverage[]`；`outline.md` + `units/` 取代 `teaching-guide.md` |
 | 1.3 | `shape`、`parent_course`、`pool / reserve`、`anchor`、`probe`、`branch_candidates[]` |
 | 1.4 | 前置课：`prerequisite_of`、`blocked_at`、`depth`；任何课程可用外部存档集作 `pool` |
-| 1.5 | 概念 `contrast / cases / ontology`；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`；复习课 `shape: review` 与 `review_of[]`。校验器打印 `INFO: variation a/b`（有易混对、有两个案例的核心概念数），不设阈值 |
+| 1.5 | 概念 `contrast / cases / ontology`；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`；复习课 `shape: review`、`review_of[]`、节 `review_kind`。校验器打印 `INFO: variation a/b`（有易混对、有两个案例的核心概念数），不设阈值 |
