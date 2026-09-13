@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- clarify 只处理当前课程：`scan_wikilinks.py` 收到工作区或计划目录时，只扫最近更新过进度的那门课，其他课程只报告 inbox 待处理数；`--course` 指定一门，`--all` 全部。
 - schema 1.5（1.4 的超集，新字段都可选）：概念 `contrast`（易混对）、`cases[2]`（对比案例）、`ontology`（本体类别）；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`（子节）；复习课 `shape: review` 与 `review_of[]`（覆盖表可为空）；前置计划的簇可带 `dependency_kind`；学习计划每门课一行“够用的标志”。校验器、导出、按节打印跟进；校验器打印有易混对与案例的核心概念比例，不设阈值。协议与讲义模板怎么用这些字段，随后两步。
 - `SKILL.md` 从 189 行拆到 52 行：各宿主的路径解析、工作区布局、知识库命令、建课规则（§1–§5、默认值、完成标准）原文搬到 `references/hosts.md`、`workspace.md`、`store.md`、`build.md`，进入对应阶段才读；教学一轮载入的入口文本从 24.5 KB 降到 6.2 KB。
 - 教学时的上下文预算：`next_step.py` 从进度文件算出当前状态（等前置课、结课、探测轮、追问后重答、待作答、新会话开场），打印该读的那一份协议文件和填好路径的命令；`lesson_section.py` 按节打印课程数据（`--section`、`--final`、`--list`），模型不再整份读几十到一百多 KB 的 `lesson-plan.json`；`learning_state.py mark` 记探测轮完成。协议改动只有对应的几句。

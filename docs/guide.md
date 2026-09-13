@@ -170,7 +170,7 @@ claude plugin install whetstone@whetstone-ai
 
 > **你**：/whetstone:clarify
 
-> **模型**：扫描到 2 个未解决的链接：证书链（units/s04.md）、DICE（outline.md）。为每个生成 `concepts/<名>.md`：解决什么问题、机制、两个例子、边界与误解、相关概念的链接、回链到所在的节。材料里没有依据的部分标为外部知识并附来源。inbox 已清空。
+> **模型**：只看你正在学的这门课，扫描到 2 个未解决的链接：证书链（units/s04.md）、DICE（outline.md）；另一门课还有 1 条待处理，点名再做。为每个生成 `concepts/<名>.md`：解决什么问题、机制、两个例子、边界与误解、相关概念的链接、回链到所在的节。材料里没有依据的部分标为外部知识并附来源。inbox 已清空。
 
 ### 5.6 继续课程
 
@@ -344,6 +344,6 @@ python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --k
 # 重建掌握状态（模型通常自动运行）
 python3 $S/learner_state_build.py build --store store
 # 概念笔记扫描；打包插件
-python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone/courses/x
+python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone   # 只扫最近在学的课；--all 全部
 python3 whetstone-ai/package_plugin.py
 ```

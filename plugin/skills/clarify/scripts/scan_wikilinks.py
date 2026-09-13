@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Scan a lesson pack for unresolved [[wikilinks]] and inbox entries."""
+"""Scan a course directory for unresolved [[wikilinks]] and inbox entries.
+
+Given a workspace or plan directory instead of a course, scan only the course whose
+learning-progress.json was updated most recently (the one being studied) and list the
+others with their inbox counts; --all scans every course, --course picks one.
+"""
 
 from __future__ import annotations
 
@@ -75,6 +80,26 @@ def inbox_entries(inbox: Path) -> list[str]:
     return entries
 
 
+def is_course_dir(path: Path) -> bool:
+    return path.is_dir() and ((path / "lesson-plan.json").is_file() or (path / "teaching-guide.md").is_file())
+
+
+def course_dirs(root: Path) -> list[Path]:
+    """Course directories under a workspace or plan directory, most recently studied first."""
+    found = sorted({p.parent for p in root.rglob("lesson-plan.json")} | {p.parent for p in root.rglob("teaching-guide.md")}
+                   if not is_course_dir(root) else {root})
+
+    def updated(course: Path) -> str:
+        progress = course / "learning-progress.json"
+        if progress.is_file():
+            try:
+                return str(json.loads(progress.read_text(encoding="utf-8")).get("updated_at") or "")
+            except (OSError, ValueError):
+                return ""
+        return ""
+    return sorted(found, key=lambda c: (updated(c), str(c)), reverse=True)
+
+
 def scan(pack_dir: Path, inbox: Path | None) -> dict:
     concepts_dir = pack_dir / "concepts"
     known = note_names(concepts_dir)
@@ -105,15 +130,41 @@ def scan(pack_dir: Path, inbox: Path | None) -> dict:
     }
 
 
+def scan_scope(root: Path, inbox: Path | None, scan_all: bool, chosen: Path | None) -> dict:
+    """One course by default (the one studied most recently); the others are only counted."""
+    courses = course_dirs(root)
+    if chosen is not None:
+        if not is_course_dir(chosen):
+            raise ValueError(f"not a course directory (no lesson-plan.json): {chosen}")
+        courses = [chosen] + [c for c in courses if c.resolve() != chosen.resolve()]
+    if not courses:
+        return {"error": f"no course directory (lesson-plan.json) under {root}", "courses": []}
+    targets = courses if scan_all else courses[:1]
+    scanned = [scan(course, inbox if course == targets[0] else None) for course in targets]
+    others = [{"pack_dir": str(c), "inbox_pending": len(inbox_entries(c / "concepts" / "_inbox.md"))}
+              for c in courses if c not in targets]
+    return {"current_course": str(targets[0]), "scanned": scanned, "other_courses": others,
+            "note": "only the current course was scanned; pass --all to scan every course, --course <dir> to pick one" if others else ""}
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("pack_dir", type=Path, help="Lesson pack directory")
-    parser.add_argument("--inbox", type=Path, help="Inbox file (default: <pack>/concepts/_inbox.md)")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("pack_dir", type=Path, help="A course directory, or a workspace / plan directory holding several")
+    parser.add_argument("--inbox", type=Path, help="Inbox file (default: <course>/concepts/_inbox.md)")
+    parser.add_argument("--all", action="store_true", help="Scan every course under the directory")
+    parser.add_argument("--course", type=Path, help="Scan this course (a directory with lesson-plan.json)")
     args = parser.parse_args()
     if not args.pack_dir.is_dir():
         print(f"ERROR: not a directory: {args.pack_dir}")
         return 2
-    print(json.dumps(scan(args.pack_dir, args.inbox), ensure_ascii=False, indent=2))
+    try:
+        if is_course_dir(args.pack_dir) and not args.all and args.course is None:
+            print(json.dumps(scan(args.pack_dir, args.inbox), ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(scan_scope(args.pack_dir, args.inbox, args.all, args.course), ensure_ascii=False, indent=2))
+    except (OSError, ValueError) as error:
+        print(f"ERROR: {error}")
+        return 2
     return 0
 
 
