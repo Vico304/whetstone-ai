@@ -35,7 +35,7 @@ One skill directory, five hosts:
 | Host | Install | Invoke |
 |---|---|---|
 | Claude Code | `claude plugin marketplace add /path/to/whetstone-ai && claude plugin install whetstone@whetstone-ai`, or ad hoc `claude --plugin-dir ./plugin` | `/whetstone:learn` … |
-| Claude Desktop | `python3 package_plugin.py` builds `../dist/whetstone.plugin`; upload it in the plugin manager. Or `./install_skills.sh ~/.claude/skills` | `/learn` … |
+| Claude Desktop | download `whetstone-<version>.plugin` from a release (or build it with `python3 package_release.py`) and upload it in the plugin manager. Or `./install_skills.sh ~/.claude/skills` | `/learn` … |
 | DeepSeek Harness | `./install_skills.sh ~/.agents/skills`, then restart `npx @deepseek-ai/dsh web` | `/learn` … |
 | pi | `pi install git:github.com/Vico304/whetstone-ai` (or a local checkout: `pi install /path/to/whetstone-ai`, or `./install_skills.sh ~/.pi/agent/skills`) | `/skill:learn` … |
 | Codex | install `plugin/` as a plugin | `$learn` … |
