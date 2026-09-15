@@ -38,6 +38,7 @@ lesson_section = load_module("lesson_section")
 next_step = load_module("next_step")
 review_outline = load_module("review_outline")
 cards = load_module("cards")
+diagram = load_module("diagram")
 store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
@@ -1935,4 +1936,47 @@ class FactCardTests(_StoreHelpers, unittest.TestCase):
             boundary = state["concepts"]["learning-design.system-boundary"]
             self.assertEqual((boundary["attempts"], boundary["last_verdict"], boundary["depth_max"]), (2, "retry", "fact"))
             self.assertEqual(cards.lesson_ids_with_cards(store), ["sample-guided-lesson"])
+
+
+class DiagramTests(unittest.TestCase):
+    def test_diagrams_use_public_fields_only_and_the_outline_must_carry_the_chain(self):
+        plan = load_template()
+        plan["sections"] = [dict(plan["sections"][0], id="s01"), dict(plan["sections"][0], id="s02", title="第二节", depends_on=["s01"]),
+                            dict(plan["sections"][0], id="s03", title="第三节", depends_on=["s01"])]
+        plan["deferred"] = [{"type": "section", "id": "s03", "reason": "略过"}]
+        chain = diagram.chain(plan)
+        self.assertTrue(chain.startswith("```mermaid\nflowchart TD") and chain.endswith("```"))
+        self.assertIn('S_s01["1 从线性材料到总体结构"]', chain)
+        self.assertIn("S_s01 --> S_s02", chain)
+        self.assertNotIn("S_s03[", chain)                       # deferred sections are not drawn
+        self.assertIn("本次略过：s03", chain)
+        for hidden in (plan["sections"][0]["meaning"], plan["sections"][0]["checkpoint"]["criteria"][0]["text"]):
+            self.assertNotIn(hidden, chain)
+        system = diagram.system(plan)
+        self.assertIn('M1["输入范围"]', system)
+        self.assertIn("M4 --> M5", system)
+        graph = diagram.section_graph(plan, "s01")
+        self.assertIn("-- depends_on -->", graph)
+        self.assertIn("问题链（supporting）", graph)
+        plan["relations"][0]["layer"] = "rationale"
+        self.assertIn("没有公开层的关系边", diagram.section_graph(plan, "s01"))   # rationale-layer edges are never drawn
+        with self.assertRaises(ValueError):
+            diagram.section_graph(plan, "s99")
+        with self.assertRaises(ValueError):
+            diagram.system(dict(plan, big_picture={"system_map": []}))
+
+        outline = (PLUGIN_ROOT / "skills" / "learn" / "assets" / "outline-template.md").read_text(encoding="utf-8")
+        base = load_template()
+        self.assertEqual(validate_lesson.validate_outline(outline, base), [])
+        stripped = validate_lesson.MERMAID_BLOCK.sub("", outline)
+        errors = validate_lesson.validate_outline(stripped, base)
+        self.assertTrue(any("mermaid diagram of the problem chain" in e for e in errors), errors)
+        old = dict(base, schema_version="1.2")
+        old["sections"][0]["concepts"][0] = {k: v for k, v in old["sections"][0]["concepts"][0].items() if k not in ("contrast", "cases", "ontology")}
+        self.assertEqual(validate_lesson.validate_outline(stripped, old), [])   # older courses are not asked for a diagram
+        two = load_template()
+        two["sections"].append(dict(two["sections"][0], id="s02", title="没画进图的节", depends_on=["s01"]))
+        two["sections"][0]["new_problem"] = "下一节"
+        errors = validate_lesson.validate_outline(outline + "\n第二节标题：没画进图的节\n", two)
+        self.assertTrue(any("does not show section 's02'" in e for e in errors), errors)
 
