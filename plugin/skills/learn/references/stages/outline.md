@@ -7,7 +7,7 @@
 1. 读 `learner-profile.md`（工作区根的，统一布局下再叠加计划目录里的）与计划目录 `learning-plan.md` 里这门课的条目（材料子集、目标）；
 2. 建立来源范围（[../build.md](../build.md) §1）；
 3. 从大框架建立问题链、给每个 unit 分配全部概念并标角色、填覆盖账本（[../build.md](../build.md) §3）；
-4. 写 `lesson-plan.json`（schema 1.5，`outline_confirmed_at: null`）与 `outline.md`，运行
+4. 写 `lesson-plan.json`（schema 1.5，`outline_confirmed_at: null`）与 `outline.md`——问题链图与系统框图用 `scripts/diagram.py <plan> --chain` / `--system` 生成后贴入，不手画——运行
    `validate_lesson.py <plan> --outline outline.md [--sources-root <材料根>]`。
 
 ## 呈现与确认

@@ -870,10 +870,28 @@ def hidden_texts(section: dict) -> list[tuple[str, str]]:
     return pairs
 
 
+MERMAID_BLOCK = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL)
+
+
+def mermaid_blocks(text: str) -> list[str]:
+    return [m.group(1) for m in MERMAID_BLOCK.finditer(text)]
+
+
 def validate_outline(outline: str, plan: dict) -> list[str]:
     """outline.md must show the route and every concept, and hide everything above the public layer."""
     errors: list[str] = []
     normalized = normalize_text(outline)
+    if schema_version(plan) == "1.5":  # new courses: the problem chain is also drawn (diagram.py --chain)
+        diagrams = normalize_text("\n".join(mermaid_blocks(outline)))
+        if not diagrams:
+            errors.append("outline must contain a mermaid diagram of the problem chain (paste `diagram.py <plan> --chain`)")
+        else:
+            deferred = deferred_section_ids(plan)
+            for section in plan.get("sections", []) or []:
+                if isinstance(section, dict) and nonempty(section.get("id")) and section["id"] not in deferred:
+                    title = section.get("title") or ""
+                    if normalize_text(section["id"]) not in diagrams and (not title or normalize_text(title) not in diagrams):
+                        errors.append(f"outline's mermaid diagram does not show section '{section['id']}'")
     if nonempty(plan.get("title")) and plan["title"] not in outline:
         errors.append(f"outline does not contain title '{plan['title']}'")
     mode = plan.get("mode")
