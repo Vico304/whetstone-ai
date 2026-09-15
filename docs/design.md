@@ -145,7 +145,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `validate_prerequisites.py` | 校验前置阶段产物 |
 | `source_manifest.py`、`survey_materials.py` | 来源清单；混杂目录清点（仓库、文档、生成信号、噪声） |
 | `learning_state.py`、`prerequisite_state.py` | 进度文件的 init / record / defer / block / mark / bridge |
-| `next_step.py`、`lesson_section.py`、`diagram.py` | 从进度文件判断当前状态，打印该读的协议文件与下一条命令；按节打印课程数据，模型不整份读 `lesson-plan.json`；从课程数据生成问题链、系统框图与本节关系图的 Mermaid |
+| `next_step.py`、`lesson_section.py`、`diagram.py`、`outline_status.py` | 从进度文件判断当前状态，打印该读的协议文件与下一条命令；按节打印课程数据，模型不整份读 `lesson-plan.json`；从课程数据生成问题链、系统框图与本节关系图的 Mermaid；每次记录后把大纲的状态列与“学习情况”块刷新到与进度文件一致 |
 | `store_init.py`、`mrg_export.py`、`index_match.py`、`store_sync.py` | 知识库初始化与登记；导出公开层与高层；别名召回、登记、前置判定（`--home` 读汇总）；结课时把本目录快照推进学习者主目录并重算汇总 |
 | `comparator.py` | 学习者作答抽取对照 MRG：`missing / partial / conflict / weak_reference / representation_only / beyond_reference`，给出反馈顺序，不打分 |
 | `lrg_record.py`、`learner_state_build.py`、`review_pool.py`、`review_outline.py`、`cards.py` | 追加学习记录；派生掌握状态；取匿名复习题；复习课原料；事实卡 |

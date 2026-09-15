@@ -33,6 +33,19 @@ def normalize_time(value: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def refresh_outline(progress_path: Path, store: Path | None = None) -> None:
+    """Keep outline.md next to the progress file current; never fails a record."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("outline_status", Path(__file__).resolve().parent / "outline_status.py")
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        module.refresh(Path(progress_path).resolve().parent, store)
+    except Exception as error:  # noqa: BLE001 — the record itself must not depend on the outline
+        print(f"note: outline.md not refreshed ({error})")
+
+
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -202,6 +215,7 @@ def command_record(args: argparse.Namespace) -> int:
         review=args.review, criteria_met=criteria_met, depth_reached=args.depth, at=args.at, force=args.force,
     )
     atomic_write(args.state, state)
+    refresh_outline(args.state)
     print(f"OK: appended {'review' if args.review else 'checkpoint'} attempt for {args.section_id}")
     return 0
 
@@ -222,6 +236,7 @@ def command_mark(args: argparse.Namespace) -> int:
     state = read_json(args.state)
     mark_event(state, args.type, args.note)
     atomic_write(args.state, state)
+    refresh_outline(args.state)
     print(f"OK: marked {args.type} in {args.state}")
     return 0
 
@@ -287,6 +302,7 @@ def command_block(args: argparse.Namespace) -> int:
         raise ValueError("progress state root must be an object")
     block_section(state, args.section_id, args.by)
     atomic_write(args.state, state)
+    refresh_outline(args.state)
     print(f"OK: {args.section_id} blocked by prerequisite course '{args.by}'; resume this course after it finishes")
     return 0
 
@@ -297,6 +313,7 @@ def command_unblock(args: argparse.Namespace) -> int:
         raise ValueError("progress state root must be an object")
     child = unblock_section(state, args.section_id)
     atomic_write(args.state, state)
+    refresh_outline(args.state)
     print(f"OK: {args.section_id} unblocked (prerequisite course '{child}' done); current section is {state.get('current_section_id')}")
     return 0
 
@@ -307,6 +324,7 @@ def command_defer(args: argparse.Namespace) -> int:
         raise ValueError("progress state root must be an object")
     defer_section(state, args.section_id, args.reason)
     atomic_write(args.state, state)
+    refresh_outline(args.state)
     print(f"OK: deferred {args.section_id} ({args.reason}); current section is now {state.get('current_section_id')}")
     return 0
 

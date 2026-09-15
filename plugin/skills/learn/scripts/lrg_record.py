@@ -214,6 +214,7 @@ def command_append(args: argparse.Namespace) -> int:
             )
             attempt_number = learning_state.find_section(state, args.section_id)["attempts"][-1]["attempt_number"]
             learning_state.atomic_write(args.progress, state)
+            learning_state.refresh_outline(args.progress, args.store)
     if rigor is None:
         rigor = "full"
     if attempt_number is None:
