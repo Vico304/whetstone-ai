@@ -379,7 +379,7 @@ class SectionViewAndNextStepTests(unittest.TestCase):
             learning_state.mark_event(state, "lunch")
 
     def test_next_step_cli_prints_quoted_paths_and_the_record_command(self):
-        import subprocess, sys
+        import shlex, subprocess, sys
         with tempfile.TemporaryDirectory() as temporary:
             course = Path(temporary) / "my course"
             course.mkdir()
@@ -390,12 +390,12 @@ class SectionViewAndNextStepTests(unittest.TestCase):
             out = subprocess.run([sys.executable, str(script), "--progress", str(course / "learning-progress.json")],
                                  capture_output=True, text=True, check=True).stdout
             self.assertIn("state: READY  section: s01", out)
-            self.assertIn("'lesson-plan.json' --section s01", out.replace(str(course), "").replace("'/", "'"))
-            self.assertIn("learning_state.py' record --state", out)
+            self.assertIn(f"{shlex.quote(str(course / 'lesson-plan.json'))} --section s01", out)  # the course path has a space: quoted
+            self.assertRegex(out, r"learning_state\.py'? record --state ")                        # the script path is quoted only if it needs it
             self.assertIn("ready.md", out)
             out = subprocess.run([sys.executable, str(script), "--progress", str(course / "learning-progress.json"), "--store", "/tmp/s t"],
                                  capture_output=True, text=True, check=True).stdout
-            self.assertIn("lrg_record.py' append --store '/tmp/s t'", out)
+            self.assertRegex(out, r"lrg_record\.py'? append --store '/tmp/s t'")
 
 
 class OrphanConceptTests(unittest.TestCase):
