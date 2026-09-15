@@ -346,5 +346,5 @@ python3 $S/lrg_record.py append --store store --lesson-id x --section-id s02 --k
 python3 $S/learner_state_build.py build --store store   # 重建掌握状态（模型通常自动运行）
 # 概念解释扫描（按节归组）；打包插件
 python3 whetstone-ai/plugin/skills/clarify/scripts/scan_wikilinks.py whetstone   # 只扫最近在学的课；--all 全部
-python3 whetstone-ai/package_plugin.py
+python3 whetstone-ai/package_release.py   # 生成插件、技能 zip、单技能 zip 到 dist/
 ```

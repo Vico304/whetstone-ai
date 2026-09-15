@@ -64,3 +64,6 @@ jobs:
       - name: Docs — links, vocabulary, length
         working-directory: .
         run: python3 check_docs.py
+      - name: Release artifacts build and the standalone skill checks
+        working-directory: .
+        run: python3 package_release.py --check
