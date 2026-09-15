@@ -39,6 +39,7 @@ next_step = load_module("next_step")
 review_outline = load_module("review_outline")
 cards = load_module("cards")
 diagram = load_module("diagram")
+outline_status = load_module("outline_status")
 store_sync = load_module("store_sync")
 score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
 survey_materials = load_module("survey_materials")
@@ -1979,4 +1980,45 @@ class DiagramTests(unittest.TestCase):
         two["sections"][0]["new_problem"] = "下一节"
         errors = validate_lesson.validate_outline(outline + "\n第二节标题：没画进图的节\n", two)
         self.assertTrue(any("does not show section 's02'" in e for e in errors), errors)
+
+
+class OutlineStatusTests(unittest.TestCase):
+    def test_outline_status_follows_the_progress_file_and_keeps_the_closing_summary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            course = Path(temporary) / "course"
+            course.mkdir()
+            plan = load_template()
+            plan["sections"].append(dict(plan["sections"][0], id="s02", title="第二节", depends_on=["s01"]))
+            plan["sections"][0]["new_problem"] = "下一节"
+            (course / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            outline = (PLUGIN_ROOT / "skills" / "learn" / "assets" / "outline-template.md").read_text(encoding="utf-8")
+            outline = outline.replace("| 1 | [[s01\\|从线性材料到总体结构]] | 逐页阅读让局部遮住整体 → 先建立输入、过程、输出的宏观地图 | 待学 |",
+                                      "| 1 | [[s01\\|从线性材料到总体结构]] | 逐页阅读让局部遮住整体 → 先建立输入、过程、输出的宏观地图 | 待学 |\n| 2 | 第二节 | 问题 → 方案 | 待学 |")
+            outline = outline.replace("## 本课程涉及的全部概念", diagram.chain(plan) + "\n\n## 本课程涉及的全部概念")  # the chain must show s02 too
+            (course / "outline.md").write_text(outline, encoding="utf-8")
+            state = learning_state.create_state(plan)
+            learning_state.atomic_write(course / "learning-progress.json", state)
+            learning_state.append_attempt(state, "s01", "a", "", "partial", 3, depth_reached="mechanism")
+            learning_state.atomic_write(course / "learning-progress.json", state)
+            result = outline_status.refresh(course)
+            text = (course / "outline.md").read_text(encoding="utf-8")
+            self.assertTrue(result["updated"])
+            self.assertIn("| 学习中（1 次作答） |", text)
+            self.assertIn("| 2 | 第二节 | 问题 → 方案 | 待学 |", text)
+            self.assertIn("- 进度：0/2 节完成，1 节学习中；课程进行中", text)
+            self.assertIn("| s01 从线性材料到总体结构 | 学习中（1 次作答） | 1 | 部分 | 机制 |", text)
+            self.assertEqual(validate_lesson.validate_outline(text, plan), [])
+            # the closing summary written after the block survives the next refresh; recording refreshes on its own
+            (course / "outline.md").write_text(text + "\n已解释成功：第一节的因果链。\n", encoding="utf-8")
+            learning_state.append_attempt(state, "s01", "b", "", "mastered", 5, depth_reached="rationale")
+            learning_state.append_attempt(state, "s02", "c", "", "mastered", 5, depth_reached="mechanism")
+            learning_state.atomic_write(course / "learning-progress.json", state)
+            learning_state.refresh_outline(course / "learning-progress.json")
+            text = (course / "outline.md").read_text(encoding="utf-8")
+            self.assertIn("2/2 节完成；课程已结课（", text)
+            self.assertIn("| s01 从线性材料到总体结构 | 已完成（", text)
+            self.assertIn("已解释成功：第一节的因果链。", text)
+            self.assertEqual(text.count(outline_status.START), 1)
+            self.assertIn("- 仍待复习：无", text)
+            self.assertFalse(outline_status.refresh(Path(temporary))["updated"])   # nothing to do without the three files
 

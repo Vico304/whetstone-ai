@@ -108,7 +108,7 @@
 
 ## 9. `outline.md`
 
-必含：学习目标、模式、材料范围；总体问题与系统地图（`diagram.py --system` 生成的 Mermaid 框图）；问题链，每节一行"编号、标题、问题 → 方案"，加 `diagram.py --chain` 生成的问题链图——1.5 课程校验器要求 `outline.md` 有 Mermaid 块且覆盖每个未略过的节；deferred 的节标"本次略过：理由"；全部概念按节、按角色列出（core 只列名，supporting 名 + 一句，listed 名 + 一句 + 定位，deferred 名 + 理由）；覆盖表摘要，`excluded` 附理由；使用说明（讲义在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred）。
+必含：学习目标、模式、材料范围；总体问题与系统地图（`diagram.py --system` 生成的 Mermaid 框图）；问题链，每节一行"编号、标题、问题 → 方案"，加 `diagram.py --chain` 生成的问题链图——1.5 课程校验器要求 `outline.md` 有 Mermaid 块且覆盖每个未略过的节；deferred 的节标"本次略过：理由"；学习情况——问题链表的状态列与文末 `<!-- whetstone:status -->` 块（进度、每节的状态、作答次数、最近判定、到达的层，有库时链重建比例，仍待复习的节）由 `outline_status.py --course <目录> [--store …]` 从进度文件生成，`learning_state.py` 与 `lrg_record.py` 每次写进度后自动刷新，结课总结写在块之后；全部概念按节、按角色列出（core 只列名，supporting 名 + 一句，listed 名 + 一句 + 定位，deferred 名 + 理由）；覆盖表摘要，`excluded` 附理由；使用说明（讲义在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred）。
 
 校验：课程标题、模式、每个节标题、每个概念名都出现；`criteria`、`check.criteria`、`principle` 出现为错误；`meaning`、`tradeoffs` 逐字出现为警告。模板 `assets/outline-template.md`。
 

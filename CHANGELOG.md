@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 大纲的学习情况：`outline_status.py` 从进度文件刷新问题链表的状态列和文末的“学习情况”块（进度、每节状态与最近判定、到达的层、链重建比例、仍待复习的节），`learning_state.py` 与 `lrg_record.py` 每次写进度后自动调用；结课总结写在块之后。起因：结课后大纲仍写着“待学”。
 - 图：`diagram.py` 从课程数据生成 Mermaid——问题链框图（`--chain`）、系统框图（`--system`）、本节概念关系图（`--section`），只用公开层字段。大纲必含前两张（1.5 课程由校验器检查问题链图覆盖每个未略过的节），讲义可选。
 - 事实卡：`cards.py build` 为 `fact` 层与 `listed` 概念生成卡（`store/cards/<课程>.json`），`cards.py due` 按与时效同一条规则列到期卡；作答记 `kind: recall`，只落在该概念上；resume 与复习课开场先过到期卡；前置检查里的定义类缺口进父课 `listed` 后由事实卡复习。不给机制、本质、思想做卡，不接 FSRS。
 - 复习课：说"复习 <课程>"进入 `stages/review.md`；`review_outline.py` 从掌握状态取薄弱项按被复习课的节归簇，并列出可长子节的稳固节（每个核心概念至少两次延迟证据且到过本质层）；节带 `review_kind: repeat / deepen` 与 `parent_section`；先作答再揭示，`next_step.py` 认得；校验器 `--reviewed` 做反向泄漏检查；`review_of` 多于一门时结课出接缝题；掌握状态加每个概念的 `delayed_successes`。

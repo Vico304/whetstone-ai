@@ -126,6 +126,7 @@ explicit | entailed | pedagogical_inference | external | unsupported
 4. **全部概念清单**，按 unit 分组、按角色标注（core 只列名；supporting 名 + 一句；listed 名 + 一句事实层定义 + 定位；deferred 名 + 理由）；
 5. 覆盖账本摘要：材料各部分 → 去处，`excluded` 附理由；
 6. 使用说明：unit 文档在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred。
+7. 学习情况：问题链表的状态列与文末 `<!-- whetstone:status -->` 块由 `outline_status.py` 从进度文件生成，每次记录后自动刷新；结课总结由模型写在块之后。
 
 校验器检查：标题、模式、每个 section 标题、每个概念名都出现；1.5 课程有覆盖全部未略过 unit 的 Mermaid 问题链图；criteria、`check.criteria`、`principle`、`meaning`、`tradeoffs` 都不出现。模板见 `assets/outline-template.md`。 骨架课另需：落点比例、每个概念的落点或 external / no-anchor 标记、分支候选表（校验器检查候选标题）、`probe.criteria` 不出现；模板见 `assets/skeleton-example/outline.md`。
 
