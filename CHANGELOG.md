@@ -1,5 +1,9 @@
 # 更新记录
 
+## 未发布
+
+- 当场补讲的前置缺口落记录：反馈或细化中确认学习者卡住的是本课没有定义的概念、并当场补讲了它时，先用 `index_match.py recall` 取 id，再记一条只落在这个概念上的记录（`--kind supporting --concept <id>`，`--verdict partial` 或 `retry`，`--depth fact`），不加 `--progress`，不改变本节判定与当前位置，同一会话同一概念只记一次；索引里没有这个概念就不记。同时 `learner_state_build.py` 改为：`--kind supporting` 的记录只算到 `--concept` 指定的概念上，不再连带把本节其他概念一起记成这次判定——此前“验收 X”也受这个问题影响。起因：09-16 的一门骨架课当场补讲了 `sliding-window-cache`，没有留下任何记录，同一缺口在四小时后的第三次作答才再次暴露，而知识库一直把它当成从未出现过的概念。
+
 ## 1.1.0 — 2026-09-15
 
 发布物：`whetstone-1.1.0.plugin`（Claude Desktop 插件）、`whetstone-skills-1.1.0.zip`（四个技能目录并列）、`whetstone-learn.zip`（单技能版，只有 learn 入口）；三者由 `package_release.py` 生成。新流程（结课链重建、复习课、事实卡、把握三档、对比案例）有测试和真实库上的干跑数据，还没有一门课用它们从头教到结课。

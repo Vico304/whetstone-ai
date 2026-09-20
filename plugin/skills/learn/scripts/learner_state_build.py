@@ -50,6 +50,7 @@ BASE_WINDOW_DAYS = 7
 MAX_WINDOW_DAYS = 180
 TEACHING_KINDS = {"checkpoint", "probe", "diagnostic"}  # asked in the same sitting as the teaching: never delayed
 TRANSFER_KINDS = {"transfer", "final"}
+CONCEPT_KINDS = {"supporting", "recall"}  # aimed at one concept: the attempt lands on --concept only
 DELAYED_MIN_HOURS = 8  # together with a local day boundary: "a night in between"
 PREREQUISITE_EDGE_TYPES = {"prerequisite_for", "depends_on"}  # public-layer edges that order learning
 WEAK_VERDICTS = {"partial", "retry"}
@@ -167,7 +168,7 @@ def load_events(store: Path) -> list[dict]:
 
 
 def concepts_for_event(event: dict, section_concepts: dict) -> set[str]:
-    if event.get("kind") == "recall":  # a card touches its own concept only, never the section around it
+    if event.get("kind") in CONCEPT_KINDS:  # a card or a supporting check lands on its own concept, never the section around it
         return set(event.get("target_concept_ids", []) or [])
     ids: set[str] = set(section_concepts.get(event.get("lesson_id"), {}).get(event.get("section_id"), []))
     ids.update(event.get("target_concept_ids", []) or [])
