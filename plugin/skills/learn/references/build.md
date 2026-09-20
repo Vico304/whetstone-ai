@@ -55,6 +55,11 @@
 
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
+开启知识库且某个概念 id 复用了库里已登记的概念（判定见 [store.md](store.md) 的 `index_match.py recall`）时，对这些 id 跑一次 `scripts/review_pool.py --store <工作区>/store --concept <id> [--concept …] --limit 3`（要跨工作区就改 `--home`），读 `items[]` 里的错误命题：
+
+- 有命题的概念，按输出顺序（`wrong` 在 `partial` 之前）取前两条，各给该概念所在 unit 的 `checkpoint.criteria` 加一条对准这个误解的条目——判的是误解的反面，不是命题本身；
+- 同一 unit 的文档里加一句**正面陈述边界**的提醒（"静态预算内是权重、KV 池与图池，激活在预算之外"）。不得复述学习者说过的话：学习记录不向学习者回引，命题只用来决定讲什么，不用来展示。
+
 产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ## 4. 生成教学包：按 unit 逐份生成
@@ -80,7 +85,7 @@
 - `units/<id>.md`：围绕一个可解释步骤，至少包含：当前问题、（core 概念带 `cases` 时）两个案例并列并请学习者先写共同点、解决方案、工作机制、它引出的新问题、本节概念（core / supporting / listed 三块都可见）、来源定位和学习者检查点。`supporting` 概念各有一段"它在本节机制里的位置"，不附"想验收它就说……"的提醒（只在 outline 使用说明里写一次）；`listed` 只有名 + 一句 + 定位，**不讲机制**。**意义、代价与设计思想不进文档**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
 - "新问题"应自然引出下一 unit；最后一个 unit 可转为未决问题、边界或迁移挑战。图不强制：本节概念的关系图用 `diagram.py --section <id>` 生成；机制或架构的框图（框套框、数据流）有助于理解时按材料手写 Mermaid，只画公开层的东西。
 - 来源定位靠近相关结论。外部知识必须单独标记，不得用来填补材料缺口而不说明。
-- 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题。
+- 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题；复用的概念带着库里的错误命题时，`criteria` 里有一条直接对准那个误解（来源见 §3）。
 - 快速模式下只保留主线 core unit，其余进 `deferred[]`；被略过的内容在 outline 里可见，日后可补。
 
 ## 完成标准（建课与首节教学）

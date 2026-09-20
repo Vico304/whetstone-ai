@@ -100,7 +100,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 
 - `concepts[]`：`{ref, status}`，`ref` 是 id、名称或别名，`status ∈ correct / partial / wrong / missing`；
 - `relations[]`：`{from, to, type, status}`，`status ∈ correct / direction_reversed / wrong_type / missing / extra`；
-- `propositions[]`：`{text, status, concept_refs[], confidence_high?}`，`text` 是匿名化的原子命题——不含"你说""我认为"，不引用原句；`status ∈ correct / partial / wrong / representation_only`。
+- `propositions[]`：`{text, status, concept_refs[], confidence_high?}`，`text` 是匿名化的原子命题——不含"你说""我认为"，不引用原句，也不把回答里限定的对象换成更宽的对象；`status ∈ correct / partial / wrong / representation_only`。
 
 学习者不确认、不修改抽取；异议以新一次作答追加。
 
@@ -158,7 +158,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 python3 scripts/review_pool.py --store <目录> --lesson-id <id> [--progress learning-progress.json]
 ```
 
-只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。`review_outline.py --store … --lesson-id <课程>…` 把同样的池按被复习课的节归簇、并列出可长子节的稳固节，供复习课出大纲（[protocol.md](protocol.md)）。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。
+只读 `learner-state.json`，输出四个池和取题顺序 `order`：`suspect`（假性掌握的概念与它薄弱的前置）、`items`（`error_propositions` 里的命题：`claim`、`status`、`at`、`lesson_id`、`section_id`，`wrong` 在 `partial` 之前、旧的在前；给 `--progress` 时只取已完成的节）、`missing_edges`（最近一次链重建漏掉或方向反了的边，带 `status`）、`stale`（过期的概念，最久未成功的在前）。`--lesson-id` 对四个池都生效。`review_outline.py --store … --lesson-id <课程>…` 把同样的池按被复习课的节归簇、并列出可长子节的稳固节，供复习课出大纲（[protocol.md](protocol.md)）。命题的呈现固定为："有一种说法是「{claim}」。这个说法哪里有问题？"——不说这是学习者自己说的，不引用原始回答，纠正在同一轮给出。作答记 `--kind review`。答对后命题仍留在池里，由时效自然淘汰。建课时读同一个池：复用的概念带着错误命题时，按输出顺序取前两条给该 unit 的 `criteria` 加对准这个误解的条目，讲义里只正面陈述边界，不回引原句。
 
 ## 7. 事实卡：`cards/<lesson-id>.json`
 
