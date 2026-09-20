@@ -374,6 +374,10 @@ class SectionViewAndNextStepTests(unittest.TestCase):
         skeleton = dict(plan3, shape="skeleton")
         state = learning_state.create_state(skeleton)
         self.assertEqual(decide(plan=skeleton)["state"], "PROBE")
+        # a prerequisite course built from the pre-probe map blocks first: BLOCKED wins over PROBE
+        learning_state.block_section(state, "s01", "gap-course-1")
+        self.assertEqual(decide(plan=skeleton)["state"], "BLOCKED")
+        state = learning_state.create_state(skeleton)
         learning_state.mark_event(state, "probe_completed", "全部照学")
         self.assertEqual(decide(plan=skeleton)["state"], "READY")
         self.assertEqual(state["events"][-1]["type"], "probe_completed")

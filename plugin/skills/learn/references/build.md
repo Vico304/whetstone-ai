@@ -31,7 +31,7 @@
 
 ## 2. 检查并补足前置知识
 
-**骨架课（`shape: skeleton`）不跑前置阶段**，改在 units 生成后做一轮原理探测（[protocol/probe.md](protocol/probe.md)）；探测暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）把这一阶段推迟到 units 生成之后**：先按 [protocol/probe.md](protocol/probe.md) 为"单元正文用到而本课未定义"的概念做一次前置地图（阶段一、二，深度按 `prerequisite_check`），再做一轮原理探测；两者暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
