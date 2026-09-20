@@ -31,7 +31,7 @@
 
 ## 3. 前置检查
 
-`prerequisite_check`：`auto`（默认，材料依赖了课程内不解释、且会阻断主线的知识，而学习者背景未知时才做）、`always`（学习者自述基础薄弱时档案里记这个）、`skip`。骨架课不跑这一阶段，改为探测轮；探测暴露地板太低时进入同样的诊断与建课。三个触发点：前置检查或探测轮之后、大纲确认时学习者说"我不懂 X、Y"、正课中途暴露缺口（只诊断受影响的簇）。
+`prerequisite_check`：`auto`（默认，材料依赖了课程内不解释、且会阻断主线的知识，而学习者背景未知时才做）、`always`（学习者自述基础薄弱时档案里记这个）、`skip`。骨架课把这一阶段推迟到 `units/` 生成之后：先为单元正文用到而本课未定义的概念做前置地图（总是抽取，诊断深度按上面三档），再做探测轮；两者暴露地板太低时进入同样的诊断与建课。三个触发点：前置检查或探测轮之后、大纲确认时学习者说"我不懂 X、Y"、正课中途暴露缺口（只诊断受影响的簇）。
 
 1. **最小前置地图**：只列会阻断主线的概念簇，记名称、为何是前置、支撑哪段主线、材料位置、确定性，可选 `dependency_kind`（`def` 缺定义、`mech` 缺机制、`tool` 缺表征或操作）；写 `prerequisite-plan.json`，`validate_prerequisites.py` 校验。开启知识库时先 `index_match.py prerequisites --lesson-id <本课>`，按 `variant / variant_then_diagnose / diagnose` 处理（见 [knowledge-store.md](knowledge-store.md) §3）；本课的前置课里学过的概念一律 `variant`。
 2. **诊断**：一次一题，提问后交还对话，不给参考答案；问题优先暴露能否生成概念、说明边界、说明关系与方向、应用到新情境；对每个簇记 `ready / fragile / gap / misconception / skipped` 与判断置信度；证据够就停，不凑题数；`prerequisite_state.py` 追加原始回答，开启知识库时同时记 `kind: diagnostic`。只说"这个簇对本材料尚未就绪"，不作能力概括。`build + teach` 模式下写完计划、提出第一题就停。
@@ -74,7 +74,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **复习课**（`stages/review.md`，需要知识库）：`review_outline.py --store … --lesson-id <课程>…` 输出薄弱簇（按被复习课的节归，薄弱多的在前）、稳固的节（每个核心概念 ≥ 2 次延迟或迁移级成功且一个到过本质层，附 `listed` 概念）与被复习课的目录。大纲：一簇一节，`review_kind: repeat`，`parent_section` 指回原节，问题在新情境里、放在最易混淆处，方案与机制用新情境重述；稳固的节列一个可选子节（`review_kind: deepen`，`id` 为 `<原节>.1`，来源只用材料池与外部存档），一门最多一个，确认大纲时问学不学。教学：READY 直接出主问题，判定后再揭示；`repeat` 记 `--kind review`，`deepen` 记 `--kind checkpoint`；`review_of` 多于一门时结课迁移题是接缝题。校验加 `--reviewed <被复习课的 lesson-plan.json>`。
 
-**探测轮**（骨架课）：见 [domain-skeleton.md](domain-skeleton.md) §5。
+**前置地图与探测轮**（骨架课）：见 [domain-skeleton.md](domain-skeleton.md) §5。
 
 **结课**：先链重建——只给 `lesson_section.py --final` 打出的打乱概念名，学习者写出谁引出谁、谁依赖谁、哪几个属于同一节，抽成 `relations[]` 记 `lrg_record.py append --kind final --chain`，反馈只说漏了哪两个概念之间的关系、哪条方向反了、哪条类型不对，不展示参考图；再解释删除或替换某组件的后果；在新案例里应用同一机制；标出仍不确定的关系。快速模式第一项必做，标准是"能把节之间的问题 → 方案串起来、说出关键取舍的方向"，链重建比例只记录不设阈值，其余可选，并写明略过的节。总结分开报告"已解释成功""提示后成功""仍待复习""材料本身不确定"，注明本课内的成功多为即时证据。开启知识库时迁移题记 `--kind transfer`，结束后 `learner_state_build.py build`。骨架课多一步分支决策。
 

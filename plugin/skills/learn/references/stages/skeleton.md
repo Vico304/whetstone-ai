@@ -13,6 +13,7 @@
 7. `final_challenge` 与迁移题**只用学习者的实际材料**出题（这是第三道相关性锚）；
 8. 写 `lesson-plan.json`（`schema_version: "1.5"`, `shape: "skeleton"`, `outline_confirmed_at: null`）与 `outline.md`（模板：`assets/skeleton-example/`），运行
    `validate_lesson.py <plan> --outline outline.md --sources-root <材料根>`；把它打印的 `INFO: grounding …` 原样写进 outline 的"落点比例"。
+9. 大纲确认并生成 `units/` 之后，按 [../protocol/probe.md](../protocol/probe.md) 先做前置地图（单元正文用到而本课未定义的概念），再做探测轮。
 
 ## 呈现时额外说明
 
@@ -20,6 +21,6 @@
 
 - 骨架课讲的是通用原理，与教科书重合是正常的；相关性看"落点比例"和"分支候选"两张表——**没有阈值**，漂不漂由你判断；
 - `no-anchor` 的概念列出来了：保留（通识）还是删掉由你定；
-- 确认后会先做一轮原理探测（[../protocol/probe.md](../protocol/probe.md)），答对的 unit 可以跳过。
+- 确认后先看单元正文里有没有你不熟的词（不熟的先补），再做一轮原理探测（[../protocol/probe.md](../protocol/probe.md)），答对的 unit 可以跳过。
 
 确认问题与 [outline.md](outline.md) 相同（模式 + 略过/加深/升级），多加一句："no-anchor 的概念留不留？"

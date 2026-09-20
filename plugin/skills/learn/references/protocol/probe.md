@@ -1,8 +1,16 @@
-# 原理探测轮（仅骨架课）
+# 骨架课开课前：前置地图与原理探测轮
 
-大纲确认、`units/` 生成、`learning_state.py init` 之后，正式教学之前运行一次。骨架课**不跑** `prerequisite/` 协议——探测就是它的前置判断。
+大纲确认、`units/` 生成、`learning_state.py init` 之后，正式教学之前运行一次。探测之前先做一次前置地图：探测题按规则无提示、原理层、不依赖材料细节，结构上碰不到只在单元正文出现的词，两者各管一段。
 
-## 流程
+## 前置地图（探测之前）
+
+1. 从 `units/` 正文里取出**用来解释机制、而本课 `concepts[]` 没有定义**的概念名。这一步总是做；取到空集就什么都不说，直接进"探测轮流程"。模型专有的字段名（`compress_ratios` 这类）不算概念，它们是材料来源不足的问题。
+2. 非空时按 `prerequisite_check` 决定诊断到哪一步：`always` 直接诊断；`skip` 只把清单列给学习者、不出题；`auto`（默认）列出清单并问一句"这几个词要不要先测"。
+3. 要诊断时按 [../prerequisite/diagnose.md](../prerequisite/diagnose.md) 阶段一写 `prerequisite-plan.json`（只收这些概念），跑 `index_match.py prerequisites`：前置课里学过的出变式题，`unknown` 的出诊断题。
+4. 非 `ready` 的簇按 [../prerequisite/course.md](../prerequisite/course.md) 的依赖类型分流：`def` 进本课当前 unit 的 `listed` 概念，由事实卡复习；`mech` 与 `tool` 建前置课，本课在第一个未 deferred 的 unit 上 `block`。建了前置课时 `next_step.py` 报 BLOCKED 而不是 PROBE，按 [../prerequisite/return.md](../prerequisite/return.md) 回程之后再做探测。
+5. 前置地图收的是"单元正文用到但本课未定义的词"，探测轮量的是"原理层的地板在哪"。同一个概念不在两处重复出题。
+
+## 探测轮流程
 
 1. 一句话说明规则："每个 unit 一道无提示题，考的是原理不是材料细节；答对可以跳过该 unit，答不对不扣分，直接照学。"
 2. 按 unit 顺序，**一次一题**：只给 `probe.prompt`，不给提示、不给材料；学习者作答后交还对话。

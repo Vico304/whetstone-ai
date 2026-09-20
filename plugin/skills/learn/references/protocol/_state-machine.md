@@ -24,7 +24,7 @@ ASSESS
 | 当前状态 | 读取 |
 |---|---|
 | build：大纲生成后、unit 生成前 | [../stages/outline.md](../stages/outline.md) |
-| 骨架课：units 生成后、第一个 READY 前 | [probe.md](probe.md) |
+| 骨架课：units 生成后、第一个 READY 前（前置地图与探测轮） | [probe.md](probe.md) |
 | READY | [ready.md](ready.md) |
 | PREDICT | [predict.md](predict.md) |
 | DEEPEN | [deepen.md](deepen.md) |
@@ -36,6 +36,8 @@ ASSESS
 | 最后一节完成后 | [finish.md](finish.md) |
 
 一次回复只推进一个状态。提出问题或追问后应把对话交还给学习者，不同时回答自己的问题。
+
+骨架课的前置地图建成前置课时，`next_step.py` 报 BLOCKED 而不是 PROBE：先回程（[../prerequisite/return.md](../prerequisite/return.md)），再做探测轮。
 
 复习课（`shape: review`）：READY 直接提出主问题（[main.md](main.md)），判定与反馈之后才揭示 `units/<id>.md`；没有 PREDICT 与探测轮；`repeat` 节记 `--kind review`，`deepen` 节记 `--kind checkpoint`。`next_step.py` 会按此打印。
 
