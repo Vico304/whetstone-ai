@@ -22,6 +22,15 @@
 
 追问必须由本次回答内容驱动，不得照抄题库。同一小节追问最多两层；两层后仍未解释清楚，给完整解释并要求学习者用新表述总结，然后继续。让学习者再次重建，而不是立即展示完整答案。
 
+## 缺口在本课以外的概念
+
+反馈或追问中确认学习者卡住的是一个本课没有定义的概念，并当场补讲了它时，补讲之后记一条只落在这个概念上的记录：
+
+1. `python3 scripts/index_match.py recall --home --candidates '[{"name": "<概念名>", "aliases": ["<别名>"]}]'`（主目录还不存在时改 `--store <工作区>/store`）取 id；没有命中就不记，也不在这里新建 id；
+2. `python3 scripts/lrg_record.py append --store <工作区>/store --lesson-id <本课> --section-id <当前节> --kind supporting --concept <id> --verdict partial --depth fact --response-file <学习者暴露缺口的那段原话>`。说不出定义记 `partial`，说错且会断掉本节机制记 `retry`；
+3. 不加 `--progress`：这条不改变本节 verdict，也不改变当前位置；
+4. 同一会话同一概念只记一次。补讲之后的复述不再记第二条——当场复述只是即时证据，记了会把这个概念抬高。
+
 ## 同节不重复出题
 
 同一小节内不用相似问题再次验证。需要再验证时：

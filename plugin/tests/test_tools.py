@@ -1069,6 +1069,22 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(chain["rigor_max"], "fast")
             self.assertEqual(chain["attempts"], 1)
 
+    def test_supporting_record_lands_on_its_concept_only(self):
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._store(Path(temporary))
+            gap = lrg_record.build_event(  # a gap taught on the spot, defined in another course
+                lesson_id="sample-guided-lesson", section_id="s01", kind="supporting", attempt_number=1,
+                response="没听过这个词", feedback="", verdict="retry", confidence=None, criteria_met=[],
+                depth_reached="fact", extraction=None, comparison=None, elapsed_seconds=None,
+                target_concept_ids=["llm-serving.sliding-window-cache"],
+            )
+            lrg_record.append_event(store, "sample-guided-lesson", gap)
+            state = learner_state_build.build(store, now=datetime.now(timezone.utc))
+            self.assertEqual(state["concepts"]["llm-serving.sliding-window-cache"]["last_verdict"], "retry")
+            for around in ("learning-design.system-boundary", "learning-design.macro-map"):
+                self.assertNotIn(around, state["concepts"])  # the section around it keeps its own verdicts
+
     def test_fast_rigor_downgrades_prerequisite_action(self):
         from datetime import datetime, timezone
         with tempfile.TemporaryDirectory() as temporary:
