@@ -17,7 +17,7 @@ python3 scripts/review_outline.py --store <工作区>/store --lesson-id <课程 
 
 1. **节从簇来**：一个簇一节，相邻且有边相连的簇可以合成一节；没有薄弱项的节不进复习课。每节 `review_kind: repeat`、`parent_section: {lesson_id, section_id}` 指向被复习的那一节；`problem` 写成新情境里的问题，优先放在最易与近邻混淆、最易诱发旧直觉的地方（概念有 `contrast` / `cases` 时用它们换情境）；`solution` / `mechanism` 用新情境重述，不抄原文；`checkpoint.prompt` 是变式题，不复用原主问题措辞。
 2. **子节**：`stable_sections` 里的节列为可选子节，每个从它的 `listed` 概念或材料池里选一个方向，写成 `review_kind: deepen` 的节（`id` 用 `<原节>.1`），内容是普通 unit（问题 → 方案 → 机制 → 新问题），来源只用材料池与外部存档，不动 `reserve`。**一门复习课最多提供一个子节**，写进大纲但默认不算主线。
-3. `lesson-plan.json`：`schema_version: "1.5"`、`shape: review`、`review_of: [<课程 id>…]`、`mode` 跟随被复习课里最严格的一门；覆盖表可为空；`relations[]` 照常写，链重建用它。
+3. `lesson-plan.json`：`schema_version: "1.6"`、`shape: review`、`review_of: [<课程 id>…]`、`mode` 跟随被复习课里最严格的一门；覆盖表可为空；`relations[]` 照常写，链重建用它。
 4. 呈现确认时多问一句："这次复习 N 节；`<稳固的节>` 已稳定，要不要顺带学它的子节《…》？"学习者不要就把子节 `deferred`。
 5. 校验：`validate_lesson.py <plan> --outline outline.md --units-dir units --reviewed <被复习课的 lesson-plan.json>…`——反向泄漏检查在这里。
 

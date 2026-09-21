@@ -10,7 +10,7 @@
 ├── prerequisite-plan.json       # 运行前置检查时创建
 ├── prerequisite-progress.json   # 前置作答、来源与桥接复测
 ├── prerequisite-guide.md        # 旧课程的补充文档；1.4 起缺口建成前置课，不再生成
-├── lesson-plan.json             # schema 1.5（旧课程 1.0–1.4 仍被接受）
+├── lesson-plan.json             # schema 1.6（旧课程 1.0–1.5 仍被接受）
 ├── outline.md                   # 路线图 + 全部概念 + 覆盖账本（取代 teaching-guide.md）
 ├── units/                       # 每个非 deferred 的 unit 一份，独立生成
 │   └── <section-id>.md
@@ -47,16 +47,18 @@
 
 顶层必需字段：
 
-- `schema_version`：新课程写 `1.5`（1.4 的超集，新增字段都可选：概念 `contrast / cases / ontology`、`tradeoffs[]` 的 `contested`、节 `parent_section`、复习课 `review_of`）；校验器与导出脚本同时接受 `1.0`–`1.4`（旧课程）；
+- `schema_version`：新课程写 `1.6`（1.5 的超集，新增字段都可选：节 `kind`、过程节 `steps[]`、节 `position`、结构化的 `big_picture.system_map`）；1.5 自己是 1.4 的超集（概念 `contrast / cases / ontology`、`tradeoffs[]` 的 `contested`、节 `parent_section`、复习课 `review_of`）；校验器与导出脚本同时接受 `1.0`–`1.5`（旧课程）；
 - **1.2** `mode`：`full | fast`；`outline_confirmed_at`：大纲生成时为 `null`，学习者确认后写 ISO 时间——为 `null` 时不得生成 `units/`；
 - `lesson_id`、`title`、`learning_goal`；
 - `source_manifest`：清单相对路径或 `null`；
 - `big_picture.problem`：材料总体解决的问题；
 - `big_picture.outcome`：学习后应能完成的行为；
-- `big_picture.system_map`：从输入到结果的关键步骤数组；
+- `big_picture.system_map`：从输入到结果的关键步骤数组；课程有结构讲解节时改写成 `{components: [{id, parent?}], links: [{from, to, label}]}`——部件是本课的概念 id（开启知识库时也可以是库里登记过的他课概念），`parent` 表示包含，`label` 是几个字的短语；
 - `sections`：有序教学小节；
 - `final_challenge.prompt` 与 `criteria`；
 - `uncertainties`：解析、证据或语义上的未决项，可为空数组。
+
+每个 `sections[]` 的 `kind` 缺省是 `chain`（问题链节）。`structure`（结构讲解节）没有 `solution` 与 `new_problem`、`tradeoffs` 留空，它的概念只能是 `supporting` 或 `listed` 且都在系统图上、都填 `ontology`；`process`（过程讲解节）没有 `solution` 与 `new_problem`，另有 `steps[]`（至少两条 `{actor, target?, action, changes}`，`actor` 与 `target` 是本课概念 id）和一个 `ontology: process` 的 core 概念。任何节可选 `position`，指出本节展开的是系统图上的哪个部件。
 
 每个 `sections[]` 必需包含：
 
@@ -128,7 +130,15 @@ explicit | entailed | pedagogical_inference | external | unsupported
 6. 使用说明：unit 文档在哪、怎么要求验收 supporting、怎么展开 listed、怎么补 deferred。
 7. 学习情况：问题链表的状态列与文末 `<!-- whetstone:status -->` 块由 `outline_status.py` 从进度文件生成，每次记录后自动刷新；结课总结由模型写在块之后。
 
-校验器检查：标题、模式、每个 section 标题、每个概念名都出现；1.5 课程有覆盖全部未略过 unit 的 Mermaid 问题链图；criteria、`check.criteria`、`principle`、`meaning`、`tradeoffs` 都不出现。模板见 `assets/outline-template.md`。 骨架课另需：落点比例、每个概念的落点或 external / no-anchor 标记、分支候选表（校验器检查候选标题）、`probe.criteria` 不出现；模板见 `assets/skeleton-example/outline.md`。
+校验器检查：标题、模式、每个 section 标题、每个概念名都出现；1.5 起的课程有覆盖全部未略过 unit 的 Mermaid 问题链图；criteria、`check.criteria`、`principle`、`meaning`、`tradeoffs` 都不出现。模板见 `assets/outline-template.md`。 骨架课另需：落点比例、每个概念的落点或 external / no-anchor 标记、分支候选表（校验器检查候选标题）、`probe.criteria` 不出现；模板见 `assets/skeleton-example/outline.md`。
+
+## 结构讲解节与过程讲解节的讲义（1.6）
+
+结构讲解节的 `units/<id>.md`：本节要安放的部件清单（每个一句职责、输入输出、与谁相连，内部机制写"本节不展开"）、`diagram.py --section <id>` 生成的部件图、来源定位、"轮到你"检查点。不写方案，不写引出的新问题。
+
+过程讲解节的 `units/<id>.md`：被追踪的那一种运行方式是什么、`diagram.py --section <id>` 生成的时序图、逐步说明（谁做的、做了什么、什么变了）、本次不追踪的可选运行方式一句（它与被追踪过程差在哪个变量）、来源定位、检查点。
+
+两种文档都在开头写一句它们是可以随时回来看的参考；检查点要求合上文档、按一条路径自己讲一遍。带 `position` 的节在开头写明本节展开的是系统图上的哪个部件，结尾写一句回到整体的位置。
 
 ## `units/<section-id>.md`（1.2）
 

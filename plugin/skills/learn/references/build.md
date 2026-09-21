@@ -53,6 +53,17 @@
 
 不要按文件顺序机械摘要。课程顺序应优先服务因果理解和先修关系；必要时说明它与原材料顺序不同。
 
+### 三种节：先安放，再追踪，再追因果
+
+一节写成什么，取决于学习者在这一段遇到的是哪种困难，不是深浅等级。缺省是问题链节（`kind` 不写），只在下面两种情况改用另外两种：
+
+- **结构讲解节**（`kind: "structure"`）：学习者说不出这些名词在系统里的位置。触发信号有三个——档案自述基础薄弱；[protocol/probe.md](protocol/probe.md) 的前置地图报出多个部件类名词；材料是学习者陌生的技术框架。它回答"由哪些部分组成、谁包含谁、谁连谁、各管什么"，**没有方案、没有引出的新问题、取舍留空**。不要为名词虚构设计理由（"为什么需要 CUDA"没有真实答案）。
+- **过程讲解节**（`kind: "process"`）：名词认识了，但说不出一次运行怎么走。它追踪**一种明确的运行方式**，`steps[]` 至少两条 `{actor, target?, action, changes}`，`actor` 与 `target` 用概念 id。本次不追踪的可选运行方式写成本节的 `listed` 概念，填 `contrast.with` 指向被追踪的那个过程概念、`differs_in` 写清差在哪个变量——**不要把可选机制串进必经步骤**；超出课程范围的进 `deferred[]`。
+
+结构讲解节的部件写进 `big_picture.system_map`：`components[]` 每项 `{id, parent?}`（`parent` 表示包含），`links[]` 每条 `{from, to, label}`，`label` 是几个字的短语（图示原样渲染，不截断）。部件就是本课的概念，在结构讲解节里只能是 `supporting` 或 `listed`，每个必填 `ontology`——CUDA 这样的平台、统一内存这样的管理机制、远程过程调用这样的通信方式，画成三个并排的方框就错了。部件的 `explanation` 只写职责、输入输出、连接，内部机制写一句"本节不展开"；真要展开时另起一节，用 `position` 指回这个部件。
+
+不因为引入结构讲解节就把全部底层细节设成必学前置：导览是为了让后面的内容有坐标系，不是先学完一层基础。
+
 然后为每个 unit 分配**全部**涉及的概念并标角色（`core` 进检查点、≤ 4；`supporting` 会讲、自带可选验收题；`listed` 只列名 + 一句事实层定义 + 定位），并填写**覆盖账本**：材料的每个一级/二级标题去了哪个 unit 的哪个角色，或 `deferred / excluded`（带理由）。**任何抽取到的概念都必须有去处，绝不静默丢弃。** 概念多于上限时降为 supporting 或 listed，不是删掉。
 
 开启知识库且某个概念 id 复用了库里已登记的概念（判定见 [store.md](store.md) 的 `index_match.py recall`）时，对这些 id 跑一次 `scripts/review_pool.py --store <工作区>/store --concept <id> [--concept …] --limit 3`（要跨工作区就改 `--home`），读 `items[]` 里的错误命题：
@@ -62,7 +73,7 @@
 
 开启知识库且本课沿用了库里已有的概念时，至少写一条 `relations` 边把它接到本课的概念上（`depends_on` 或 `prerequisite_for`，端点用库里的 id，`rationale` 写清这条关系成立的理由——它是教学时的判定依据；`source_refs` 照常填本课材料里的定位）。这些边由 [protocol/predict.md](protocol/predict.md) 在揭示之前问学习者，不进结课的链重建。
 
-产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json --store <工作区>/store`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+产出 `lesson-plan.json`（schema `1.6`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json --store <工作区>/store`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ## 4. 生成教学包：按 unit 逐份生成
 
@@ -87,7 +98,10 @@
 - `units/<id>.md`：围绕一个可解释步骤，至少包含：当前问题、（core 概念带 `cases` 时）两个案例并列并请学习者先写共同点、解决方案、工作机制、它引出的新问题、本节概念（core / supporting / listed 三块都可见）、来源定位和学习者检查点。`supporting` 概念各有一段"它在本节机制里的位置"，不附"想验收它就说……"的提醒（只在 outline 使用说明里写一次）；`listed` 只有名 + 一句 + 定位，**不讲机制**。**意义、代价与设计思想不进文档**——它们写在 `lesson-plan.json` 的 `meaning`、`tradeoffs`、`principle` 里，作为主问题与追问的素材，由学习者在回答中自己得出。
 - "新问题"应自然引出下一 unit；最后一个 unit 可转为未决问题、边界或迁移挑战。图不强制：本节概念的关系图用 `diagram.py --section <id>` 生成；机制或架构的框图（框套框、数据流）有助于理解时按材料手写 Mermaid，只画公开层的东西。
 - 来源定位靠近相关结论。外部知识必须单独标记，不得用来填补材料缺口而不说明。
-- 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题；复用的概念带着库里的错误命题时，`criteria` 里有一条直接对准那个误解（来源见 §3）。
+- 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题；复用的概念带着库里的错误命题时，`criteria` 里有一条直接对准那个误解（来源见 §3）。按节类型出题，一律**合上文档作答**（结构图与步骤表学习期间随时可回查，验收时合上）：
+  - 结构讲解节：给一个起点和一个终点，请学习者说出中间经过哪些部件、谁装在谁里面、每条连线上走的是什么。只判这一条路径，不要求复述整张图。`criteria` 三条——定位、职责、连接，`layer: fact`；
+  - 过程讲解节：请学习者按顺序说出这次运行的步骤、每步谁做的、什么变了。`criteria` 三条——步骤、参与者、变化，`layer: mechanism`；
+  - 问题链节不变。
 - 快速模式下只保留主线 core unit，其余进 `deferred[]`；被略过的内容在 outline 里可见，日后可补。
 
 ## 完成标准（建课与首节教学）

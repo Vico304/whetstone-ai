@@ -4,7 +4,7 @@
 
 ## 前置地图（探测之前）
 
-1. 从 `units/` 正文里取出**用来解释机制、而本课 `concepts[]` 没有定义**的概念名。这一步总是做；取到空集就什么都不说，直接进"探测轮流程"。模型专有的字段名（`compress_ratios` 这类）不算概念，它们是材料来源不足的问题。
+1. 从 `units/` 正文里取出**用来解释机制、而本课 `concepts[]` 没有定义**的概念名。这一步总是做；取到空集就什么都不说，直接进"探测轮流程"。模型专有的字段名（`compress_ratios` 这类）不算概念，它们是材料来源不足的问题。本课有结构讲解节时，那一节安放过的部件也不收——它们的位置由那一节负责讲。
 2. 非空时按 `prerequisite_check` 决定诊断到哪一步：`always` 直接诊断；`skip` 只把清单列给学习者、不出题；`auto`（默认）列出清单并问一句"这几个词要不要先测"。
 3. 要诊断时按 [../prerequisite/diagnose.md](../prerequisite/diagnose.md) 阶段一写 `prerequisite-plan.json`（只收这些概念），跑 `index_match.py prerequisites`：前置课里学过的出变式题，`unknown` 的出诊断题。
 4. 非 `ready` 的簇按 [../prerequisite/course.md](../prerequisite/course.md) 的依赖类型分流：`def` 进本课当前 unit 的 `listed` 概念，由事实卡复习；`mech` 与 `tool` 建前置课，本课在第一个未 deferred 的 unit 上 `block`。建了前置课时 `next_step.py` 报 BLOCKED 而不是 PROBE，按 [../prerequisite/return.md](../prerequisite/return.md) 回程之后再做探测。
