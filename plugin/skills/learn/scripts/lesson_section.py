@@ -145,6 +145,19 @@ def render_section(plan: dict, section_id: str) -> str:
     for label, key in (("当前问题", "problem"), ("方案", "solution"), ("机制", "mechanism"), ("引出的新问题", "new_problem")):
         out += [f"## {label}", str(section.get(key) or "-"), ""]
     out += ["## 概念", *concept_lines(section), ""]
+    position = section.get("position")
+    if position:
+        names = {c["id"]: c.get("name") or c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
+                 for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
+        out += [f"## 返回位置", f"本节展开的是系统图上的 {names.get(position, position)}（`{position}`）", ""]
+    steps = section.get("steps")
+    if isinstance(steps, list) and steps:
+        out += ["## 步骤（过程讲解节；验收时合上本表）"]
+        for index, step in enumerate(steps, start=1):
+            if isinstance(step, dict):
+                target = f" → {step.get('target')}" if step.get("target") else ""
+                out.append(f"{index}. {step.get('actor')}{target}：{step.get('action')}　变化：{step.get('changes')}")
+        out.append("")
     crossing = cross_lesson_lines(plan, section)
     if crossing:
         out += ["## 跨课关系（不展示，先问后揭示：protocol/predict.md）", *crossing, ""]
@@ -185,6 +198,20 @@ def render_final(plan: dict) -> str:
     elif isinstance(final, str):
         out += ["## 结课题（迁移 / 桥接）", final, ""]
     out += ["## 本课概念名（打乱顺序，链重建时只给这份，不给节标题和顺序）", *(f"- {n}" for n in shuffled_concept_names(plan)), ""]
+    system_map = (plan.get("big_picture") or {}).get("system_map")
+    if isinstance(system_map, dict):
+        names = {c["id"]: c.get("name") or c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
+                 for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
+        out += ["## 系统图（路线重建：给起点与终点，只判这一条路径）"]
+        for item in system_map.get("components") or []:
+            if isinstance(item, dict) and item.get("id"):
+                inside = f"，在 {names.get(item['parent'], item['parent'])} 里" if item.get("parent") else ""
+                out.append(f"- {names.get(item['id'], item['id'])}（`{item['id']}`）{inside}")
+        for link in system_map.get("links") or []:
+            if isinstance(link, dict):
+                out.append(f"- {names.get(link.get('from'), link.get('from'))} → "
+                           f"{names.get(link.get('to'), link.get('to'))}：{link.get('label')}")
+        out.append("")
     candidates = plan.get("branch_candidates") or []
     if candidates:
         out += ["## 分支候选（骨架课）"]

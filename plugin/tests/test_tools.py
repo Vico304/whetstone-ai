@@ -1549,6 +1549,52 @@ class CourseOrganisationTests(unittest.TestCase):
         self.assertIn("宿主进程", names)  # it also takes part in the process section
         self.assertIn("一次任务的提交与取回", names)
 
+    def test_the_system_map_is_drawn_with_containment_and_labelled_links(self):
+        plan = self.plan()
+        drawn = diagram.system(plan)
+        self.assertIn('subgraph C_org_host["宿主进程"]', drawn)  # parent becomes a subgraph: containment reads as nesting
+        self.assertIn('C_org_runtime["运行时"]', drawn)
+        self.assertIn('-- "把任务交给它执行" -->', drawn)  # the author's own words, not truncated
+        plan["sections"] = plan["sections"][2:]
+        plan["big_picture"]["system_map"] = ["提交", "执行", "取回"]
+        legacy = diagram.system(plan)
+        self.assertIn("flowchart LR", legacy)  # the old list of steps still renders as a left-to-right flow
+        self.assertIn("M1 --> M2", legacy)
+
+    def test_a_structure_section_draws_only_the_parts_it_places(self):
+        plan = self.plan()
+        plan["sections"][0]["concepts"] = plan["sections"][0]["concepts"][:2]  # host and runtime, not the accelerator
+        drawn = diagram.section_graph(plan, "s01")
+        self.assertIn("C_org_runtime", drawn)
+        self.assertIn("subgraph C_org_host", drawn)  # the parent is kept so the nesting still reads
+        self.assertNotIn("C_org_accelerator", drawn)
+
+    def test_a_process_section_draws_the_run_step_by_step(self):
+        drawn = diagram.section_graph(self.plan(), "s02")
+        self.assertIn("sequenceDiagram", drawn)
+        self.assertIn("participant P_org_host as 宿主进程", drawn)
+        self.assertEqual(drawn.index("P_org_host as"), min(drawn.index(f"P_org_{n} as") for n in ("host", "runtime", "accelerator")))
+        self.assertIn("P_org_host->>P_org_runtime: 提交任务", drawn)
+        self.assertIn("Note right of P_org_runtime: 任务进入队列", drawn)
+
+    def test_the_problem_chain_shows_all_three_kinds(self):
+        drawn = diagram.chain(self.plan())
+        self.assertIn("1 系统由哪些部分组成（结构）", drawn)
+        self.assertIn("2 跟随一次任务跑一遍（过程）", drawn)
+        self.assertIn("S_s01 --> S_s02", drawn)
+        self.assertNotIn("（结构）", drawn.split("S_s03")[1])  # a chain section carries no mark
+
+    def test_the_finish_view_carries_the_map_and_the_section_view_its_position(self):
+        plan = self.plan()
+        final = lesson_section.render_final(plan)
+        self.assertIn("路线重建", final)
+        self.assertIn("运行时（`org.runtime`），在 宿主进程 里", final)
+        self.assertIn("运行时 → 加速器：把任务交给它执行", final)
+        view = lesson_section.render_section(plan, "s01")
+        self.assertIn("返回位置", view)
+        self.assertIn("宿主进程", view)
+        self.assertIn("步骤（过程讲解节", lesson_section.render_section(plan, "s02"))
+
     def test_the_new_fields_are_rejected_before_16(self):
         for key, value in (("kind", "process"), ("steps", []), ("position", "x")):
             plan = load_template()
