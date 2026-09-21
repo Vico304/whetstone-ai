@@ -98,7 +98,7 @@
 
 `big_picture.system_map` 仍可以是旧的步骤字符串数组；写成 `{components: [{id, parent?}], links: [{from, to, label}]}` 时，`id / parent / from / to` 是本课概念 id，或（校验器带 `--store` 时）知识库里登记过的他课概念 id。`parent` 表示包含，不许成环；`links` 是带一句文字说明的有向线，没有类型，不导出为参考图的边，也不进前置、假性掌握与链重建。课程含 `structure` 节时必须用这种形式。`sections[].position` 任何节类型可选，指出本节展开的是哪个部件。
 
-图上的部件不计入 `INFO: orphan concepts`——它们靠 `links` 相连，不靠 `relations[]`；`structure` 节的概念不进结课链重建的名单，它是可随时回查的参考，不是凭记忆重建的内容。
+骨架课里 `structure` 节不要 `probe`（它的答案在 `outline.md` 的系统图上），`process` 节照常要。图上的部件不计入 `INFO: orphan concepts`——它们靠 `links` 相连，不靠 `relations[]`；`structure` 节的概念不进结课链重建的名单，它是可随时回查的参考，不是凭记忆重建的内容。
 
 ## 6. 判定标准
 

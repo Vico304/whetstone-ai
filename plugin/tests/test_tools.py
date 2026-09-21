@@ -1606,6 +1606,21 @@ class CourseOrganisationTests(unittest.TestCase):
         self.assertEqual([validate_lesson.section_kind(s) for s in plan["sections"]], ["structure", "chain"])
         self.assertIn("subgraph", diagram.system(plan))  # the map is drawn from components, not from a list of steps
 
+    def test_a_skeleton_courses_structure_section_has_no_probe(self):
+        plan = self.plan()
+        plan["shape"] = "skeleton"
+        probe = {"prompt": "不看材料：这一步为什么必要？",
+                 "criteria": [{"id": "p1", "text": "说出它回应的限制", "layer": "mechanism"}]}
+        for section in plan["sections"]:
+            section["probe"] = copy.deepcopy(probe)
+        errors = self.errors(plan)  # the structure section's answer is already on the outline's map
+        self.assertTrue(any("sections[0].probe is not allowed in a structure section" in e for e in errors), errors)
+        del plan["sections"][0]["probe"]
+        errors = self.errors(plan)
+        self.assertFalse(any(".probe" in e for e in errors), errors)
+        del plan["sections"][1]["probe"]  # the process section still needs one: its steps are not on the outline
+        self.assertTrue(any("sections[1].probe is required" in e for e in self.errors(plan)), self.errors(plan))
+
     def test_the_new_fields_are_rejected_before_16(self):
         for key, value in (("kind", "process"), ("steps", []), ("position", "x")):
             plan = load_template()

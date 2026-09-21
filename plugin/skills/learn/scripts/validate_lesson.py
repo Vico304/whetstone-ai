@@ -660,7 +660,13 @@ def validate_v13(plan: dict, concept_ids: set[str], errors: list[str]) -> None:
             continue
         location = f"sections[{index}]"
         probe = section.get("probe")
-        if shape == "skeleton":
+        # a structure section's answer is the system map, which the outline already shows: a probe
+        # there measures nothing, so it is neither required nor allowed
+        if shape == "skeleton" and section_kind(section) == "structure":
+            if probe is not None:
+                errors.append(f"{location}.probe is not allowed in a structure section: its answer is the "
+                              "system map, which outline.md already shows")
+        elif shape == "skeleton":
             if not isinstance(probe, dict):
                 errors.append(f"{location}.probe is required in a skeleton course (principle-level, no-hint question)")
             else:
