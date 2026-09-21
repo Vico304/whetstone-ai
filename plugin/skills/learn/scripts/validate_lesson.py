@@ -11,10 +11,12 @@ from typing import Any
 
 
 SUPPORT_TYPES = {"explicit", "entailed", "pedagogical_inference", "external", "unsupported"}
-SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3", "1.4", "1.5"}
-ROLE_AWARE_VERSIONS = {"1.2", "1.3", "1.4", "1.5"}  # course-planning (spec C) fields
-SHAPE_AWARE_VERSIONS = {"1.3", "1.4", "1.5"}  # shape / pool / anchor / probe / branch candidates
-PREREQUISITE_VERSIONS = {"1.4", "1.5"}
+SCHEMA_VERSIONS = {"1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6"}
+ROLE_AWARE_VERSIONS = {"1.2", "1.3", "1.4", "1.5", "1.6"}  # course-planning (spec C) fields
+SHAPE_AWARE_VERSIONS = {"1.3", "1.4", "1.5", "1.6"}  # shape / pool / anchor / probe / branch candidates
+PREREQUISITE_VERSIONS = {"1.4", "1.5", "1.6"}
+VARIATION_VERSIONS = {"1.5", "1.6"}  # contrast / cases / ontology, contested tradeoffs, sub-sections, review courses
+ORGANISATION_VERSIONS = {"1.6"}  # section kinds, structured system map, process steps, position
 PREREQUISITE_KEYS = ("prerequisite_of", "blocked_at", "depth")  # 1.4: a course spawned to fill a parent course's gap
 SHAPES = {"linear", "skeleton", "branch", "review"}
 # 1.5: variation fields on concepts, contested tradeoffs, sub-sections, review courses
@@ -23,6 +25,11 @@ CASES_PER_CONCEPT = 2
 CONTESTED_SIDES = 2
 V15_CONCEPT_KEYS = ("contrast", "cases", "ontology")
 REVIEW_KINDS = {"repeat", "deepen"}
+# 1.6: a course may mix a problem chain with structure and process sections
+SECTION_KINDS = {"chain", "structure", "process"}
+CHAIN_ONLY_KEYS = ("solution", "new_problem")  # a structure or process section has neither
+STEP_KEYS = ("actor", "action", "changes")
+MIN_STEPS = 2
 REVIEW_LEAK_MIN_CHARS = 20  # a sentence of the reviewed section's solution/mechanism this long must not reappear verbatim
 ANCHOR_MARKERS = {"external", "no-anchor"}
 # a locator into data or code reaches a key or a symbol, never a passage that explains the concept
@@ -239,8 +246,9 @@ def validate_tradeoffs(section: dict, location: str, errors: list[str], version:
         t_location = f"{location}.tradeoffs[{index}]"
         if nonempty(item):
             continue
-        if not isinstance(item, dict) or version != "1.5":
-            errors.append(f"{t_location} must be a non-empty string" + ("" if version == "1.5" else " (objects need schema 1.5)"))
+        if not isinstance(item, dict) or version not in VARIATION_VERSIONS:
+            errors.append(f"{t_location} must be a non-empty string"
+                          + ("" if version in VARIATION_VERSIONS else " (objects need schema 1.5)"))
             continue
         require_text(item, "text", t_location, errors)
         contested = item.get("contested", False)
@@ -258,6 +266,169 @@ def validate_tradeoffs(section: dict, location: str, errors: list[str], version:
                         continue
                     require_text(side, "claim", s_location, errors)
                     validate_source_refs(side.get("source_refs"), s_location, errors, manifest_paths)
+
+
+def section_kind(section: Any) -> str:
+    """1.6: how this section is organised. Older plans and plans without the field are problem chains."""
+    kind = section.get("kind") if isinstance(section, dict) else None
+    return kind if kind in SECTION_KINDS else "chain"
+
+
+def system_map_components(plan: dict) -> dict[str, Any] | None:
+    """{component id: parent id or None} for a structured system map, or None for the legacy list of steps."""
+    system_map = (plan.get("big_picture") or {}).get("system_map")
+    if not isinstance(system_map, dict):
+        return None
+    components = system_map.get("components")
+    if not isinstance(components, list):
+        return {}
+    return {item["id"]: item.get("parent") for item in components
+            if isinstance(item, dict) and nonempty(item.get("id"))}
+
+
+def validate_system_map(plan: dict, concept_ids: set[str], errors: list[str], registered: set[str] | None) -> None:
+    """1.6: a system map is either the legacy list of steps or {components, links} over this course's concepts."""
+    big_picture = plan.get("big_picture")
+    if not isinstance(big_picture, dict):
+        return
+    system_map = big_picture.get("system_map")
+    if not isinstance(system_map, dict):
+        require_text_list(big_picture, "system_map", "big_picture", errors)
+        return
+    known = set(concept_ids) | (registered or set())
+
+    def check_id(value: Any, location: str, within: set[str]) -> None:
+        if not nonempty(value):
+            errors.append(f"{location} must be a concept id")
+        elif value not in within:
+            errors.append(f"{location} '{value}' is not a concept of this lesson"
+                          + ("" if registered is None else " and is not registered in the store"))
+
+    components = system_map.get("components")
+    if not isinstance(components, list) or not components:
+        errors.append("big_picture.system_map.components must be a non-empty list of {id, parent?}")
+        components = []
+    parents: dict[str, Any] = {}
+    for index, item in enumerate(components):
+        location = f"big_picture.system_map.components[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object {{id, parent?}}")
+            continue
+        check_id(item.get("id"), f"{location}.id", known)
+        if nonempty(item.get("id")):
+            if item["id"] in parents:
+                errors.append(f"{location}.id duplicates '{item['id']}'")
+            parents[item["id"]] = item.get("parent")
+    for cid, parent in parents.items():
+        if parent is None:
+            continue
+        if parent not in parents:
+            errors.append(f"big_picture.system_map: parent '{parent}' of '{cid}' is not a component")
+            continue
+        seen, walk = {cid}, parent
+        while walk is not None:
+            if walk in seen:
+                errors.append(f"big_picture.system_map: '{cid}' is inside itself through '{parent}'")
+                break
+            seen.add(walk)
+            walk = parents.get(walk)
+
+    links = system_map.get("links")
+    if links is None:
+        links = []
+    if not isinstance(links, list):
+        errors.append("big_picture.system_map.links must be a list of {from, to, label}")
+        links = []
+    for index, link in enumerate(links):
+        location = f"big_picture.system_map.links[{index}]"
+        if not isinstance(link, dict):
+            errors.append(f"{location} must be an object {{from, to, label}}")
+            continue
+        for end in ("from", "to"):
+            check_id(link.get(end), f"{location}.{end}", set(parents))
+        require_text(link, "label", location, errors)
+        if link.get("from") == link.get("to") and link.get("from") is not None:
+            errors.append(f"{location} must not connect a component to itself")
+
+
+def validate_v16(plan: dict, concept_ids: set[str], errors: list[str], warnings: list[str]) -> None:
+    """Schema 1.6: structure and process sections beside the problem chain, and the components they place."""
+    components = system_map_components(plan)
+    has_structure = any(section_kind(s) == "structure" for s in (plan.get("sections") or []) if isinstance(s, dict))
+    if has_structure and components is None:
+        errors.append("big_picture.system_map must be {components, links} when the course has a structure section "
+                      "(the structure section places those components)")
+    for index, section in enumerate(plan.get("sections") or []):
+        if not isinstance(section, dict):
+            continue
+        location = f"sections[{index}]"
+        kind = section.get("kind")
+        if kind is not None and kind not in SECTION_KINDS:
+            errors.append(f"{location}.kind must be one of {sorted(SECTION_KINDS)}")
+            continue
+        kind = section_kind(section)
+        position = section.get("position")
+        if position is not None:
+            if components is None or position not in components:
+                errors.append(f"{location}.position '{position}' is not a component of big_picture.system_map")
+        if kind == "chain":
+            if "steps" in section:
+                errors.append(f"{location}.steps is only allowed in a process section")
+            continue
+
+        for key in CHAIN_ONLY_KEYS:
+            if section.get(key) is not None:
+                errors.append(f"{location}.{key} is not allowed in a {kind} section "
+                              "(it explains where things are or how a run proceeds, not what a solution answers)")
+        roles = {c.get("id"): c.get("role", "core") for c in (section.get("concepts") or []) if isinstance(c, dict)}
+        if kind == "structure":
+            if section.get("tradeoffs"):
+                errors.append(f"{location}.tradeoffs must be empty in a structure section "
+                              "(a cost or a boundary belongs to a chain section)")
+            if "steps" in section:
+                errors.append(f"{location}.steps is only allowed in a process section")
+            placed = [cid for cid in roles if components is not None and cid in components]
+            if components is not None and not placed:
+                errors.append(f"{location} is a structure section but none of its concepts is a component of "
+                              "big_picture.system_map")
+            for cid, role in roles.items():
+                if role == "core":
+                    errors.append(f"{location}: concept '{cid}' must be supporting or listed in a structure section "
+                                  "(a structure section places parts, it does not take a core concept into the checkpoint)")
+            for concept in section.get("concepts") or []:
+                if isinstance(concept, dict) and components is not None and concept.get("id") in components \
+                        and concept.get("ontology") not in ONTOLOGY_TYPES:
+                    errors.append(f"{location}: component '{concept.get('id')}' must declare ontology "
+                                  f"(one of {sorted(ONTOLOGY_TYPES)})")
+            unplaced = [cid for cid in roles if components is not None and cid not in components]
+            if unplaced:
+                warnings.append(f"{location}: {len(unplaced)} concept(s) of this structure section are not on the "
+                                f"system map ({', '.join(str(c) for c in unplaced)}) — the learner cannot locate them there")
+        else:  # process
+            steps = section.get("steps")
+            if not isinstance(steps, list) or len(steps) < MIN_STEPS:
+                errors.append(f"{location}.steps must be a list of at least {MIN_STEPS} "
+                              "{actor, target?, action, changes} in a process section")
+                steps = []
+            for s_index, step in enumerate(steps):
+                s_location = f"{location}.steps[{s_index}]"
+                if not isinstance(step, dict):
+                    errors.append(f"{s_location} must be an object {{actor, target?, action, changes}}")
+                    continue
+                for key in STEP_KEYS:
+                    require_text(step, key, s_location, errors)
+                for end in ("actor", "target"):
+                    value = step.get(end)
+                    if value is None and end == "target":
+                        continue
+                    if not nonempty(value) or value not in concept_ids:
+                        errors.append(f"{s_location}.{end} '{value}' is not a concept id in this lesson")
+                    elif components is not None and value not in components:
+                        warnings.append(f"{s_location}.{end} '{value}' takes part in the run but is not on the system map")
+            tracked = [c for c in (section.get("concepts") or [])
+                       if isinstance(c, dict) and c.get("role", "core") == "core" and c.get("ontology") == "process"]
+            if not tracked:
+                errors.append(f"{location} must have one core concept with ontology 'process': the run it tracks")
 
 
 def validate_v15(plan: dict, section_ids: set[str], errors: list[str]) -> None:
@@ -541,10 +712,12 @@ def validate_v14(plan: dict, errors: list[str]) -> None:
 
 def orphan_concepts(plan: dict) -> dict:
     """Core concepts (by id) that no relation touches. No threshold: a printed number for the learner to judge."""
+    components = system_map_components(plan) or {}  # placed on the system map: joined by links, not by relations
     core: set[str] = set()
     for section in plan.get("sections", []) or []:
         for concept in (section.get("concepts", []) or []) if isinstance(section, dict) else []:
-            if isinstance(concept, dict) and concept.get("role", "core") == "core" and nonempty(concept.get("id")):
+            if isinstance(concept, dict) and concept.get("role", "core") == "core" and nonempty(concept.get("id")) \
+                    and concept["id"] not in components:
                 core.add(concept["id"])
     related: set[str] = set()
     for relation in plan.get("relations", []) or []:
@@ -761,7 +934,7 @@ def criteria_texts(checkpoint: Any) -> list[str]:
 
 
 def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty_coverage: bool = False,
-                  registered: set[str] | None = None) -> list[str]:
+                  registered: set[str] | None = None, warnings: list[str] | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
         return ["lesson plan root must be an object"]
@@ -785,7 +958,12 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
     else:
         require_text(big_picture, "problem", "big_picture", errors)
         require_text(big_picture, "outcome", "big_picture", errors)
-        require_text_list(big_picture, "system_map", "big_picture", errors)
+        if version in ORGANISATION_VERSIONS:
+            pass  # validate_v16 checks it against this course's concept ids, which the section loop collects
+        elif isinstance(big_picture.get("system_map"), dict):
+            errors.append("big_picture.system_map as {components, links} requires schema_version '1.6'")
+        else:
+            require_text_list(big_picture, "system_map", "big_picture", errors)
 
     sections = plan.get("sections")
     if not isinstance(sections, list) or not sections:
@@ -798,7 +976,11 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         if not isinstance(section, dict):
             errors.append(f"{location} must be an object")
             continue
-        for key in ("id", "title", "problem", "solution", "mechanism", "meaning"):
+        kind = section_kind(section) if version in ORGANISATION_VERSIONS else "chain"
+        required = ["id", "title", "problem", "mechanism", "meaning"]
+        if kind == "chain":
+            required.insert(3, "solution")
+        for key in required:
             require_text(section, key, location, errors)
         section_id = section.get("id")
         if nonempty(section_id):
@@ -817,7 +999,9 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
 
         validate_tradeoffs(section, location, errors, version, manifest_paths)
         new_problem = section.get("new_problem")
-        if index < len(sections) - 1 and not nonempty(new_problem):
+        if kind != "chain":
+            pass  # a structure or process section has no new problem; validate_v16 rejects the field outright
+        elif index < len(sections) - 1 and not nonempty(new_problem):
             errors.append(f"{location}.new_problem must lead into the next section")
         elif index == len(sections) - 1 and new_problem is not None and not nonempty(new_problem):
             errors.append(f"{location}.new_problem must be null or a non-empty string")
@@ -837,7 +1021,7 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
                     validate_concept_v11(concept, concept_location, errors, names_by_id)
                 if version in ROLE_AWARE_VERSIONS:
                     validate_concept_v12(concept, concept_location, errors)
-                if version == "1.5":
+                if version in VARIATION_VERSIONS:
                     validate_concept_v15(concept, concept_location, errors, manifest_paths)
                 elif any(key in concept for key in V15_CONCEPT_KEYS):
                     errors.append(f"{concept_location}.contrast / cases / ontology require schema_version '1.5'")
@@ -878,7 +1062,17 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
         for key in PREREQUISITE_KEYS:
             if key in plan:
                 errors.append(f"root.{key} requires schema_version '1.4'")
-    if version == "1.5":
+    if version in ORGANISATION_VERSIONS:
+        validate_system_map(plan, set(names_by_id), errors, registered)
+        validate_v16(plan, set(names_by_id), errors, warnings if warnings is not None else [])
+    else:
+        for s_index, section in enumerate(sections):
+            if not isinstance(section, dict):
+                continue
+            for key in ("kind", "steps", "position"):
+                if key in section:
+                    errors.append(f"sections[{s_index}].{key} requires schema_version '1.6'")
+    if version in VARIATION_VERSIONS:
         validate_v15(plan, seen, errors)
     else:
         if "review_of" in plan or plan.get("shape") == "review":
@@ -990,7 +1184,7 @@ def validate_outline(outline: str, plan: dict) -> list[str]:
     """outline.md must show the route and every concept, and hide everything above the public layer."""
     errors: list[str] = []
     normalized = normalize_text(outline)
-    if schema_version(plan) == "1.5":  # new courses: the problem chain is also drawn (diagram.py --chain)
+    if schema_version(plan) in VARIATION_VERSIONS:  # new courses: the problem chain is also drawn (diagram.py --chain)
         diagrams = normalize_text("\n".join(mermaid_blocks(outline)))
         if not diagrams:
             errors.append("outline must contain a mermaid diagram of the problem chain (paste `diagram.py <plan> --chain`)")
@@ -1228,8 +1422,10 @@ def main() -> int:
                 if sources_root is not None:
                     print(f"INFO: sources root {sources_root} (from {manifest_path.name} base_path)")
         registered = registered_concept_ids(args.store)
-        errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage, registered=registered)
-        warnings = collect_warnings(plan)
+        warnings: list[str] = []
+        errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage,
+                               registered=registered, warnings=warnings)
+        warnings.extend(collect_warnings(plan))
         if args.guide:
             guide = args.guide.read_text(encoding="utf-8")
             errors.extend(validate_guide(guide, plan))
@@ -1255,7 +1451,7 @@ def main() -> int:
             f = fact_ratio(plan)
             print(f"INFO: prerequisite course of {plan.get('prerequisite_of')} (depth {plan.get('depth')}, blocked at {plan.get('blocked_at')}); "
                   f"fact ratio {f['fact']}/{f['total']} concepts are fact-layer — no threshold; when nearly all are conventions, the next level is cards, not a course")
-        if schema_version(plan) == "1.5":
+        if schema_version(plan) in VARIATION_VERSIONS:
             v = variation_ratio(plan)
             print(f"INFO: variation {v['contrast']}/{v['total']} core concepts have a contrast pair, {v['cases']}/{v['total']} have two cases "
                   f"— no threshold; a concept without them is taught from one example")

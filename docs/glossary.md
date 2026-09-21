@@ -30,6 +30,9 @@
 | 对比案例 | `cases[2]` | 两个表面不同、结构相同的例子，讲义先摆它们再揭示机制 |
 | 本体类别 | `ontology: entity / process / constraint / relation` | 一个概念是东西、过程、约束还是关系；答错类别时要重新归类，不是反驳 |
 | 有争议的取舍 | `tradeoffs[].contested` 与 `sides[]` | 材料在这一点上说法不一，两方各有来源 |
+| 结构讲解节、过程讲解节 | `sections[].kind: structure / process`（schema 1.6；缺省 `chain` 即问题链节） | 结构讲解节说清系统由哪些部分组成、谁包含谁、谁连谁；过程讲解节追踪一种明确的运行方式，一步一步说清谁做了什么、什么变了。两者都没有"方案"和"引出的新问题" |
+| 系统结构图 | `big_picture.system_map: {components, links}`（schema 1.6） | 部件清单与它们之间带文字说明的连线；部件就是本课的概念，`parent` 表示包含。旧的步骤列表形式仍然接受 |
+| 返回位置 | `sections[].position`（schema 1.6） | 这一节展开的是系统结构图上的哪个部件 |
 | 子节 | `sections[].parent_section` | 深化某一节的节，在原节稳固之后学 |
 | 依赖类型 | `dependency_kind: def / mech / tool` | 前置缺口缺的是定义、机制还是表征或操作，决定补法 |
 | 复习课 | `shape: review`、`review_of[]`、`review_kind: repeat / deepen` | 为已学过的一门或几门课建的课，侧重薄弱处，先作答再揭示；子节在这里学 |

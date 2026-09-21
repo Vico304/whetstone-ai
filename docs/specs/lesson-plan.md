@@ -82,6 +82,24 @@
 
 **跨课的边**：端点可以是本课没有的概念 id，条件是校验器带了 `--store` 且那个 id 在 `concepts/index.json` 的 `concepts` 里登记过；不带 `--store` 时仍然报错，离线校验不放宽。校验器打印 `INFO: relations n cross-lesson edges`。这样的边有三处不同：`lesson_section.py --section` 把它打进"跨课关系"，教学时在揭示方案与机制之前先问学习者（[protocol.md](protocol.md) 的 PREDICT），作答记 `--kind transfer --concept <他课 id>`；它不进结课链重建的参考边——学习者拿到的只有本课的概念名；`source_refs` 照常填本课材料里的定位，`rationale` 是判定这道题的依据。
 
+## 5a. 节类型与系统结构图（1.6）
+
+`sections[].kind` 缺省 `chain`，此前的计划与模板不受影响。三种节的字段差别：
+
+| 字段 | `chain` | `structure` | `process` |
+|---|---|---|---|
+| `problem` / `mechanism` / `meaning` / `concepts` / `checkpoint` / `depends_on` / `source_refs` | 必填 | 必填 | 必填 |
+| `solution` | 必填 | 不允许 | 不允许 |
+| `new_problem` | 末节外必填 | 不允许 | 不允许 |
+| `tradeoffs` | 列表，可空 | 必须为空 | 列表，可空 |
+| `steps[]` | 不允许 | 不允许 | 必填，至少两条 |
+
+`structure` 节的概念只能是 `supporting` 或 `listed`：它安放部件，不把核心概念送进检查点；出现在系统结构图上的概念必填 `ontology`。不在图上的概念只警告，不报错。`process` 节的 `steps[]` 每条 `{actor, target?, action, changes}`，`actor` 与 `target` 是本课概念 id（不是图上的部件时警告）；本节必须有一个 `ontology: process` 的核心概念——被追踪的那一种运行方式。本次不追踪的可选运行方式写成本节 `listed` 概念并填 `contrast.with` 指向它，课程范围外的进 `deferred[]`。
+
+`big_picture.system_map` 仍可以是旧的步骤字符串数组；写成 `{components: [{id, parent?}], links: [{from, to, label}]}` 时，`id / parent / from / to` 是本课概念 id，或（校验器带 `--store` 时）知识库里登记过的他课概念 id。`parent` 表示包含，不许成环；`links` 是带一句文字说明的有向线，没有类型，不导出为参考图的边，也不进前置、假性掌握与链重建。课程含 `structure` 节时必须用这种形式。`sections[].position` 任何节类型可选，指出本节展开的是哪个部件。
+
+图上的部件不计入 `INFO: orphan concepts`——它们靠 `links` 相连，不靠 `relations[]`；`structure` 节的概念不进结课链重建的名单，它是可随时回查的参考，不是凭记忆重建的内容。
+
 ## 6. 判定标准
 
 `checkpoint.criteria[]`、`check.criteria[]`、`probe.criteria[]`、`final_challenge.criteria[]` 都是 `[{id, text, layer}]`（1.0 是字符串数组），`id` 在节内唯一，供 `criteria_met` 引用。所有 criteria 都不进任何面向学习者的文档。`hint` 是首次作答后按需给的渐进提示。
@@ -144,3 +162,4 @@ python3 scripts/validate_lesson.py lesson-plan.json --guide teaching-guide.md
 | 1.3 | `shape`、`parent_course`、`pool / reserve`、`anchor`、`probe`、`branch_candidates[]` |
 | 1.4 | 前置课：`prerequisite_of`、`blocked_at`、`depth`；任何课程可用外部存档集作 `pool` |
 | 1.5 | 概念 `contrast / cases / ontology`；`tradeoffs[]` 条目可带 `contested` 与两方来源；节 `parent_section`；复习课 `shape: review`、`review_of[]`、节 `review_kind`。校验器打印 `INFO: variation a/b`（有易混对、有两个案例的核心概念数），不设阈值 |
+| 1.6 | 节 `kind: chain / structure / process`（缺省 `chain`）、`steps[]`、`position`；`big_picture.system_map` 可写成 `{components, links}`。见 §5a |
