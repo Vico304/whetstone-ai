@@ -84,7 +84,7 @@
 
 ## 5a. 节类型与系统结构图（1.6）
 
-`sections[].kind` 缺省 `chain`，此前的计划与模板不受影响。三种节的字段差别：
+`sections[].kind` 缺省 `chain`（问题链节），此前的计划与模板不受影响；`structure` 是结构讲解节，`process` 是过程讲解节。三种节的字段差别：
 
 | 字段 | `chain` | `structure` | `process` |
 |---|---|---|---|
