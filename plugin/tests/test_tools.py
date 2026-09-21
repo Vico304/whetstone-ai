@@ -839,6 +839,37 @@ class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(pools, [])
             self.assertEqual(review_pool.stale_pool(state, None, 5), [])
 
+    def test_a_correct_section_chain_is_not_scored_as_zero(self):
+        """The real failure: every section link stated, a different concept named at each end."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plan = load_template()
+            plan["sections"] = [copy.deepcopy(plan["sections"][0]) for _ in range(2)]
+            plan["sections"][0]["id"], plan["sections"][1]["id"] = "s01", "s02"
+            plan["sections"][1]["depends_on"], plan["sections"][0]["new_problem"] = ["s01"], "引出下一节"
+            plan["sections"][1]["new_problem"] = None
+            # each section keeps all four concepts, so a link between them can be named by any pair
+            public, deep = mrg_export.export(plan)
+            reference = comparator.Reference(public, deep)
+            self.assertEqual(comparator.section_pairs(reference), [("s01", "s02")])
+
+            # the reference edge joins system-boundary to macro-map; the learner names another pair
+            other = comparator.compare_relations(reference, [
+                {"from": "learning-design.problem-chain", "to": "learning-design.appendix", "type": "depends_on"}])
+            self.assertEqual(other["ratio"], 0.0)  # exact matching says zero, as it did on the real course
+            self.assertEqual(other["section_chain"]["ratio"], 1.0)  # the section chain was in fact reproduced
+            self.assertEqual(other["section_chain"]["missing_pairs"], [])
+
+            # wrong direction and wrong type still count as reaching the edge, and are reported
+            reached = comparator.compare_relations(reference, [
+                {"from": "learning-design.macro-map", "to": "learning-design.system-boundary", "type": "depends_on"}])
+            self.assertEqual((reached["ratio"], reached["pair_ratio"]), (0.0, 1.0))
+
+            nothing = comparator.compare_relations(reference, [])
+            self.assertEqual(nothing["section_chain"], {"pairs": 1, "covered": 0, "ratio": 0.0,
+                                                        "missing_pairs": [["s01", "s02"]]})
+            del root  # the fixture needs no store: the reference is built straight from the export
+
     def test_chain_rebuild_compares_relation_sets_and_feeds_state_and_review_pool(self):
         import argparse, io, contextlib
         from datetime import datetime, timezone

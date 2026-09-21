@@ -233,8 +233,12 @@ def build(store: Path, now: datetime | None = None, tz: tzinfo | None = None) ->
                 overconfident_attempts += 1
         chain = event.get("chain")
         if isinstance(chain, dict) and event.get("lesson_id"):
+            section_chain = chain.get("section_chain") or {}
             lessons.setdefault(event["lesson_id"], {})["chain_rebuild"] = {
                 "at": at, "ratio": chain.get("ratio"), "matched": len(chain.get("matched") or []),
+                "pair_ratio": chain.get("pair_ratio"),
+                "section_chain_ratio": section_chain.get("ratio"),
+                "section_chain": {"pairs": section_chain.get("pairs"), "covered": section_chain.get("covered")},
                 "reference_edges": chain.get("reference_edges"),
                 "missing": [{"from": m.get("from"), "to": m.get("to"), "type": m.get("type")} for m in chain.get("missing") or []],
                 "direction_reversed": [{"from": m.get("reference_from"), "to": m.get("reference_to"), "type": m.get("type")}
@@ -335,7 +339,9 @@ def command_build(args: argparse.Namespace) -> int:
     print(f"delayed evidence {s['delayed_or_transfer']}/{s['concepts']} concepts; "
           f"overconfident {s['overconfident_attempts']}/{s['high_confidence_attempts']} high-confidence attempts; "
           f"suspect {s['suspect']}, next {s['outer']}"
-          + "".join(f"; chain rebuild {lid} {l['chain_rebuild']['ratio']}" for lid, l in state["lessons"].items() if l.get("chain_rebuild")))
+          + "".join(f"; chain rebuild {lid} section chain {l['chain_rebuild'].get('section_chain_ratio')}, "
+                    f"edges reached {l['chain_rebuild'].get('pair_ratio')}, exact {l['chain_rebuild']['ratio']}"
+                    for lid, l in state["lessons"].items() if l.get("chain_rebuild")))
     return 0
 
 

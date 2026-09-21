@@ -198,8 +198,53 @@ def compare(reference: Reference, section_id: str, extraction: dict) -> dict:
             "feedback_priority": feedback_priority(diff)}
 
 
+def section_pairs(reference: Reference) -> list[tuple[str, str]]:
+    """The adjacent section pairs of the problem chain — the links the learner is asked to reproduce."""
+    ordered = [s for s in reference.sections.values() if isinstance(s, dict) and not s.get("deferred")]
+    ids = [s["id"] for s in ordered if s.get("id")]
+    pairs: list[tuple[str, str]] = []
+    for index, section in enumerate(ordered):
+        depends = [d for d in (section.get("depends_on") or []) if d in ids]
+        if not depends and index > 0:
+            depends = [ids[index - 1]]  # same fallback the chain diagram draws
+        for dep in depends:
+            pair = (dep, section.get("id"))
+            if pair not in pairs and all(pair):
+                pairs.append(pair)
+    return pairs
+
+
+def chain_coverage(reference: Reference, asserted: list[dict]) -> dict:
+    """How much of the section chain the learner's edges reach, whatever concepts they chose to name.
+
+    A pair counts as covered when some asserted edge joins the two sections, in either direction:
+    direction errors are already reported per concept edge, and what this number measures is
+    whether the learner saw that these two sections are linked at all."""
+    pairs = section_pairs(reference)
+    where = {cid: set(node.get("section_ids") or []) for cid, node in reference.nodes.items()}
+    covered: set[tuple[str, str]] = set()
+    for item in asserted or []:
+        if not isinstance(item, dict):
+            continue
+        a, b = reference.resolve(item.get("from")), reference.resolve(item.get("to"))
+        if a is None or b is None:
+            continue
+        here, there = where.get(a, set()), where.get(b, set())
+        for pair in pairs:
+            if (pair[0] in here and pair[1] in there) or (pair[0] in there and pair[1] in here):
+                covered.add(pair)
+    return {"pairs": len(pairs), "covered": len(covered),
+            "ratio": round(len(covered) / len(pairs), 3) if pairs else None,
+            "missing_pairs": [list(pair) for pair in pairs if pair not in covered]}
+
+
 def compare_relations(reference: Reference, asserted: list[dict]) -> dict:
     """Relation set against relation set, over the public edges of the whole lesson.
+
+    Reports three numbers: `section_chain.ratio` (how much of the section chain the learner linked),
+    `pair_ratio` (reference edges reached, direction or type wrong included) and `ratio` (exact).
+    A course whose sections were all linked correctly can still score near zero on the last one by
+    naming a different concept at each end, so feedback uses the first two.
 
     Each asserted relation is {from, to, type}; any `status` is ignored — the matching is done here.
     A reference edge is matched at most once. Deep-layer edges are not in the denominator: a learner
@@ -242,6 +287,11 @@ def compare_relations(reference: Reference, asserted: list[dict]) -> dict:
     total = len(reference.public_edges)
     result["reference_edges"] = total
     result["ratio"] = round(len(result["matched"]) / total, 3) if total else None
+    # three numbers describe a chain rebuild, not one: which sections the learner linked at all,
+    # which reference edges they reached however they named or directed them, and exact matches
+    reached = len(result["matched"]) + len(result["direction_reversed"]) + len(result["wrong_type"])
+    result["pair_ratio"] = round(reached / total, 3) if total else None
+    result["section_chain"] = chain_coverage(reference, asserted)
     return result
 
 

@@ -148,7 +148,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 | `fringe.outer` | 前沿：自身最近判定不是 `mastered`（或没作答过）、有前置、且每个前置最近判定都是 `mastered` 的概念。前置关系取公开导出里的 `prerequisite_for` 与 `depends_on` 边（`A prerequisite_for B` 与 `B depends_on A` 都表示 A 在 B 之前） |
 | `fringe.suspect`、`fringe.suspect_edges` | 假性掌握：最近判定 `mastered`、但某个前置最近判定是 `partial / retry` 的概念，以及这些边（带 `from_verdict`）。这条边的先后顺序在数据里没有得到支持 |
 | `summary` | `concepts`、`mastered`、`delayed_or_transfer`（证据等级为延迟或迁移的概念数）、`high_confidence_attempts` 与 `overconfident_attempts`（把握为 5 的作答次数，及其中 `retry` 或高信心冲突的次数）、`suspect`、`outer`。`build` 打印这几个数，不设阈值 |
-| `lessons.<id>.chain_rebuild` | 该课最近一次链重建：`at`、`ratio`、`matched`、`reference_edges`、`missing[]`、`direction_reversed[]`（记参考方向）、`wrong_type` 计数 |
+| `lessons.<id>.chain_rebuild` | 该课最近一次链重建：`at`、三个比例 `section_chain_ratio`（相邻节被连起来的比例）/ `pair_ratio`（配上的参考边，含方向反与类型错）/ `ratio`（精确）、`matched`、`reference_edges`、`missing[]`、`direction_reversed[]`（记参考方向）、`wrong_type` 计数 |
 
 汇总到主目录时只合并概念；`fringe`、`summary`、`lessons` 是工作区内的派生物。
 
