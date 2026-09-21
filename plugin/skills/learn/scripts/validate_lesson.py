@@ -592,6 +592,14 @@ def grounding(plan: dict) -> dict:
     return counts
 
 
+def cross_lesson_edges(plan: dict, concept_ids: set[str]) -> list[str]:
+    """Relation ids with an endpoint outside this lesson: carried over from an earlier course."""
+    return [relation.get("id") or f"relations[{index}]"
+            for index, relation in enumerate(plan.get("relations") or [])
+            if isinstance(relation, dict)
+            and any(relation.get(end) not in concept_ids for end in ("from", "to"))]
+
+
 def anchor_passage(path: Path, locator: str) -> str | None:
     """What the locator points at: a heading's own section, or the paragraph its line sits in."""
     try:
@@ -693,7 +701,19 @@ def validate_criteria(checkpoint: dict, location: str, errors: list[str], versio
             seen.add(criterion["id"])
 
 
-def validate_relations(plan: dict, concept_ids: set[str], errors: list[str], manifest_paths: set[str] | None) -> None:
+def registered_concept_ids(store: Path | None) -> set[str] | None:
+    """Ids in the store's cross-course registry, or None when no store was given (offline check stays strict)."""
+    if store is None:
+        return None
+    path = store / "concepts" / "index.json"
+    if not path.is_file():
+        raise ValueError(f"no concept index at {path}; run store_init.py init --store {store}")
+    concepts = json.loads(path.read_text(encoding="utf-8")).get("concepts")
+    return set(concepts) if isinstance(concepts, dict) else set()
+
+
+def validate_relations(plan: dict, concept_ids: set[str], errors: list[str], manifest_paths: set[str] | None,
+                       registered: set[str] | None = None) -> None:
     relations = plan.get("relations", [])
     if not isinstance(relations, list):
         errors.append("root.relations must be a list")
@@ -710,8 +730,12 @@ def validate_relations(plan: dict, concept_ids: set[str], errors: list[str], man
                 errors.append(f"{location}.id duplicates '{relation['id']}'")
             seen.add(relation["id"])
         for end in ("from", "to"):
-            if relation.get(end) not in concept_ids:
-                errors.append(f"{location}.{end} '{relation.get(end)}' is not a concept id in this lesson")
+            if relation.get(end) in concept_ids:
+                continue
+            if registered is not None and relation.get(end) in registered:
+                continue  # a concept carried over from an earlier course, registered in the store
+            errors.append(f"{location}.{end} '{relation.get(end)}' is not a concept id in this lesson"
+                          + ("" if registered is None else " and is not registered in the store"))
         if relation.get("from") == relation.get("to") and relation.get("from") is not None:
             errors.append(f"{location} must not connect a concept to itself")
         if relation.get("type") not in RELATION_TYPES:
@@ -736,7 +760,8 @@ def criteria_texts(checkpoint: Any) -> list[str]:
     return texts
 
 
-def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty_coverage: bool = False) -> list[str]:
+def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty_coverage: bool = False,
+                  registered: set[str] | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
         return ["lesson plan root must be an object"]
@@ -831,7 +856,7 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None, allow_empty
             validate_criteria(checkpoint, f"{location}.checkpoint", errors, version)
 
     if version != "1.0":
-        validate_relations(plan, set(names_by_id), errors, manifest_paths)
+        validate_relations(plan, set(names_by_id), errors, manifest_paths, registered)
     elif "relations" in plan:
         errors.append("root.relations requires schema_version '1.1'")
     if version in ROLE_AWARE_VERSIONS:
@@ -1184,6 +1209,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reviewed", type=Path, action="append", help="lesson-plan.json of a reviewed course (review courses; repeatable)")
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--sources-root", type=Path, help="Material root for the coverage check; defaults to sources.json base_path (relative to the pack)")
+    parser.add_argument("--store", type=Path, help="Knowledge store: relation endpoints registered there may come from an earlier course")
     parser.add_argument("--allow-empty-coverage", action="store_true")
     return parser.parse_args()
 
@@ -1201,7 +1227,8 @@ def main() -> int:
                 sources_root = sources_root_from_manifest(manifest_path, manifest if manifest is not None else load_json(manifest_path))
                 if sources_root is not None:
                     print(f"INFO: sources root {sources_root} (from {manifest_path.name} base_path)")
-        errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage)
+        registered = registered_concept_ids(args.store)
+        errors = validate_plan(plan, paths, allow_empty_coverage=args.allow_empty_coverage, registered=registered)
         warnings = collect_warnings(plan)
         if args.guide:
             guide = args.guide.read_text(encoding="utf-8")
@@ -1237,6 +1264,13 @@ def main() -> int:
             if o["orphans"]:
                 print(f"INFO: orphan concepts {len(o['orphans'])}/{o['total']} core concepts appear in no relation "
                       f"({', '.join(o['orphans'])}) — no threshold; a chain rebuild cannot reach them")
+        if registered is not None and schema_version(plan) != "1.0":
+            local = {c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
+                     for c in (s.get("concepts") or []) if isinstance(c, dict) and nonempty(c.get("id"))}
+            crossing = cross_lesson_edges(plan, local)
+            if crossing:
+                print(f"INFO: relations {len(crossing)} cross-lesson edges ({', '.join(crossing)}) — endpoints registered in the store, "
+                      f"not concepts of this lesson; asked at PREDICT, left out of the chain rebuild")
         x = external_refs(plan)
         if x["external"]:
             print(f"INFO: external refs {x['external']}/{x['total']} source refs come from outside the learner's materials "

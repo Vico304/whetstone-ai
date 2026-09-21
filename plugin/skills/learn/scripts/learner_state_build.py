@@ -50,7 +50,9 @@ BASE_WINDOW_DAYS = 7
 MAX_WINDOW_DAYS = 180
 TEACHING_KINDS = {"checkpoint", "probe", "diagnostic"}  # asked in the same sitting as the teaching: never delayed
 TRANSFER_KINDS = {"transfer", "final"}
-CONCEPT_KINDS = {"supporting", "recall"}  # aimed at one concept: the attempt lands on --concept only
+CONCEPT_KINDS = {"supporting", "recall"}  # always aimed at one concept: --concept is required for them
+TARGETED_KINDS = {"transfer", "variant", "bridge"}  # aimed at the concepts named by --concept, when it is given
+# both land on those concepts only, never on the section around them
 DELAYED_MIN_HOURS = 8  # together with a local day boundary: "a night in between"
 PREREQUISITE_EDGE_TYPES = {"prerequisite_for", "depends_on"}  # public-layer edges that order learning
 WEAK_VERDICTS = {"partial", "retry"}
@@ -168,10 +170,12 @@ def load_events(store: Path) -> list[dict]:
 
 
 def concepts_for_event(event: dict, section_concepts: dict) -> set[str]:
-    if event.get("kind") in CONCEPT_KINDS:  # a card or a supporting check lands on its own concept, never the section around it
-        return set(event.get("target_concept_ids", []) or [])
+    targets = set(event.get("target_concept_ids", []) or [])
+    kind = event.get("kind")
+    if kind in CONCEPT_KINDS or (targets and kind in TARGETED_KINDS):
+        return targets
     ids: set[str] = set(section_concepts.get(event.get("lesson_id"), {}).get(event.get("section_id"), []))
-    ids.update(event.get("target_concept_ids", []) or [])
+    ids.update(targets)
     for prop in event.get("propositions", []) or []:
         ids.update(prop.get("concept_ids", []) or [])
     for item in (event.get("extraction") or {}).get("concepts", []) or []:

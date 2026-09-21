@@ -60,7 +60,9 @@
 - 有命题的概念，按输出顺序（`wrong` 在 `partial` 之前）取前两条，各给该概念所在 unit 的 `checkpoint.criteria` 加一条对准这个误解的条目——判的是误解的反面，不是命题本身；
 - 同一 unit 的文档里加一句**正面陈述边界**的提醒（"静态预算内是权重、KV 池与图池，激活在预算之外"）。不得复述学习者说过的话：学习记录不向学习者回引，命题只用来决定讲什么，不用来展示。
 
-产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
+开启知识库且本课沿用了库里已有的概念时，至少写一条 `relations` 边把它接到本课的概念上（`depends_on` 或 `prerequisite_for`，端点用库里的 id，`rationale` 写清这条关系成立的理由——它是教学时的判定依据；`source_refs` 照常填本课材料里的定位）。这些边由 [protocol/predict.md](protocol/predict.md) 在揭示之前问学习者，不进结课的链重建。
+
+产出 `lesson-plan.json`（schema `1.5`，`outline_confirmed_at: null`）与 `outline.md`，运行 `scripts/validate_lesson.py <plan> --outline outline.md --manifest sources.json --store <工作区>/store`（材料根从 `sources.json` 推出；没有清单时给 `--sources-root <材料根>`）。**然后停下**，按 [stages/outline.md](stages/outline.md) 把大纲呈现给学习者并只问一件事（模式 + 想略过/加深的 unit）。两种模式都要确认；确认后写回 `mode`、`deferred[]`、`outline_confirmed_at`。
 
 ## 4. 生成教学包：按 unit 逐份生成
 

@@ -56,7 +56,7 @@ ASSESS ├ mastered → 简短巩固，下一节 READY
 
 **READY**：只呈现 `problem`，问"你觉得应该怎么解决"或"难点在哪"。学习者已读过本节、节太短、学习者要求加快时跳过 PREDICT 直接进 MAIN。
 
-**PREDICT**：收到预测后，本节 core 概念带 `cases` 时先并列两个案例请学习者写共同结构，再呈现 `solution` 与 `mechanism`，一两句对照异同；带 `contrast` 的概念揭示后点出近邻与差在哪个变量。预测与共同结构不判分、不记录。`tradeoffs` 与 `new_problem` 留作主问题和追问的素材。
+**PREDICT**：收到预测后，本节 core 概念带 `cases` 时先并列两个案例请学习者写共同结构，再呈现 `solution` 与 `mechanism`，一两句对照异同；带 `contrast` 的概念揭示后点出近邻与差在哪个变量。预测与共同结构不判分、不记录。本节概念与前一门课的概念之间有关系时（`lesson_section.py` 打出的"跨课关系"），在揭示之前先问这条关系，一次一条，对照它的 `type` 与 `rationale` 判，记 `--kind transfer --concept <他课 id>`，不加 `--progress`，同一条只问一次。`tradeoffs` 与 `new_problem` 留作主问题和追问的素材。
 
 **DEEPEN**：提出主问题前问一句"本节还有 {listed 概念} 等衍生概念，想先深入哪一个，还是直接回答"，候选取本节 `listed` 概念，没有就不问。学习者选择细化时生成 `zoom/<id>-guide.md`（只覆盖本节衍生概念，每个概念至少两个例子，一个贴材料语境、一个换情境；来源约束同讲义；不含本节 checkpoint 的答案），读完回到本节主问题；细化文档解释到本课没有定义的概念时同样记一条 `--kind supporting`；一节最多细化一次；不在建课阶段预生成。
 

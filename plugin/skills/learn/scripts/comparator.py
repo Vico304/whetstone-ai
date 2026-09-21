@@ -56,8 +56,11 @@ class Reference:
         self.nodes: dict[str, dict] = {}
         for node in public.get("nodes", []) + deep.get("nodes", []):
             self.nodes[node["id"]] = node
-        self.public_edges: list[dict] = list(public.get("edges", []))
-        self.edges: list[dict] = self.public_edges + list(deep.get("edges", []))
+        edges = list(public.get("edges", []))
+        # the chain rebuild gives the learner this lesson's concept names only, so an edge reaching
+        # a concept carried over from an earlier course cannot be stated and is not a reference edge
+        self.public_edges: list[dict] = [e for e in edges if e.get("from") in self.nodes and e.get("to") in self.nodes]
+        self.edges: list[dict] = edges + list(deep.get("edges", []))
         self.sections = {section["id"]: section for section in public.get("sections", [])}
         self.lookup: dict[str, str] = {}
         for node in self.nodes.values():

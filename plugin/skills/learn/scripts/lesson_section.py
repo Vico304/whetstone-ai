@@ -111,6 +111,26 @@ def render_list(plan: dict) -> str:
     return "\n".join(lines)
 
 
+def cross_lesson_lines(plan: dict, section: dict) -> list[str]:
+    """Relations from this section's concepts to a concept carried over from an earlier course."""
+    local_all = {c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
+                 for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
+    names = {c["id"]: c.get("name") or c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
+             for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
+    here = {c["id"] for c in (section.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
+    lines = []
+    for relation in plan.get("relations") or []:
+        if not isinstance(relation, dict):
+            continue
+        ends = (relation.get("from"), relation.get("to"))
+        outside = [e for e in ends if e not in local_all]
+        if not outside or not any(e in here for e in ends):
+            continue
+        lines.append(f"- {names.get(ends[0], ends[0])} --{relation.get('type')}--> {names.get(ends[1], ends[1])}"
+                     f"　依据：{relation.get('rationale') or '-'}")
+    return lines
+
+
 def render_section(plan: dict, section_id: str) -> str:
     section = find_section(plan, section_id)
     flag = " [deferred]" if section_id in deferred_ids(plan) else ""
@@ -125,6 +145,9 @@ def render_section(plan: dict, section_id: str) -> str:
     for label, key in (("当前问题", "problem"), ("方案", "solution"), ("机制", "mechanism"), ("引出的新问题", "new_problem")):
         out += [f"## {label}", str(section.get(key) or "-"), ""]
     out += ["## 概念", *concept_lines(section), ""]
+    crossing = cross_lesson_lines(plan, section)
+    if crossing:
+        out += ["## 跨课关系（不展示，先问后揭示：protocol/predict.md）", *crossing, ""]
     probe = section.get("probe")
     if isinstance(probe, dict) and probe.get("prompt"):
         out += ["## 探测题（骨架课，教学前）", probe["prompt"], *criteria_lines(probe.get("criteria")), ""]
