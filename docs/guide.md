@@ -28,7 +28,7 @@ claude plugin install whetstone@whetstone-ai
 
 **Codex**：把 `plugin/` 作为插件安装，调用 `$guide`、`$outline`、`$learn`、`$clarify`。
 
-**DeepSeek Harness**：`./install_skills.sh ~/.agents/skills`（全局）或 `./install_skills.sh <项目>/.agents/skills`（项目级，目录里要有 `.git`）。四个技能必须平铺在同一个根目录下，guide 和 outline 会引用同级的 learn。启动 `npx @deepseek-ai/dsh web`（Node 22.19 以上），打开 http://127.0.0.1:3080 ，首次在 Settings → Models 填 API key，用 Choose workspace 选中工作目录；重启后在 `/` 面板的 Skills 组里能看到。
+**DeepSeek Harness**：`./install_skills.sh ~/.agents/skills`（全局）或 `./install_skills.sh <项目>/.agents/skills`（项目级，目录里要有 `.git`）。五个技能必须平铺在同一个根目录下，guide、outline 和 map 会引用同级的 learn。启动 `npx @deepseek-ai/dsh web`（Node 22.19 以上），打开 http://127.0.0.1:3080 ，首次在 Settings → Models 填 API key，用 Choose workspace 选中工作目录；重启后在 `/` 面板的 Skills 组里能看到。
 
 **pi**：`pi install git:github.com/Vico304/whetstone-ai`（根目录 `package.json` 的 `pi.skills` 指向 `plugin/skills`），或本地 `pi install /path/to/whetstone-ai`，或 `./install_skills.sh ~/.pi/agent/skills`；pi 也读 `~/.agents/skills`，装过 DeepSeek Harness 那份就不用再装。调用 `/skill:learn` 等。
 

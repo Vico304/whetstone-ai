@@ -130,7 +130,7 @@ def build_skills_zip(dist: Path) -> Path:
     folder = dist / "whetstone-skills"
     if folder.exists():
         shutil.rmtree(folder)
-    for skill in ("learn", "guide", "outline", "clarify"):
+    for skill in ("learn", "guide", "outline", "map", "clarify"):
         copy_tree(SKILLS / skill, folder / skill)
     (folder / "README.md").write_text((ROOT / "release" / "README.whetstone-skills.md").read_text(encoding="utf-8").replace("{{version}}", version()), encoding="utf-8")
     shutil.copy2(ROOT / "LICENSE", folder / "LICENSE")
