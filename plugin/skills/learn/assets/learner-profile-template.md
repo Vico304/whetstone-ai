@@ -22,6 +22,7 @@
 
 ## 三、约束与偏好
 
+- 研究对象：`subject={{designed|natural}}`（默认值，可修改）——`designed` 材料讲的是人做出来的东西，有人做过设计决定；`natural` 讲的是自然界本来就有的现象，没有设计者。它决定问题链怎么推进
 - 取向：`orientation={{material|domain}}`（默认值，可修改）——`material` 学这批材料本身；`domain` 先学骨架课（只讲基本原理，材料作证据池），学完再选分支
 - 默认深度：`mode={{full|fast}}`（默认值，可修改）——每门课的大纲确认时仍会再问一次
 - 前置检查：`prerequisite_check={{always|auto|skip}}`（默认值，可修改）
