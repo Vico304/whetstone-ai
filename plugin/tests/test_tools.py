@@ -1595,7 +1595,9 @@ class CourseOrganisationTests(unittest.TestCase):
         view = lesson_section.render_section(plan, "s01")
         self.assertIn("返回位置", view)
         self.assertIn("宿主进程", view)
-        self.assertIn("步骤（过程讲解节", lesson_section.render_section(plan, "s02"))
+        steps_view = lesson_section.render_section(plan, "s02")
+        self.assertIn("步骤（过程讲解节", steps_view)
+        self.assertIn("宿主进程 → 运行时：提交任务", steps_view)  # names, not concept ids
 
     def test_the_shipped_structure_example_validates(self):
         plan = json.loads(STRUCTURE_PLAN.read_text(encoding="utf-8"))

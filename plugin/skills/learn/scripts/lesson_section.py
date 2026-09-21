@@ -146,17 +146,19 @@ def render_section(plan: dict, section_id: str) -> str:
         out += [f"## {label}", str(section.get(key) or "-"), ""]
     out += ["## 概念", *concept_lines(section), ""]
     position = section.get("position")
-    if position:
+    steps = section.get("steps")
+    if position or (isinstance(steps, list) and steps):
         names = {c["id"]: c.get("name") or c["id"] for s in (plan.get("sections") or []) if isinstance(s, dict)
                  for c in (s.get("concepts") or []) if isinstance(c, dict) and c.get("id")}
-        out += [f"## 返回位置", f"本节展开的是系统图上的 {names.get(position, position)}（`{position}`）", ""]
-    steps = section.get("steps")
+    if position:
+        out += ["## 返回位置", f"本节展开的是系统图上的 {names.get(position, position)}（`{position}`）", ""]
     if isinstance(steps, list) and steps:
         out += ["## 步骤（过程讲解节；验收时合上本表）"]
         for index, step in enumerate(steps, start=1):
             if isinstance(step, dict):
-                target = f" → {step.get('target')}" if step.get("target") else ""
-                out.append(f"{index}. {step.get('actor')}{target}：{step.get('action')}　变化：{step.get('changes')}")
+                actor = names.get(step.get("actor"), step.get("actor"))
+                target = f" → {names.get(step.get('target'), step.get('target'))}" if step.get("target") else ""
+                out.append(f"{index}. {actor}{target}：{step.get('action')}　变化：{step.get('changes')}")
         out.append("")
     crossing = cross_lesson_lines(plan, section)
     if crossing:
