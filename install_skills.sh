@@ -10,7 +10,7 @@ TARGET="${1:?usage: install_skills.sh <skills-dir> [--link]}"
 MODE="${2:-copy}"
 SRC="$(cd "$(dirname "$0")" && pwd)/plugin/skills"
 mkdir -p "$TARGET"
-for skill in guide outline learn clarify; do
+for skill in guide outline map learn clarify; do
   rm -rf "$TARGET/$skill"
   if [ "$MODE" = "--link" ]; then
     ln -s "$SRC/$skill" "$TARGET/$skill"
@@ -20,4 +20,4 @@ for skill in guide outline learn clarify; do
   fi
   echo "installed $skill -> $TARGET/$skill"
 done
-echo "Restart the host so it rediscovers skills; then type / and look for guide, outline, learn, clarify (pi: /skill:learn)."
+echo "Restart the host so it rediscovers skills; then type / and look for guide, outline, map, learn, clarify (pi: /skill:learn)."

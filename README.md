@@ -40,15 +40,16 @@ One skill directory, five hosts:
 | pi | `pi install git:github.com/Vico304/whetstone-ai` (or a local checkout: `pi install /path/to/whetstone-ai`, or `./install_skills.sh ~/.pi/agent/skills`) | `/skill:learn` … |
 | Codex | install `plugin/` as a plugin | `$learn` … |
 
-Type `/` and you should see `guide / outline / learn / clarify`. Everything the tool writes goes under `whetstone/` inside your materials directory; the materials themselves are never modified.
+Type `/` and you should see `guide / outline / map / learn / clarify`. Everything the tool writes goes under `whetstone/` inside your materials directory; the materials themselves are never modified.
 
-## The four skills
+## The five skills
 
 | Skill | What it does |
 |---|---|
 | **learn** | Main entry. Fills in whatever is missing (your profile, a survey of the materials, a course-by-course plan, this course's outline), then generates one lesson document per section, checks prerequisites and tutors section by section |
 | **guide** | Wizard. Asks whether you want a tour or a plan; planning records your background and goals, surveys a directory of materials, and confirms the course sequence one course at a time. Plans only |
 | **outline** | Generate, discuss or revise one course's outline; writes it back after you confirm |
+| **map** | Builds or revises a course's system map — parts, what contains what, labelled links — and turns a section into one that places the parts or follows one run; writes back on confirmation |
 | **clarify** | Groups the `[[wikilinks]]` you leave in the lesson documents by unit and writes one source-grounded note per unit: a single unclear concept is just explained, several in one unit get the unit re-taught from them (Obsidian-compatible) |
 
 Two choices are made while planning: **full** or **fast** (fast narrows the scope and relaxes judging, but still predicts before revealing); **by material** or **by domain** (by domain starts with a skeleton course of basic principles, with your materials as examples, and you pick branches to go deeper afterwards).
