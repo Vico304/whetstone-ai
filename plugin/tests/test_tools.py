@@ -1448,6 +1448,38 @@ class SkeletonCourseTests(unittest.TestCase):
             self.assertNotIn("Enable the cache", passage)  # stops at the next heading of the same level
             self.assertIsNone(validate_lesson.anchor_passage(doc, "## A heading that is not there"))
 
+    def test_cross_lesson_relation_needs_the_store(self):
+        plan = load_template()
+        plan["relations"].append({
+            "id": "r-cross", "from": plan["sections"][0]["concepts"][0]["id"], "to": "other-course.macro-map",
+            "type": "depends_on", "layer": "mechanism", "rationale": "沿用前一门课的概念",
+            "source_refs": list(plan["relations"][0]["source_refs"]),
+        })
+        errors = validate_lesson.validate_plan(plan)  # offline: an unknown endpoint is still an error
+        self.assertTrue(any("other-course.macro-map" in e for e in errors), errors)
+        self.assertEqual(validate_lesson.validate_plan(plan, registered={"other-course.macro-map"}), [])
+        self.assertEqual(validate_lesson.validate_plan(plan, registered=set())[0].count("not registered in the store"), 1)
+        local = {c["id"] for s in plan["sections"] for c in s["concepts"]}
+        self.assertEqual(validate_lesson.cross_lesson_edges(plan, local), ["r-cross"])
+
+    def test_cross_lesson_edges_are_taught_at_predict_and_left_out_of_the_chain(self):
+        plan = load_template()
+        section = plan["sections"][0]
+        plan["relations"].append({
+            "id": "r-cross", "from": section["concepts"][0]["id"], "to": "other-course.macro-map",
+            "type": "depends_on", "layer": "mechanism", "rationale": "它是本节机制的前一步",
+            "source_refs": list(plan["relations"][0]["source_refs"]),
+        })
+        view = lesson_section.render_section(plan, section["id"])
+        self.assertIn("## 跨课关系", view)
+        self.assertIn("other-course.macro-map", view)
+        self.assertIn("它是本节机制的前一步", view)
+        public, deep = mrg_export.export(plan)
+        self.assertIn("r-cross", [e["id"] for e in public["edges"]])  # exported, so the section view can use it
+        reference = comparator.Reference(public, deep)
+        self.assertNotIn("r-cross", [e["id"] for e in reference.public_edges])  # but not a chain-rebuild reference edge
+        self.assertIn("r-cross", [e["id"] for e in reference.edges])
+
     def test_skeleton_requirements_are_enforced(self):
         plan = load_skeleton()
         del plan["sections"][0]["probe"]

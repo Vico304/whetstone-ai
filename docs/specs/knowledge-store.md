@@ -124,7 +124,7 @@ python3 scripts/lrg_record.py append --store <目录> --lesson-id <id> --section
 
 ## 5. 掌握状态：`learner-state.json`
 
-`learner_state_build.py build --store <目录>` 从 `lrg/` 与 `mrg/` 重建，每次教学会话结束或 resume 开始时运行。一次作答涉及的概念 = 该节的概念 + `target_concept_ids` + 命题里的概念 + 抽取里以 id 引用的概念。每个概念：
+`learner_state_build.py build --store <目录>` 从 `lrg/` 与 `mrg/` 重建，每次教学会话结束或 resume 开始时运行。一次作答涉及的概念 = 该节的概念 + `target_concept_ids` + 命题里的概念 + 抽取里以 id 引用的概念；但 `supporting` 与 `recall`，以及带了 `--concept` 的 `transfer / variant / bridge`，只落在 `target_concept_ids` 上——这些题瞄准的就是那几个概念，不是它们周围的那一节。每个概念：
 
 | 字段 | 规则 |
 |---|---|
