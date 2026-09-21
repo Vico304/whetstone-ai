@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import tempfile
@@ -1393,6 +1394,170 @@ SKELETON_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-examp
 
 def load_skeleton():
     return json.loads(SKELETON_PLAN.read_text(encoding="utf-8"))
+
+
+class CourseOrganisationTests(unittest.TestCase):
+    """Schema 1.6: a course may mix a problem chain with structure and process sections."""
+
+    def plan(self) -> dict:
+        """A 1.6 plan: one structure section placing two parts, one process section, one chain section."""
+        plan = load_template()
+        plan["schema_version"] = "1.6"
+        chain = copy.deepcopy(plan["sections"][0])
+        chain["id"], chain["new_problem"] = "s03", None
+        refs = copy.deepcopy(chain["source_refs"])
+        checkpoint = copy.deepcopy(chain["checkpoint"])
+
+        def concept(cid, name, role, ontology):
+            return {"id": cid, "name": name, "role": role, "layer": "fact", "domain_path": ["学习设计"],
+                    "ontology": ontology, "explanation": f"{name}在系统里的位置。"}
+
+        structure = {
+            "id": "s01", "kind": "structure", "title": "系统由哪些部分组成", "depends_on": [],
+            "problem": "后面要比较几条路径，先要知道这套系统由哪些部分组成、谁连谁。",
+            "mechanism": "宿主进程调用运行时，运行时把任务交给加速器。",
+            "meaning": "有了这张图，后面每一节都能指出自己在讲哪一块。",
+            "tradeoffs": [], "position": "org.host",
+            "concepts": [concept("org.host", "宿主进程", "supporting", "entity"),
+                         concept("org.runtime", "运行时", "supporting", "entity"),
+                         concept("org.accelerator", "加速器", "listed", "entity")],
+            "source_refs": copy.deepcopy(refs), "checkpoint": copy.deepcopy(checkpoint),
+        }
+        process = {
+            "id": "s02", "kind": "process", "title": "跟随一次任务跑一遍", "depends_on": ["s01"],
+            "problem": "名词认识了，一次任务实际怎么走？",
+            "mechanism": "提交、执行、取回三步，每步换一个参与者。",
+            "meaning": "能追踪一次运行，才谈得上比较几条路径。",
+            "tradeoffs": [],
+            "concepts": [{"id": "org.submit-run", "name": "一次任务的提交与取回", "role": "core", "layer": "mechanism",
+                          "domain_path": ["学习设计"], "ontology": "process", "explanation": "被追踪的那一种运行方式。"},
+                         concept("org.host", "宿主进程", "supporting", "entity")],
+            "steps": [{"actor": "org.host", "target": "org.runtime", "action": "提交任务", "changes": "任务进入队列"},
+                      {"actor": "org.runtime", "target": "org.accelerator", "action": "执行并取回", "changes": "结果回到宿主内存"}],
+            "source_refs": copy.deepcopy(refs), "checkpoint": copy.deepcopy(checkpoint),
+        }
+        chain["depends_on"] = ["s02"]
+        plan["sections"] = [structure, process, chain]
+        plan["big_picture"]["system_map"] = {
+            "components": [{"id": "org.host"}, {"id": "org.runtime", "parent": "org.host"}, {"id": "org.accelerator"}],
+            "links": [{"from": "org.runtime", "to": "org.accelerator", "label": "把任务交给它执行"}],
+        }
+        return plan
+
+    def errors(self, plan: dict, **kwargs) -> list[str]:
+        return validate_lesson.validate_plan(plan, allow_empty_coverage=True, **kwargs)
+
+    def test_three_kinds_coexist_and_older_plans_are_untouched(self):
+        self.assertEqual(self.errors(self.plan()), [])
+        self.assertEqual(validate_lesson.section_kind({}), "chain")  # no field: a problem chain
+        self.assertEqual(validate_lesson.validate_plan(load_template()), [])  # the 1.5 template is unchanged
+        old = load_template()
+        old["sections"][0]["kind"] = "structure"
+        self.assertTrue(any("requires schema_version '1.6'" in e for e in validate_lesson.validate_plan(old)))
+
+    def test_a_structure_section_has_no_solution_and_no_new_problem(self):
+        plan = self.plan()
+        plan["sections"][0]["solution"] = "某个方案"
+        self.assertTrue(any("solution is not allowed in a structure section" in e for e in self.errors(plan)))
+        plan = self.plan()
+        plan["sections"][0]["new_problem"] = "引出下一节"
+        self.assertTrue(any("new_problem is not allowed in a structure section" in e for e in self.errors(plan)))
+        plan = self.plan()
+        plan["sections"][0]["tradeoffs"] = ["某个代价"]
+        self.assertTrue(any("tradeoffs must be empty in a structure section" in e for e in self.errors(plan)))
+        plan = self.plan()  # a chain section still needs its solution
+        del plan["sections"][2]["solution"]
+        self.assertTrue(any("sections[2].solution" in e for e in self.errors(plan)))
+
+    def test_a_structure_sections_parts_are_concepts_on_the_map(self):
+        plan = self.plan()
+        plan["sections"][0]["concepts"][0]["role"] = "core"
+        self.assertTrue(any("must be supporting or listed in a structure section" in e for e in self.errors(plan)))
+        plan = self.plan()
+        del plan["sections"][0]["concepts"][0]["ontology"]
+        self.assertTrue(any("must declare ontology" in e for e in self.errors(plan)))
+        plan = self.plan()  # a concept of the structure section that is not on the map is advisory, not an error
+        plan["sections"][0]["concepts"].append(
+            {"id": "org.aside", "name": "旁注", "role": "listed", "layer": "fact",
+             "domain_path": ["学习设计"], "explanation": "不在图上的一条。"})
+        warnings: list = []
+        self.assertEqual(validate_lesson.validate_plan(plan, allow_empty_coverage=True, warnings=warnings), [])
+        self.assertTrue(any("not on the system map" in w for w in warnings), warnings)
+
+    def test_system_map_components_are_concept_ids(self):
+        plan = self.plan()
+        plan["big_picture"]["system_map"]["components"].append({"id": "other-course.fabric"})
+        self.assertTrue(any("other-course.fabric" in e for e in self.errors(plan)))
+        self.assertEqual(self.errors(plan, registered={"other-course.fabric"}), [])
+        plan = self.plan()
+        plan["big_picture"]["system_map"]["components"][1]["parent"] = "org.nowhere"
+        self.assertTrue(any("is not a component" in e for e in self.errors(plan)))
+        plan = self.plan()
+        components = plan["big_picture"]["system_map"]["components"]
+        components[0]["parent"], components[1]["parent"] = "org.runtime", "org.host"
+        self.assertTrue(any("is inside itself" in e for e in self.errors(plan)))
+        plan = self.plan()
+        plan["big_picture"]["system_map"]["links"][0]["label"] = "  "
+        self.assertTrue(any("links[0].label" in e for e in self.errors(plan)))
+
+    def test_a_structure_section_requires_the_structured_map(self):
+        plan = self.plan()
+        plan["sections"] = plan["sections"][2:]  # no structure section: the legacy list of steps is still fine
+        plan["sections"][0]["depends_on"] = []
+        plan["coverage"] = [dict(item, section_id="s03") if item.get("section_id") else item
+                            for item in plan["coverage"]]
+        plan["big_picture"]["system_map"] = ["提交", "执行", "取回"]
+        self.assertEqual(self.errors(plan), [])
+        plan = self.plan()
+        plan["big_picture"]["system_map"] = ["提交", "执行", "取回"]
+        self.assertTrue(any("must be {components, links} when the course has a structure section" in e
+                            for e in self.errors(plan)))
+
+    def test_a_process_section_tracks_one_run_step_by_step(self):
+        plan = self.plan()
+        plan["sections"][1]["steps"] = plan["sections"][1]["steps"][:1]
+        self.assertTrue(any("steps must be a list of at least 2" in e for e in self.errors(plan)))
+        plan = self.plan()
+        plan["sections"][1]["steps"][0]["actor"] = "org.nobody"
+        self.assertTrue(any("actor 'org.nobody' is not a concept id" in e for e in self.errors(plan)))
+        plan = self.plan()
+        plan["sections"][1]["concepts"][0]["ontology"] = "entity"
+        self.assertTrue(any("must have one core concept with ontology 'process'" in e for e in self.errors(plan)))
+        plan = self.plan()  # taking part in the run without being on the map is advisory
+        plan["sections"][1]["concepts"].append(
+            {"id": "org.scheduler", "name": "调度器", "role": "supporting", "layer": "fact",
+             "domain_path": ["学习设计"], "explanation": "不在图上。",
+             "check": {"prompt": "它做什么？", "criteria": [{"id": "k1", "text": "说出职责", "layer": "fact"}], "hint": "-"}})
+        plan["sections"][1]["steps"][0]["actor"] = "org.scheduler"
+        warnings: list = []
+        self.assertEqual(validate_lesson.validate_plan(plan, allow_empty_coverage=True, warnings=warnings), [])
+        self.assertTrue(any("is not on the system map" in w for w in warnings), warnings)
+
+    def test_position_names_the_component_this_section_opens_up(self):
+        plan = self.plan()
+        plan["sections"][2]["position"] = "org.accelerator"
+        self.assertEqual(self.errors(plan), [])
+        plan["sections"][2]["position"] = "org.nowhere"
+        self.assertTrue(any("position 'org.nowhere' is not a component" in e for e in self.errors(plan)))
+
+    def test_parts_are_left_out_of_the_orphan_count_and_the_chain_roster(self):
+        plan = self.plan()
+        orphans = validate_lesson.orphan_concepts(plan)
+        self.assertNotIn("org.host", orphans["orphans"])  # a part is joined by the map's links, not by relations
+        names = lesson_section.shuffled_concept_names(plan)
+        self.assertNotIn("运行时", names)  # only in the structure section: a reference, not something to rebuild
+        self.assertIn("宿主进程", names)  # it also takes part in the process section
+        self.assertIn("一次任务的提交与取回", names)
+
+    def test_the_new_fields_are_rejected_before_16(self):
+        for key, value in (("kind", "process"), ("steps", []), ("position", "x")):
+            plan = load_template()
+            plan["sections"][0][key] = value
+            self.assertTrue(any(f"sections[0].{key} requires schema_version '1.6'" in e
+                                for e in validate_lesson.validate_plan(plan)), key)
+        plan = load_template()
+        plan["big_picture"]["system_map"] = {"components": [], "links": []}
+        self.assertTrue(any("requires schema_version '1.6'" in e for e in validate_lesson.validate_plan(plan)))
 
 
 class SkeletonCourseTests(unittest.TestCase):

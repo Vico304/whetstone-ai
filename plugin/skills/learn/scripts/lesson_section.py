@@ -168,6 +168,8 @@ def shuffled_concept_names(plan: dict) -> list[str]:
     for section in plan["sections"]:
         if not isinstance(section, dict) or section.get("id") in deferred:
             continue
+        if section.get("kind") == "structure":
+            continue  # a structure section is a reference to come back to, not something to rebuild from memory
         for concept in section.get("concepts", []) or []:
             if isinstance(concept, dict) and concept.get("role", "core") in {"core", "supporting"} and concept.get("name") not in names:
                 names.append(concept["name"])
