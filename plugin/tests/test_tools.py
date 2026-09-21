@@ -1389,6 +1389,8 @@ if __name__ == "__main__":
 
 
 SKELETON_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "lesson-plan.json"
+STRUCTURE_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "structure-example" / "lesson-plan.json"
+STRUCTURE_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "structure-example" / "outline.md"
 SKELETON_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "outline.md"
 
 
@@ -1594,6 +1596,13 @@ class CourseOrganisationTests(unittest.TestCase):
         self.assertIn("返回位置", view)
         self.assertIn("宿主进程", view)
         self.assertIn("步骤（过程讲解节", lesson_section.render_section(plan, "s02"))
+
+    def test_the_shipped_structure_example_validates(self):
+        plan = json.loads(STRUCTURE_PLAN.read_text(encoding="utf-8"))
+        self.assertEqual(validate_lesson.validate_plan(plan), [])
+        self.assertEqual(validate_lesson.validate_outline(STRUCTURE_OUTLINE.read_text(encoding="utf-8"), plan), [])
+        self.assertEqual([validate_lesson.section_kind(s) for s in plan["sections"]], ["structure", "chain"])
+        self.assertIn("subgraph", diagram.system(plan))  # the map is drawn from components, not from a list of steps
 
     def test_the_new_fields_are_rejected_before_16(self):
         for key, value in (("kind", "process"), ("steps", []), ("position", "x")):

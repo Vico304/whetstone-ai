@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.6",
+  "lesson_id": "structure-example-1",
+  "title": "示例：先安放部件，再追因果",
+  "learning_goal": "面对一套陌生的技术框架时，先说得出它由哪些部分组成、谁连谁，再解释其中一处设计为什么这样做。",
+  "mode": "full",
+  "outline_confirmed_at": null,
+  "source_manifest": null,
+  "big_picture": {
+    "problem": "材料里的名词都认识，却说不出它们在系统里的位置，后面比较几条路径时无从下手。",
+    "outcome": "能在系统图上指出任意一个部件的位置与职责，并解释其中一条连线为什么存在。",
+    "system_map": {
+      "components": [
+        {
+          "id": "example.application"
+        },
+        {
+          "id": "example.runtime",
+          "parent": "example.application"
+        },
+        {
+          "id": "example.accelerator"
+        },
+        {
+          "id": "example.interconnect"
+        }
+      ],
+      "links": [
+        {
+          "from": "example.runtime",
+          "to": "example.interconnect",
+          "label": "提交任务"
+        },
+        {
+          "from": "example.interconnect",
+          "to": "example.accelerator",
+          "label": "搬运数据"
+        }
+      ]
+    }
+  },
+  "sections": [
+    {
+      "id": "s01",
+      "kind": "structure",
+      "title": "这套系统由哪些部分组成",
+      "depends_on": [],
+      "problem": "后面要比较几条数据路径，先要知道这套系统由哪些部分组成、谁包含谁、谁和谁相连。",
+      "mechanism": "应用进程里跑着运行时，运行时把任务交给互连，互连把数据搬到加速器上；四者各管一段，边界就在它们之间。",
+      "meaning": "有了这张图，后面每一节都能指出自己在讲哪一块，不必把每个名词都重新解释一遍。",
+      "tradeoffs": [],
+      "concepts": [
+        {
+          "id": "example.application",
+          "name": "应用进程",
+          "role": "supporting",
+          "layer": "fact",
+          "domain_path": [
+            "示例领域"
+          ],
+          "ontology": "entity",
+          "explanation": "发起计算的那个进程，持有输入数据。内部怎么组织不在本节展开。",
+          "check": {
+            "prompt": "应用进程在这张图里负责什么？它直接和谁相连？",
+            "criteria": [
+              {
+                "id": "k1",
+                "text": "说出它持有输入数据并发起计算，且只通过运行时对外",
+                "layer": "fact"
+              }
+            ],
+            "hint": "看它外面套着谁、里面装着谁。"
+          }
+        },
+        {
+          "id": "example.runtime",
+          "name": "运行时",
+          "role": "supporting",
+          "layer": "fact",
+          "domain_path": [
+            "示例领域"
+          ],
+          "ontology": "entity",
+          "explanation": "应用进程里的一层库，把计算请求翻译成设备能接受的任务。它的调度策略本节不展开。",
+          "check": {
+            "prompt": "运行时在应用进程里还是外面？它把任务交给谁？",
+            "criteria": [
+              {
+                "id": "k1",
+                "text": "说出它在应用进程内部，并把任务交给互连",
+                "layer": "fact"
+              }
+            ],
+            "hint": "注意它和应用进程是包含关系，不是并列关系。"
+          }
+        },
+        {
+          "id": "example.interconnect",
+          "name": "互连",
+          "role": "listed",
+          "layer": "fact",
+          "domain_path": [
+            "示例领域"
+          ],
+          "ontology": "relation",
+          "explanation": "连接主机侧与加速器的通道，任务与数据都从这里过。"
+        },
+        {
+          "id": "example.accelerator",
+          "name": "加速器",
+          "role": "listed",
+          "layer": "fact",
+          "domain_path": [
+            "示例领域"
+          ],
+          "ontology": "entity",
+          "explanation": "真正执行计算的设备，有自己的内存。"
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Architecture",
+          "support": "explicit",
+          "note": "部件清单与它们的连接"
+        }
+      ],
+      "checkpoint": {
+        "prompt": "合上这一节的图：从应用进程出发到加速器，中间经过哪些部件？谁装在谁里面？每条连线上走的是什么？",
+        "criteria": [
+          {
+            "id": "c1",
+            "text": "按顺序说出应用进程 → 运行时 → 互连 → 加速器这条路径",
+            "layer": "fact"
+          },
+          {
+            "id": "c2",
+            "text": "指出运行时在应用进程内部，其余三者是并列的",
+            "layer": "fact"
+          },
+          {
+            "id": "c3",
+            "text": "说出两条连线各自走的是任务还是数据",
+            "layer": "fact"
+          }
+        ],
+        "hint": "先定位起点和终点，再想中间隔着什么。"
+      }
+    },
+    {
+      "id": "s02",
+      "kind": "chain",
+      "title": "为什么数据要先搬过去",
+      "depends_on": [
+        "s01"
+      ],
+      "position": "example.interconnect",
+      "problem": "加速器有自己的内存，可它算的是应用进程里的数据——直接读不行吗？",
+      "solution": "在计算开始前把数据经互连搬到加速器的内存里，算完再搬回来。",
+      "mechanism": "加速器只能寻址自己的内存，互连一次搬一整块；搬运与计算可以重叠，但第一块必须先到。",
+      "meaning": "凡是跨越互连的往返都要计入代价，这决定了什么样的负载值得放到加速器上。",
+      "tradeoffs": [
+        "搬运本身要花时间，数据量小的计算搬过去反而更慢"
+      ],
+      "new_problem": null,
+      "concepts": [
+        {
+          "id": "example.transfer",
+          "name": "跨互连搬运",
+          "role": "core",
+          "layer": "mechanism",
+          "domain_path": [
+            "示例领域"
+          ],
+          "ontology": "process",
+          "explanation": "计算前后把数据在主机内存与加速器内存之间搬一趟。"
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Course ordering",
+          "support": "entailed",
+          "note": "搬运与计算的先后"
+        }
+      ],
+      "checkpoint": {
+        "prompt": "为什么加速器不能直接读应用进程的内存？这个限制带来了什么代价，什么时候这个代价不值得付？",
+        "criteria": [
+          {
+            "id": "c1",
+            "text": "说出加速器只能寻址自己的内存",
+            "layer": "mechanism"
+          },
+          {
+            "id": "c2",
+            "text": "指出往返搬运是固定代价，计算量小时不划算",
+            "layer": "rationale"
+          }
+        ],
+        "hint": "想想搬运时间与计算时间的比例。"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "r01",
+      "from": "example.transfer",
+      "to": "example.accelerator",
+      "type": "depends_on",
+      "layer": "mechanism",
+      "rationale": "搬运存在的原因是加速器只能寻址自己的内存",
+      "source_refs": [
+        {
+          "path": "examples/source.md",
+          "locator": "## Course ordering",
+          "support": "entailed",
+          "note": "-"
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "path": "examples/source.md",
+      "heading": "Architecture",
+      "disposition": "supporting",
+      "section_id": "s01"
+    },
+    {
+      "path": "examples/source.md",
+      "heading": "Course ordering",
+      "disposition": "core",
+      "section_id": "s02"
+    },
+    {
+      "path": "examples/source.md",
+      "heading": "Appendix",
+      "disposition": "excluded",
+      "reason": "与本示例的主线无关"
+    }
+  ],
+  "deferred": [],
+  "final_challenge": {
+    "prompt": "换一套你熟悉的系统：画出它的部件与连线，然后指出其中一条连线上的往返代价落在哪里。",
+    "criteria": [
+      "部件之间区分包含与连接",
+      "指出一处跨边界往返并说明它的代价"
+    ]
+  },
+  "uncertainties": []
+}
