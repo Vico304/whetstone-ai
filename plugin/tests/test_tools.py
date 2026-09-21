@@ -1410,6 +1410,44 @@ class SkeletonCourseTests(unittest.TestCase):
         plan["sections"] = plan["sections"] * 6
         self.assertFalse(any("sections (>" in w for w in validate_lesson.collect_warnings(plan)))
 
+    def _thin_anchor_sources(self, root: Path) -> Path:
+        prose = "Continuous batching keeps the accelerator busy by admitting a new request as soon as another finishes. " * 3
+        (root / "doc.md").write_text(
+            "# Continuous batching from first principles\n\n"
+            "## Continuous batching\n\n" + prose + "\n\n"
+            "## Enable the cache\n\nSet `enable_cache = true`.\n", encoding="utf-8")
+        (root / "config.json").write_text('{"index_topk": 2048}\n', encoding="utf-8")
+        return root
+
+    def _thin_anchor_plan(self) -> dict:
+        def concept(cid, role, path, locator):
+            return {"id": cid, "name": cid.split(".")[-1], "role": role, "anchor": {"path": path, "locator": locator}}
+        return {"sections": [{"id": "s01", "concepts": [
+            concept("x.explained", "core", "doc.md", "## Continuous batching"),
+            concept("x.one-liner", "core", "doc.md", "## Enable the cache"),
+            concept("x.key-name", "supporting", "config.json", '"index_topk"'),
+            concept("x.listed-only", "listed", "config.json", '"never judged"'),
+        ]}]}
+
+    def test_thin_anchors_flag_key_names_and_one_line_passages(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self._thin_anchor_sources(Path(temporary))
+            found, per_section = validate_lesson.thin_anchors(self._thin_anchor_plan(), root)
+            self.assertEqual(per_section, ["s01 2/3 concepts on thin anchors"])  # listed concepts are not judged
+            self.assertTrue(any("x.key-name" in f and "data or code file" in f for f in found), found)
+            self.assertTrue(any("x.one-liner" in f and f"under {validate_lesson.THIN_ANCHOR_CHARS}" in f for f in found), found)
+            self.assertFalse(any("x.explained" in f for f in found), found)
+
+    def test_anchor_passage_takes_the_heading_section_not_the_title_line(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            doc = self._thin_anchor_sources(Path(temporary)) / "doc.md"
+            # the file's own title line contains the same words: the exact heading must win
+            passage = validate_lesson.anchor_passage(doc, "## Continuous batching")
+            self.assertGreater(len("".join(passage.split())), validate_lesson.THIN_ANCHOR_CHARS)
+            self.assertNotIn("from first principles", passage)
+            self.assertNotIn("Enable the cache", passage)  # stops at the next heading of the same level
+            self.assertIsNone(validate_lesson.anchor_passage(doc, "## A heading that is not there"))
+
     def test_skeleton_requirements_are_enforced(self):
         plan = load_skeleton()
         del plan["sections"][0]["probe"]

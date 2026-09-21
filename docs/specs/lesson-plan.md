@@ -71,7 +71,7 @@
 | `aliases[]` | 1.1 | 可选，非空字符串 |
 | `role` | 1.2 | `core / supporting / listed`，必填。`core` 进主问题，每节超过 4 个报警告，超出的降为 supporting 而不是删除；`supporting` 会讲，每节超过 6 个报警告；`listed` 只列名、一句事实层定义与定位，`explanation` 超过 200 字报警告 |
 | `check` | 1.2 | 仅 `supporting`：`{prompt, criteria[], hint}`，学习者说"验收 X"时使用；缺失报警告 |
-| `anchor` | 1.3 | 仅骨架课 |
+| `anchor` | 1.3 | 仅骨架课；给了 `--sources-root` 时校验器还会看落点处有没有讲解，见 [domain-skeleton.md](domain-skeleton.md) §4 |
 | `contrast` | 1.5 | 可选。`{with, differs_in}`：最容易与本概念混淆的近邻（概念 id，不能是自身）和差在哪个变量；出题与反馈优先放在这里 |
 | `cases[]` | 1.5 | 可选。恰好两个 `{summary, source_refs[]}`：表面不同、结构相同的案例，来自材料池或外部存档；讲义先摆案例再揭示机制 |
 | `ontology` | 1.5 | 可选。`entity / process / constraint / relation`：本体类别，只在骨架课与前置课建议填；类别错置的回答要重新归类而不是反驳 |

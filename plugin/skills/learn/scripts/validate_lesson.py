@@ -25,6 +25,13 @@ V15_CONCEPT_KEYS = ("contrast", "cases", "ontology")
 REVIEW_KINDS = {"repeat", "deepen"}
 REVIEW_LEAK_MIN_CHARS = 20  # a sentence of the reviewed section's solution/mechanism this long must not reappear verbatim
 ANCHOR_MARKERS = {"external", "no-anchor"}
+# a locator into data or code reaches a key or a symbol, never a passage that explains the concept
+DATA_SUFFIXES = {".json", ".yaml", ".yml", ".toml", ".ini", ".env", ".sh", ".py", ".rs", ".go",
+                 ".c", ".h", ".cc", ".cpp", ".hpp", ".java", ".ts", ".js", ".rb"}
+TEXT_SUFFIXES = {".md", ".markdown", ".mdx", ".adoc", ".asciidoc", ".rst", ".txt"}
+THIN_ANCHOR_CHARS = 200  # shorter than this, the passage states the concept instead of explaining it
+ANY_HEADING_MD = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+ANY_HEADING_ADOC = re.compile(r"^(={1,6})\s+(.+?)\s*$")
 BRANCH_STATUSES = {"candidate", "chosen", "declined"}
 MODES = {"full", "fast"}
 ROLES = ("core", "supporting", "listed")
@@ -585,6 +592,83 @@ def grounding(plan: dict) -> dict:
     return counts
 
 
+def anchor_passage(path: Path, locator: str) -> str | None:
+    """What the locator points at: a heading's own section, or the paragraph its line sits in."""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    heading = ANY_HEADING_ADOC if path.suffix.lower() in {".adoc", ".asciidoc"} else ANY_HEADING_MD
+    target = normalize_text(locator)
+    if not target:
+        return None
+    start: int | None = None
+    level: int | None = None
+    for index, line in enumerate(lines):  # an exact heading wins over any line that merely contains the words
+        match = heading.match(line)
+        if match and normalize_text(match.group(2)) == target:
+            start, level = index + 1, len(match.group(1))
+            break
+    if start is None:
+        for index, line in enumerate(lines):
+            if target in normalize_text(line):
+                match = heading.match(line)
+                start, level = (index + 1, len(match.group(1))) if match else (index, None)
+                break
+    if start is None:
+        return None
+    body: list[str] = []
+    for line in lines[start:]:
+        match = heading.match(line)
+        if match and (level is None or len(match.group(1)) <= level):
+            break
+        if level is None and body and not line.strip():
+            break  # a plain locator: only the paragraph around it
+        body.append(line)
+    return "\n".join(body)
+
+
+def thin_anchors(plan: dict, sources_root: Path) -> tuple[list[str], list[str]]:
+    """Anchors that reach a name rather than an explanation. Advisory: never changes the exit code."""
+    found: list[str] = []
+    per_section: list[str] = []
+    for section in plan.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        thin = total = 0
+        for concept in section.get("concepts") or []:
+            if not isinstance(concept, dict) or concept.get("role") not in {"core", "supporting"}:
+                continue
+            anchor = concept.get("anchor")
+            if not isinstance(anchor, dict) or not nonempty(anchor.get("path")) or not nonempty(anchor.get("locator")):
+                continue
+            rel, locator = anchor["path"], anchor["locator"]
+            if is_url(rel):
+                continue
+            key = concept.get("id") or concept.get("name")
+            suffix = Path(rel).suffix.lower()
+            if suffix in DATA_SUFFIXES:
+                total, thin = total + 1, thin + 1
+                found.append(f'thin anchor {key} -> {rel} "{locator}" (data or code file: the locator reaches a key name)')
+                continue
+            path = sources_root / rel
+            if suffix not in TEXT_SUFFIXES or not path.is_file():
+                continue  # nothing readable there: not judged
+            total += 1
+            passage = anchor_passage(path, locator)
+            if passage is None:
+                thin += 1
+                found.append(f'thin anchor {key} -> {rel} "{locator}" (the locator is not in the file)')
+                continue
+            size = len("".join(passage.split()))
+            if size < THIN_ANCHOR_CHARS:
+                thin += 1
+                found.append(f'thin anchor {key} -> {rel} "{locator}" ({size} characters, under {THIN_ANCHOR_CHARS})')
+        if thin:
+            per_section.append(f"{section.get('id')} {thin}/{total} concepts on thin anchors")
+    return found, per_section
+
+
 def validate_criteria(checkpoint: dict, location: str, errors: list[str], version: str) -> None:
     criteria = checkpoint.get("criteria")
     if version == "1.0":
@@ -1135,6 +1219,11 @@ def main() -> int:
             g = grounding(plan)
             print(f"INFO: grounding {g['anchored']}/{g['total']} core+supporting concepts anchored in the evidence pool "
                   f"({g['external']} external, {g['no_anchor']} no-anchor) — no threshold; the learner judges")
+            if sources_root and schema_version(plan) in SHAPE_AWARE_VERSIONS:
+                thin, per_section = thin_anchors(plan, sources_root)
+                warnings.extend(thin)
+                for line in per_section:
+                    print(f"INFO: {line} — no threshold; add material or build as is, the learner decides")
         if is_prerequisite_course(plan):
             f = fact_ratio(plan)
             print(f"INFO: prerequisite course of {plan.get('prerequisite_of')} (depth {plan.get('depth')}, blocked at {plan.get('blocked_at')}); "
