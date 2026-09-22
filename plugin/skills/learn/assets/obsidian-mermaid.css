@@ -1,0 +1,20 @@
+/* Whetstone：让 Mermaid 图适应笔记宽度。
+   放进 <你的库>/.obsidian/snippets/，在「设置 → 外观 → CSS 代码片段」里打开。
+
+   只有一条规则要紧：给 svg 写 max-width，不要写 width。
+   写 width: 100% 会把本来就窄的图反向拉大，线条和文字一起糊掉。 */
+
+.markdown-preview-view .mermaid > svg,
+.markdown-source-view .mermaid > svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 确实需要横向空间的笔记，在 frontmatter 里写 cssclasses: wide-diagram，
+   这一篇就用整个编辑区的宽度，比默认阅读宽度多出约四到六成。 */
+
+.wide-diagram.markdown-preview-view,
+.wide-diagram .markdown-preview-sizer,
+.wide-diagram .cm-sizer {
+  max-width: none !important;
+}
