@@ -389,7 +389,7 @@ class SectionViewAndNextStepTests(unittest.TestCase):
     def test_next_step_cli_prints_quoted_paths_and_the_record_command(self):
         import shlex, subprocess, sys
         with tempfile.TemporaryDirectory() as temporary:
-            course = Path(temporary) / "my course"
+            course = Path(temporary).resolve() / "my course"  # next_step.py resolves --progress; compare resolved to resolved
             course.mkdir()
             plan = load_template()
             (course / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
