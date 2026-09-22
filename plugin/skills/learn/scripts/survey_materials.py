@@ -65,7 +65,7 @@ def walk(root: Path, max_files: int):
     count = 0
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         dirnames[:] = sorted(d for d in dirnames if d not in IGNORED_DIRS and not d.startswith(".DS"))
-        for name in filenames:
+        for name in sorted(filenames):
             if name == ".DS_Store":
                 continue
             count += 1
