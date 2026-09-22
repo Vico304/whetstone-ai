@@ -17,4 +17,4 @@
 - 能用 schema、文件边界或校验器表达的约束不写成提示词；真实运行里出的错进校验器。
 - 大改动先给方案再动手；逐步提交，每步让用户审。
 - 提交前必须通过：`cd plugin && python3 -m unittest discover -s tests`；CI 里的模板与示例目录校验；`python3 check_docs.py`（断链、用语、长度）。
-- git 身份 `wangxibin11 <wangxibin11@jd.com>`（用 `-c` 传）；提交尾注 `Co-Authored-By` 与 `Claude-Session`。不 push，不建 release，不请求计算机控制去做这两件事——用户自己做。
+- git 身份 `Vico304 <vico304@users.noreply.github.com>`（仓库本地 config 已设，`-c` 传同一组值也可）；提交尾注 `Co-Authored-By` 与 `Claude-Session`。不 push，不建 release，不请求计算机控制去做这两件事——用户自己做。
