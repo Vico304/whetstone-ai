@@ -34,6 +34,7 @@
 | 结构讲解节、过程讲解节 | `sections[].kind: structure / process`（schema 1.6；缺省 `chain` 即问题链节） | 结构讲解节说清系统由哪些部分组成、谁包含谁、谁连谁；过程讲解节追踪一种明确的运行方式，一步一步说清谁做了什么、什么变了。两者都没有"方案"和"引出的新问题" |
 | 系统结构图 | `big_picture.system_map: {components, links}`（schema 1.6） | 部件清单与它们之间带文字说明的连线；部件就是本课的概念，`parent` 表示包含。旧的步骤列表形式仍然接受 |
 | 返回位置 | `sections[].position`（schema 1.6） | 这一节展开的是系统结构图上的哪个部件 |
+| 图宽预算 | `mermaid_fit.py --width`，默认 96 列 | 一张图在笔记宽度里还看得清的上限，按等宽列数算，全角字符算两列。超出时按固定顺序收窄：折节点名、折边标签、剥掉与端点重复的标签、把有跨界边的子图画成盒子 |
 | 子节 | `sections[].parent_section` | 深化某一节的节，在原节稳固之后学 |
 | 依赖类型 | `dependency_kind: def / mech / tool` | 前置缺口缺的是定义、机制还是表征或操作，决定补法 |
 | 复习课 | `shape: review`、`review_of[]`、`review_kind: repeat / deepen` | 为已学过的一门或几门课建的课，侧重薄弱处，先作答再揭示；子节在这里学 |

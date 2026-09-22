@@ -78,7 +78,7 @@
 
 ## 5. `relations[]`
 
-每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。至少为每节的中心概念写一条它与前一节中心概念的边。校验器打印 `INFO: orphan concepts a/b`——没有出现在任何关系里的核心概念数，不设阈值；链重建对不到这些概念。`shape: review` 的课程与其他课程一样写 `relations[]`。
+每条 `{id, from, to, type, layer, rationale?, source_refs[]}`。`from`、`to` 是本课出现的概念 id，不能相同；`type` 取 `is_a / part_of / depends_on / causes / enables / implements / contrasts_with / instance_of / prerequisite_for`；`prerequisite_for` 默认 `support: pedagogical_inference`。图示把 `type` 渲染成中文（是一种 / 属于 / 依赖 / 导致 / 促成 / 实现 / 对照 / 实例 / 前置），字段值本身不变。至少为每节的中心概念写一条它与前一节中心概念的边。校验器打印 `INFO: orphan concepts a/b`——没有出现在任何关系里的核心概念数，不设阈值；链重建对不到这些概念。`shape: review` 的课程与其他课程一样写 `relations[]`。
 
 **跨课的边**：端点可以是本课没有的概念 id，条件是校验器带了 `--store` 且那个 id 在 `concepts/index.json` 的 `concepts` 里登记过；不带 `--store` 时仍然报错，离线校验不放宽。校验器打印 `INFO: relations n cross-lesson edges`。这样的边有三处不同：`lesson_section.py --section` 把它打进"跨课关系"，教学时在揭示方案与机制之前先问学习者（[protocol.md](protocol.md) 的 PREDICT），作答记 `--kind transfer --concept <他课 id>`；它不进结课链重建的参考边——学习者拿到的只有本课的概念名；`source_refs` 照常填本课材料里的定位，`rationale` 是判定这道题的依据。
 
