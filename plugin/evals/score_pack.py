@@ -223,7 +223,12 @@ def main() -> int:
         print(f"  teach: {t['attempts']} attempts, median checkpoint {t['median_checkpoint_elapsed_s']}s, "
               f"depths {t['depths']}, conflicts/attempt {t['conflicts_per_attempt']}")
     if args.baseline and args.baseline.is_file():
-        lines = diff_against(json.loads(args.baseline.read_text(encoding="utf-8")), result)
+        try:
+            baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"ERROR: {error}", file=sys.stderr)
+            return 1
+        lines = diff_against(baseline, result)
         print("  vs baseline:" if lines else "  vs baseline: no change")
         for line in lines:
             print(line)

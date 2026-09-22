@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -155,6 +156,8 @@ def base_path_for(base: Path, output: Path | None) -> str:
 def rebase_manifest(manifest_path: Path, base: Path) -> str:
     """Rewrite only base_path of an existing sources.json (migration between layouts)."""
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{manifest_path} must contain a JSON object")
     data["base_path"] = base_path_for(base, manifest_path)
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return data["base_path"]
@@ -225,18 +228,22 @@ def main() -> int:
     args = parse_args()
     if args.max_text_bytes < 1 or args.max_hash_bytes < 1:
         raise SystemExit("Size limits must be positive integers.")
-    if args.rebase:
-        print(f"OK: {args.rebase} base_path = {rebase_manifest(args.rebase, args.base)}")
-        return 0
-    if not args.sources:
+    if not args.rebase and not args.sources:
         raise SystemExit("give at least one source path (or --rebase SOURCES_JSON)")
-    manifest = build_manifest(args.sources, args.base, args.max_text_bytes, args.max_hash_bytes, args.output)
-    payload = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(payload, encoding="utf-8")
-    else:
-        print(payload, end="")
+    try:
+        if args.rebase:
+            print(f"OK: {args.rebase} base_path = {rebase_manifest(args.rebase, args.base)}")
+            return 0
+        manifest = build_manifest(args.sources, args.base, args.max_text_bytes, args.max_hash_bytes, args.output)
+        payload = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(payload, encoding="utf-8")
+        else:
+            print(payload, end="")
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     return 0 if not manifest["problems"] else 2
 
 

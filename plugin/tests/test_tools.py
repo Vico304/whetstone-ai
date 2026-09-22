@@ -83,6 +83,25 @@ class SourceManifestTests(unittest.TestCase):
         self.assertEqual(source_manifest.classify(Path("sessions/index.html")), "conversation")
         self.assertEqual(source_manifest.classify(Path("data/session_metrics.csv")), "data")
 
+    def test_rebasing_an_unreadable_manifest_reports_an_error_instead_of_a_traceback(self):
+        import subprocess, sys
+        script = SCRIPT_ROOT / "source_manifest.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "not-json.json").write_text("hello {", encoding="utf-8")
+            (root / "list.json").write_text("[]\n", encoding="utf-8")
+            (root / "good.json").write_text(json.dumps({"base_path": "."}) + "\n", encoding="utf-8")
+            for target in ("missing.json", "not-json.json", "list.json", "."):
+                done = subprocess.run([sys.executable, str(script), "--rebase", str(root / target), "--base", str(root)],
+                                      capture_output=True, text=True)
+                self.assertEqual(done.returncode, 1, target)
+                self.assertTrue(done.stderr.startswith("ERROR: "), (target, done.stderr))
+                self.assertNotIn("Traceback", done.stderr, target)
+            done = subprocess.run([sys.executable, str(script), "--rebase", str(root / "good.json"), "--base", str(root)],
+                                  capture_output=True, text=True, check=True)
+            self.assertTrue(done.stdout.startswith("OK: "), done.stdout)
+            self.assertEqual(json.loads((root / "good.json").read_text(encoding="utf-8"))["base_path"], ".")
+
 
 class LessonValidationTests(unittest.TestCase):
     def test_template_is_valid_and_matches_outline_and_units(self):
@@ -1037,6 +1056,19 @@ class EvalScoringTests(unittest.TestCase):
             changed = dict(metrics, sections=metrics["sections"] + 1)
             lines = score_pack.diff_against({"build": metrics}, {"build": changed})
             self.assertEqual(lines, ["  build.sections: 1 → 2"])
+
+    def test_an_unreadable_baseline_reports_an_error_instead_of_a_traceback(self):
+        import subprocess, sys
+        script = PLUGIN_ROOT / "evals" / "score_pack.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            baseline = Path(temporary) / "baseline.json"
+            baseline.write_text("hello {", encoding="utf-8")
+            done = subprocess.run([sys.executable, str(script), str(EXAMPLE_ROOT), "--baseline", str(baseline)],
+                                  capture_output=True, text=True)
+            self.assertEqual(done.returncode, 1)
+            self.assertTrue(done.stderr.startswith("ERROR: "), done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
+            self.assertIn("sections", done.stdout)  # the pack itself was still scored and printed
 
     def test_teach_metrics_from_store_log(self):
         with tempfile.TemporaryDirectory() as temporary:
