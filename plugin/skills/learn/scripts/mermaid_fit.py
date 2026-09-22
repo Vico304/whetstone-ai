@@ -33,7 +33,7 @@ GROUP_PAD = 4         # a subgraph's own frame
 ACTOR_GAP = 6
 DEFAULT_BUDGET = 96
 MAX_LABEL = 16        # an edge label wider than this is wrapped
-MAX_NODE = 16         # a node name wider than this is wrapped
+MAX_NODE = 24         # a node name wider than this is wrapped
 
 FLOW_DIRECTIONS = ("TD", "TB", "LR", "RL")
 VERTICAL = {"TD", "TB"}
