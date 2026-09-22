@@ -13,6 +13,7 @@ principle. Obsidian, GitHub and VS Code render ```mermaid blocks natively.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -21,6 +22,31 @@ from typing import Any
 
 PUBLIC_LAYERS = {"fact", "mechanism"}
 SAFE = re.compile(r"[^A-Za-z0-9_]")
+RELATION_WORDS = {"is_a": "是一种", "part_of": "属于", "depends_on": "依赖", "causes": "导致",
+                  "enables": "促成", "implements": "实现", "contrasts_with": "对照",
+                  "instance_of": "实例", "prerequisite_for": "前置"}
+
+
+def _load(name: str):
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parent / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+mermaid_fit = _load("mermaid_fit")
+
+
+def fenced(body: list[str], prefer: str = "TD") -> str:
+    """A flowchart in a Mermaid fence, laid out to fit the width of a note.
+
+    Direction is the single largest factor in how wide a diagram ends up: LR grows with the depth
+    of the chain, TD with the widest fan-out. Neither the model writing the plan nor the learner
+    reading the note can see that, so `mermaid_fit` decides it here — and folds long names and
+    labels when the result is still too wide. `prefer` only settles a tie.
+    """
+    return mermaid_fit.fit("\n".join(["```mermaid", f"flowchart {prefer}"] + body + ["```"]))[0]
 
 
 def load_plan(path: Path) -> dict:
@@ -90,7 +116,7 @@ def deferred_ids(plan: dict) -> set[str]:
 def chain(plan: dict) -> str:
     deferred = deferred_ids(plan)
     sections = [s for s in plan["sections"] if isinstance(s, dict) and s.get("id") and s["id"] not in deferred]
-    lines = ["```mermaid", "flowchart TD"]
+    lines: list[str] = []
     for index, section in enumerate(sections, start=1):
         title = section.get("title") or section["id"]
         mark = {"structure": "（结构）", "process": "（过程）"}.get(section.get("kind"), "")
@@ -107,8 +133,7 @@ def chain(plan: dict) -> str:
                 drawn.add((dep, section["id"]))
     if deferred:
         lines.append(f"    %% 本次略过：{', '.join(sorted(deferred))}")
-    lines.append("```")
-    return "\n".join(lines)
+    return fenced(lines)
 
 
 def system(plan: dict) -> str:
@@ -118,25 +143,22 @@ def system(plan: dict) -> str:
         if not components:
             raise ValueError("big_picture.system_map has no components; nothing to draw")
         names = concept_names(plan)
-        lines = ["```mermaid", "flowchart TD"]
-        lines += nested_nodes(components, names)
+        lines = nested_nodes(components, names)
         for link in structured["links"]:
             lines.append(f"    {node_id('C_', link['from'])} -- {label(link.get('label') or '')} --> "
                          f"{node_id('C_', link['to'])}")
         if not structured["links"]:
             lines.append("    %% 部件之间还没有连线")
-        lines.append("```")
-        return "\n".join(lines)
+        return fenced(lines)
     steps = [s for s in ((plan.get("big_picture") or {}).get("system_map") or []) if isinstance(s, str) and s.strip()]
     if not steps:
         raise ValueError("big_picture.system_map is empty; nothing to draw")
-    lines = ["```mermaid", "flowchart LR"]
+    lines = []
     for index, step in enumerate(steps, start=1):
         lines.append(f"    M{index}[{label(step)}]")
     for index in range(1, len(steps)):
         lines.append(f"    M{index} --> M{index + 1}")
-    lines.append("```")
-    return "\n".join(lines)
+    return fenced(lines)
 
 
 def structure_section_graph(plan: dict, section: dict, structured: dict) -> str:
@@ -152,8 +174,7 @@ def structure_section_graph(plan: dict, section: dict, structured: dict) -> str:
             shown.add(walk)
             walk = components.get(walk)
     names = concept_names(plan)
-    lines = ["```mermaid", "flowchart TD"]
-    lines += nested_nodes({cid: components[cid] if components.get(cid) in shown else None for cid in shown}, names)
+    lines = nested_nodes({cid: components[cid] if components.get(cid) in shown else None for cid in shown}, names)
     drawn = 0
     for link in structured["links"]:
         if link["from"] in shown and link["to"] in shown:
@@ -162,8 +183,7 @@ def structure_section_graph(plan: dict, section: dict, structured: dict) -> str:
             drawn += 1
     if not drawn:
         lines.append("    %% 这些部件之间还没有连线")
-    lines.append("```")
-    return "\n".join(lines)
+    return fenced(lines)
 
 
 def process_section_graph(plan: dict, section: dict) -> str:
@@ -193,7 +213,7 @@ def process_section_graph(plan: dict, section: dict) -> str:
             lines.append(f"    Note over {node_id('P_', actor)}: {action}")
         changes = plain(step.get("changes"))
         if changes:
-            lines.append(f"    Note right of {node_id('P_', target or actor)}: {changes}")
+            lines.append(f"    Note over {node_id('P_', target or actor)}: {changes}")
     lines.append("```")
     return "\n".join(lines)
 
@@ -219,7 +239,7 @@ def section_graph(plan: dict, section_id: str) -> str:
     edges = [r for r in (plan.get("relations") or []) if isinstance(r, dict)
              and r.get("layer", "mechanism") in PUBLIC_LAYERS and (r.get("from") in local or r.get("to") in local)]
     shown = set(local) | {r["from"] for r in edges} | {r["to"] for r in edges}
-    lines = ["```mermaid", "flowchart LR"]
+    lines: list[str] = []
     for cid in sorted(shown, key=lambda c: (c not in local, c)):
         text = names.get(cid, cid)
         if cid in local and roles[cid] != "core":
@@ -227,11 +247,11 @@ def section_graph(plan: dict, section_id: str) -> str:
         shape = f"[{label(text)}]" if cid in local else f"({label(text)})"
         lines.append(f"    {node_id('C_', cid)}{shape}")
     for r in edges:
-        lines.append(f"    {node_id('C_', r['from'])} -- {r.get('type')} --> {node_id('C_', r['to'])}")
+        word = RELATION_WORDS.get(r.get("type"), r.get("type"))
+        lines.append(f"    {node_id('C_', r['from'])} -- {label(word)} --> {node_id('C_', r['to'])}")
     if not edges:
         lines.append("    %% 本节概念之间没有公开层的关系边")
-    lines.append("```")
-    return "\n".join(lines)
+    return fenced(lines, prefer="LR")
 
 
 def main() -> int:

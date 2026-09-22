@@ -19,7 +19,7 @@ mode: full
 ## 系统地图
 
 ```mermaid
-flowchart LR
+flowchart TD
     M1["输入范围"]
     M2["结构分析"]
     M3["教学路径"]
