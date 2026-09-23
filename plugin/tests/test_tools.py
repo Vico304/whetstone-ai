@@ -1,106 +1,41 @@
 from __future__ import annotations
 
 import copy
-import importlib.util
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "learn" / "scripts"
-CLARIFY_SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "clarify" / "scripts"
-
-
-def load_module(name: str, root: Path = SCRIPT_ROOT):
-    spec = importlib.util.spec_from_file_location(name, root / f"{name}.py")
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {name}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-source_manifest = load_module("source_manifest")
-validate_lesson = load_module("validate_lesson")
-learning_state = load_module("learning_state")
-validate_prerequisites = load_module("validate_prerequisites")
-prerequisite_state = load_module("prerequisite_state")
-scan_wikilinks = load_module("scan_wikilinks", CLARIFY_SCRIPT_ROOT)
-mrg_export = load_module("mrg_export")
-store_init = load_module("store_init")
-comparator = load_module("comparator")
-lrg_record = load_module("lrg_record")
-index_match = load_module("index_match")
-learner_state_build = load_module("learner_state_build")
-review_pool = load_module("review_pool")
-lesson_section = load_module("lesson_section")
-next_step = load_module("next_step")
-review_outline = load_module("review_outline")
-cards = load_module("cards")
-diagram = load_module("diagram")
-mermaid_fit = load_module("mermaid_fit")
-outline_status = load_module("outline_status")
-store_sync = load_module("store_sync")
-score_pack = load_module("score_pack", PLUGIN_ROOT / "evals")
-survey_materials = load_module("survey_materials")
-
-TEMPLATE_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "lesson-plan-template.json"
-EXAMPLE_ROOT = PLUGIN_ROOT / "examples" / "project-consensus"
-
-
-def load_template():
-    return json.loads(TEMPLATE_PLAN.read_text(encoding="utf-8"))
-
-
-class SourceManifestTests(unittest.TestCase):
-    def test_inventory_skips_sensitive_and_ignored_files(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "src").mkdir()
-            (root / "src" / "main.py").write_text("print('ok')\n", encoding="utf-8")
-            (root / ".env").write_text("API_KEY=secret\n", encoding="utf-8")
-            (root / "node_modules").mkdir()
-            (root / "node_modules" / "ignored.js").write_text("ignored\n", encoding="utf-8")
-
-            manifest = source_manifest.build_manifest([root], root, 1024, 1024)
-            by_path = {entry["path"]: entry for entry in manifest["files"]}
-
-            self.assertEqual(by_path["src/main.py"]["status"], "included")
-            self.assertEqual(by_path[".env"]["status"], "skipped_sensitive")
-            self.assertNotIn("node_modules/ignored.js", by_path)
-            self.assertNotIn("sha256", by_path[".env"])
-
-    def test_code_named_after_sessions_is_not_a_conversation(self):
-        self.assertEqual(source_manifest.classify(Path("app/session.py")), "code")
-        self.assertEqual(source_manifest.classify(Path("store/session_store.go")), "code")
-        self.assertEqual(source_manifest.classify(Path("notes/obsession.md")), "document")
-
-    def test_exported_conversations_are_detected(self):
-        self.assertEqual(source_manifest.classify(Path("exports/chat-2026-01.json")), "conversation")
-        self.assertEqual(source_manifest.classify(Path("transcripts/2026-01-01.md")), "conversation")
-        self.assertEqual(source_manifest.classify(Path("sessions/index.html")), "conversation")
-        self.assertEqual(source_manifest.classify(Path("data/session_metrics.csv")), "data")
-
-    def test_rebasing_an_unreadable_manifest_reports_an_error_instead_of_a_traceback(self):
-        import subprocess, sys
-        script = SCRIPT_ROOT / "source_manifest.py"
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "not-json.json").write_text("hello {", encoding="utf-8")
-            (root / "list.json").write_text("[]\n", encoding="utf-8")
-            (root / "good.json").write_text(json.dumps({"base_path": "."}) + "\n", encoding="utf-8")
-            for target in ("missing.json", "not-json.json", "list.json", "."):
-                done = subprocess.run([sys.executable, str(script), "--rebase", str(root / target), "--base", str(root)],
-                                      capture_output=True, text=True)
-                self.assertEqual(done.returncode, 1, target)
-                self.assertTrue(done.stderr.startswith("ERROR: "), (target, done.stderr))
-                self.assertNotIn("Traceback", done.stderr, target)
-            done = subprocess.run([sys.executable, str(script), "--rebase", str(root / "good.json"), "--base", str(root)],
-                                  capture_output=True, text=True, check=True)
-            self.assertTrue(done.stdout.startswith("OK: "), done.stdout)
-            self.assertEqual(json.loads((root / "good.json").read_text(encoding="utf-8"))["base_path"], ".")
+from _support import (
+    EXAMPLE_ROOT,
+    PLUGIN_ROOT,
+    SCRIPT_ROOT,
+    SKELETON_OUTLINE,
+    STRUCTURE_OUTLINE,
+    STRUCTURE_PLAN,
+    TEMPLATE_PLAN,
+    _StoreHelpers,
+    cards,
+    comparator,
+    diagram,
+    index_match,
+    learner_state_build,
+    learning_state,
+    lesson_section,
+    load_skeleton,
+    load_template,
+    lrg_record,
+    mermaid_fit,
+    mrg_export,
+    next_step,
+    outline_status,
+    review_outline,
+    review_pool,
+    store_init,
+    store_sync,
+    validate_lesson,
+    validate_prerequisites,
+)
 
 
 class LessonValidationTests(unittest.TestCase):
@@ -688,30 +623,6 @@ class KnowledgeStoreTests(unittest.TestCase):
             self.assertIn("2 attempts", buffer.getvalue())
 
 
-class _StoreHelpers:
-    def _store(self, root: Path) -> Path:
-        store = root / "store"
-        store_init.init_store(store, [])
-        store_init.register_lesson(store, TEMPLATE_PLAN)
-        public, deep = mrg_export.export(load_template())
-        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.json", public)
-        mrg_export.write_json(store / "mrg" / "sample-guided-lesson.deep.json", deep)
-        index = index_match.load_index(store)
-        index_match.register_nodes(index, public["nodes"] + deep["nodes"], "sample-guided-lesson")
-        index_match.save_index(store, index)
-        return store
-
-    def _append(self, store, at, kind, verdict, confidence=None, depth=None, props=None, section="s01"):
-        event = lrg_record.build_event(
-            lesson_id="sample-guided-lesson", section_id=section, kind=kind, attempt_number=1, response="r", feedback="",
-            verdict=verdict, confidence=confidence, criteria_met=[], depth_reached=depth, extraction=None,
-            comparison={"propositions": props or [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
-        )
-        event["at"] = at
-        lrg_record.append_event(store, "sample-guided-lesson", event)
-
-
-
 class RegistryAndLearnerStateTests(_StoreHelpers, unittest.TestCase):
     def test_register_and_recall_without_auto_merge(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1021,93 +932,6 @@ class VariantAndReviewTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(len(review_pool.pool(state, None, None, None, 1)), 1)
 
 
-class EvalScoringTests(unittest.TestCase):
-    def test_scores_example_pack_with_locator_check_and_expectations(self):
-        metrics = score_pack.build_metrics(EXAMPLE_ROOT, PLUGIN_ROOT.parent, {"sections": [4, 9], "max_concepts_per_section": 4, "min_relations": 0})
-        self.assertEqual(metrics["validator_errors"], 0)
-        self.assertEqual(metrics["sections"], 8)
-        self.assertEqual(metrics["support"], {"explicit": 18})
-        self.assertEqual(metrics["layers"], {"mechanism": 24})
-        self.assertGreater(metrics["locator_checked"], 0)
-        self.assertIsNotNone(metrics["locator_hit_rate"])
-        self.assertTrue(all(metrics["expectations"].values()), metrics["expectations"])
-        self.assertTrue(score_pack.locator_hit("## 2. 项目要解决的问题 / 第一段", "…\n## 2. 项目要解决的问题\n…"))
-        self.assertFalse(score_pack.locator_hit("p. 42", "no page markers here"))
-
-    def test_scores_template_pack_and_diffs_against_baseline(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            pack = Path(temporary) / "pack"
-            pack.mkdir()
-            assets = PLUGIN_ROOT / "skills" / "learn" / "assets"
-            (pack / "lesson-plan.json").write_text(TEMPLATE_PLAN.read_text(encoding="utf-8"), encoding="utf-8")
-            (pack / "outline.md").write_text((assets / "outline-template.md").read_text(encoding="utf-8"), encoding="utf-8")
-            (pack / "units").mkdir()
-            (pack / "units" / "s01.md").write_text((assets / "units-template" / "s01.md").read_text(encoding="utf-8"), encoding="utf-8")
-            metrics = score_pack.build_metrics(pack, None, None)
-            self.assertEqual(metrics["validator_errors"], 0, metrics["errors"])
-            self.assertEqual(metrics["relations"], 1)
-            self.assertEqual(metrics["layers"], {"fact": 2, "mechanism": 2})
-            self.assertEqual(metrics["roles"], {"core": 2, "supporting": 1, "listed": 1})
-            self.assertEqual(metrics["max_core_per_section"], 2)
-            self.assertEqual(metrics["max_concepts_per_section"], 4)
-            self.assertEqual(metrics["coverage"], {"core": 1, "supporting": 1, "listed": 1, "excluded": 1})
-            self.assertEqual(metrics["units_present"], "1/1")
-            self.assertIsNone(metrics["locator_hit_rate"])
-            changed = dict(metrics, sections=metrics["sections"] + 1)
-            lines = score_pack.diff_against({"build": metrics}, {"build": changed})
-            self.assertEqual(lines, ["  build.sections: 1 → 2"])
-
-    def test_an_unreadable_baseline_reports_an_error_instead_of_a_traceback(self):
-        import subprocess, sys
-        script = PLUGIN_ROOT / "evals" / "score_pack.py"
-        with tempfile.TemporaryDirectory() as temporary:
-            baseline = Path(temporary) / "baseline.json"
-            baseline.write_text("hello {", encoding="utf-8")
-            done = subprocess.run([sys.executable, str(script), str(EXAMPLE_ROOT), "--baseline", str(baseline)],
-                                  capture_output=True, text=True)
-            self.assertEqual(done.returncode, 1)
-            self.assertTrue(done.stderr.startswith("ERROR: "), done.stderr)
-            self.assertNotIn("Traceback", done.stderr)
-            self.assertIn("sections", done.stdout)  # the pack itself was still scored and printed
-
-    def test_teach_metrics_from_store_log(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            store = Path(temporary) / "store"
-            store_init.init_store(store, [])
-            for number, (kind, verdict, elapsed) in enumerate([("checkpoint", "partial", 200), ("checkpoint", "mastered", 100), ("review", "mastered", 50)], start=1):
-                event = lrg_record.build_event(
-                    lesson_id="l", section_id="s01", kind=kind, attempt_number=number, response="r", feedback="",
-                    verdict=verdict, confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
-                    comparison={"propositions": [], "diff": {"conflict": [{"kind": "proposition", "id": "p", "confidence_high": True}]}, "feedback_priority": []},
-                    elapsed_seconds=elapsed,
-                )
-                lrg_record.append_event(store, "l", event)
-            t = score_pack.teach_metrics(store, "l")
-            self.assertEqual(t["attempts"], 3)
-            self.assertEqual(t["median_checkpoint_elapsed_s"], 150)
-            self.assertEqual(t["conflicts_per_attempt"], 1.0)
-            self.assertEqual(t["high_confidence_conflict_share"], 1.0)
-            self.assertEqual(score_pack.teach_metrics(store, "missing"), {"attempts": 0})
-
-    def test_cli_prints_n_a_when_no_checkpoint_has_a_duration(self):
-        import subprocess, sys
-        lesson_id = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))["lesson_id"]
-        with tempfile.TemporaryDirectory() as temporary:
-            store = Path(temporary) / "store"
-            store_init.init_store(store, [])
-            event = lrg_record.build_event(
-                lesson_id=lesson_id, section_id="s01", kind="review", attempt_number=1, response="r", feedback="",
-                verdict="mastered", confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
-                comparison={"propositions": [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
-            )
-            lrg_record.append_event(store, lesson_id, event)
-            done = subprocess.run([sys.executable, str(PLUGIN_ROOT / "evals" / "score_pack.py"), str(EXAMPLE_ROOT), "--store", str(store)],
-                                  capture_output=True, text=True)
-            self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertIn("median checkpoint n/a,", done.stdout)
-            self.assertNotIn("Nones", done.stdout)
-
-
 class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
     def test_deferred_sections_are_skipped_in_progress(self):
         plan = load_template()
@@ -1199,312 +1023,9 @@ class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
             self.assertEqual(decisions[0]["action"], "variant")
 
 
-class SurveyMaterialsTests(unittest.TestCase):
-    def test_survey_classifies_repos_documents_generated_and_noise(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            repo = root / "upstream"
-            (repo / ".git").mkdir(parents=True)
-            (repo / "src").mkdir()
-            (repo / "src" / "main.rs").write_text("fn main() {}\n", encoding="utf-8")
-            (repo / "src" / "lib.rs").write_text("pub mod x;\n", encoding="utf-8")
-            (repo / "README.md").write_text("# Upstream\n", encoding="utf-8")
-            (repo / "docs").mkdir()
-            (repo / "docs" / "spec.md").write_text("# Specification\n", encoding="utf-8")
-            (repo / "demos").mkdir()
-            (repo / "demos" / "main.c").write_text("int main(){}\n", encoding="utf-8")
-            docs = root / "文档"
-            docs.mkdir()
-            (docs / "5_conversation_record.md").write_text("This session is being continued from a previous conversation. Summary below covers…\n", encoding="utf-8")
-            (docs / "2_设计方案.md").write_text("# 设计方案\n\n## 1. 目标\n\n## 2. 架构\n", encoding="utf-8")
-            (root / "进展汇报_2026-09-06.md").write_text("# 进展汇报\n\n> 日期：2026-09-06\n\n## 1. 完成度\n", encoding="utf-8")
-            (root / "textbook-ch3.md").write_text("# 第三章 内存隔离\n\n习题 3.1\n", encoding="utf-8")
-            data = root / "data"
-            data.mkdir()
-            (data / "big.log").write_text("x" * 100, encoding="utf-8")
-            (data / "dump.json").write_text("{}", encoding="utf-8")
-            (root / "tmp.log").write_text("log\n", encoding="utf-8")
-            (root / ".env").write_text("SECRET=1\n", encoding="utf-8")
-            (root / "paper.pdf").write_bytes(b"%PDF-1.4")
-
-            result = survey_materials.survey(root, 1000)
-            by_name = {e["name"]: e for e in result["entries"]}
-
-            self.assertEqual(by_name["upstream"]["kind"], "git_repo")
-            self.assertEqual(by_name["upstream"]["readme"], "README.md")
-            self.assertEqual(by_name["upstream"]["doc_dirs"], ["docs"])
-            self.assertEqual(by_name["upstream"]["entry_hints"], ["src/lib.rs", "src/main.rs"])  # demos/main.c skipped
-            self.assertEqual(by_name["文档"]["kind"], "document_folder")
-            docs_by = {Path(d["path"]).name: d for d in by_name["文档"]["documents"]}
-            self.assertEqual(docs_by["5_conversation_record.md"]["likely"], "generated_intermediate")
-            self.assertIn("session_summary", docs_by["5_conversation_record.md"]["generated_signals"])
-            self.assertNotEqual(docs_by["2_设计方案.md"]["likely"], "generated_intermediate")
-            self.assertEqual(by_name["进展汇报_2026-09-06.md"]["likely"], "generated_intermediate")
-            self.assertEqual(by_name["textbook-ch3.md"]["likely"], "primary_or_authored")
-            self.assertIn("textbook_like", by_name["textbook-ch3.md"]["primary_signals"])
-            self.assertEqual(by_name["data"]["kind"], "data_or_logs")
-            self.assertEqual(by_name["tmp.log"]["kind"], "log")
-            self.assertEqual(by_name[".env"]["kind"], "sensitive_skipped")
-            self.assertEqual(by_name["paper.pdf"]["kind"], "document")
-            self.assertIn("binary document", by_name["paper.pdf"]["note"])
-
-            md = survey_materials.render_markdown(result)
-            self.assertIn("| `upstream` | git_repo |", md)
-            self.assertIn("文档夹内明细", md)
-            self.assertNotIn("SECRET", md)
-            self.assertNotIn("This session is being continued", md)  # no content copied
-
-    def test_survey_ignores_build_dirs_and_marks_release_trees(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            rel = root / "release"
-            (rel / "node_modules").mkdir(parents=True)
-            (rel / "node_modules" / "x.js").write_text("", encoding="utf-8")
-            (rel / "bin").mkdir()
-            for i in range(5):
-                (rel / "bin" / f"lib{i}.so").write_bytes(b"\x00")
-            (rel / "bin" / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
-            result = survey_materials.survey(root, 1000)
-            entry = result["entries"][0]
-            self.assertEqual(entry["kind"], "release_tree")
-            self.assertEqual(entry["files"], 6)
-
-    def test_survey_rejects_a_walk_cap_below_one(self):
-        import subprocess, sys
-        script = SCRIPT_ROOT / "survey_materials.py"
-        with tempfile.TemporaryDirectory() as temporary:
-            (Path(temporary) / "docs").mkdir()
-            (Path(temporary) / "docs" / "a.md").write_text("# A\n", encoding="utf-8")
-            for cap in ("0", "-1"):
-                done = subprocess.run([sys.executable, str(script), temporary, "--max-files", cap], capture_output=True, text=True)
-                self.assertEqual(done.returncode, 2, cap)
-                self.assertIn("--max-files must be at least 1", done.stderr)
-                self.assertEqual(done.stdout, "")
-            done = subprocess.run([sys.executable, str(script), temporary, "--max-files", "1"], capture_output=True, text=True)
-            self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertIn("`docs`", done.stdout)
-
-
-class PrerequisiteValidationTests(unittest.TestCase):
-    def test_prerequisite_templates_are_valid(self):
-        asset_root = PLUGIN_ROOT / "skills" / "learn" / "assets"
-        plan = json.loads((asset_root / "prerequisite-plan-template.json").read_text(encoding="utf-8"))
-        guide = (asset_root / "prerequisite-guide-template.md").read_text(encoding="utf-8")
-
-        self.assertEqual(validate_prerequisites.validate_plan(plan), [])
-        self.assertEqual(validate_prerequisites.validate_guide(guide), [])
-
-    def test_duplicate_prerequisite_id_is_rejected(self):
-        plan_path = (
-            PLUGIN_ROOT
-            / "skills"
-            / "learn"
-            / "assets"
-            / "prerequisite-plan-template.json"
-        )
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        plan["prerequisites"].append(dict(plan["prerequisites"][0]))
-
-        errors = validate_prerequisites.validate_plan(plan)
-
-        self.assertTrue(any("duplicates" in error for error in errors))
-
-
-class PrerequisiteStateTests(unittest.TestCase):
-    def test_assessment_sources_and_bridge_attempts_preserve_history(self):
-        plan_path = (
-            PLUGIN_ROOT
-            / "skills"
-            / "learn"
-            / "assets"
-            / "prerequisite-plan-template.json"
-        )
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        state = prerequisite_state.create_state(plan)
-
-        prerequisite_state.append_assessment(
-            state,
-            "p01",
-            "I can name the parts but not explain the transformation.",
-            "The causal relation is missing.",
-            "gap",
-            4,
-        )
-        prerequisite_state.append_assessment(
-            state,
-            "p01",
-            "The processing step changes an input into an observable result.",
-            "The relation is present but the boundary remains fragile.",
-            "fragile",
-            3,
-        )
-        prerequisite_state.add_source(
-            state,
-            "p01",
-            "Authoritative system model",
-            "Example Standards Body",
-            "https://example.com/system-model",
-            "official_or_primary",
-            "Supports the input-processing-output distinction.",
-        )
-        prerequisite_state.append_bridge(
-            state,
-            "p01",
-            "A first bridge attempt",
-            "One relation still needs revision.",
-            "retry",
-            3,
-        )
-        prerequisite_state.append_bridge(
-            state,
-            "p01",
-            "A revised bridge attempt",
-            "The boundaries and causal link are now usable.",
-            "ready",
-            4,
-        )
-
-        competency = state["competencies"][0]
-        self.assertEqual(
-            [item["response"] for item in competency["assessment_attempts"]],
-            [
-                "I can name the parts but not explain the transformation.",
-                "The processing step changes an input into an observable result.",
-            ],
-        )
-        self.assertEqual(len(competency["supplement_sources"]), 1)
-        self.assertEqual([item["verdict"] for item in competency["bridge_attempts"]], ["retry", "ready"])
-        self.assertEqual(state["status"], "ready_for_main_course")
-        self.assertEqual(state["phase"], "ready")
-        self.assertIsNone(state["current_prerequisite_id"])
-
-
-class ScanWikilinksTests(unittest.TestCase):
-    def test_unresolved_links_aliases_and_inbox(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            pack = Path(temporary)
-            concepts = pack / "concepts"
-            concepts.mkdir()
-            (pack / "teaching-guide.md").write_text(
-                "提到 [[虚拟内存]] 与 [[TLB|快表]] 和 [[页表#结构]]。\n"
-                "```\n[[代码块内不算]]\n```\n",
-                encoding="utf-8",
-            )
-            (concepts / "页表.md").write_text(
-                "---\naliases: [page table]\nstatus: grounded\n---\n# 页表\n引用 [[虚拟内存]]。\n",
-                encoding="utf-8",
-            )
-            (concepts / "_inbox.md").write_text(
-                "# 收件箱\n- 缺页中断\n- page table\n", encoding="utf-8"
-            )
-
-            result = scan_wikilinks.scan(pack, None)
-
-            unresolved = {item["concept"] for item in result["unresolved_links"]}
-            self.assertEqual(unresolved, {"虚拟内存", "TLB"})
-            self.assertNotIn("代码块内不算", unresolved)
-            self.assertEqual(result["inbox_pending"], ["缺页中断"])
-            by_concept = {
-                item["concept"]: item["found_in"] for item in result["unresolved_links"]
-            }
-            self.assertIn("concepts/页表.md", by_concept["虚拟内存"])
-
-    def test_block_list_aliases_and_inline_code_are_handled(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            pack = Path(temporary)
-            concepts = pack / "concepts"
-            concepts.mkdir()
-            (concepts / "缓存.md").write_text(
-                "---\ntitle: 缓存\naliases:\n  - cache\n  - \"Cache Layer\"\nstatus: grounded\n---\n# 缓存\n",
-                encoding="utf-8",
-            )
-            (pack / "teaching-guide.md").write_text(
-                "正文提到 [[cache]] 与 [[Cache Layer]]，还有 [[命中率]]。\n"
-                "行内代码 `[[不算链接]]` 不应被扫描。\n"
-                "~~~\n[[波浪围栏内不算]]\n~~~\n"
-                "````md\n```\n[[嵌套围栏内不算]]\n```\n````\n",
-                encoding="utf-8",
-            )
-
-            result = scan_wikilinks.scan(pack, None)
-
-            self.assertTrue({"cache layer", "cache", "缓存"} <= set(result["known_notes"]))  # plus the other .md stems of the course
-            unresolved = {item["concept"] for item in result["unresolved_links"]}
-            self.assertEqual(unresolved, {"命中率"})
-
-    def test_scan_groups_pending_concepts_by_unit_and_resolves_unit_notes_by_alias(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            course = Path(temporary) / "course"
-            (course / "units").mkdir(parents=True)
-            (course / "concepts").mkdir()
-            plan = load_template()
-            plan["sections"] = [dict(plan["sections"][0], id="s01"), dict(plan["sections"][0], id="s02", title="第二节")]
-            (course / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
-            (course / "units" / "s01.md").write_text("讲到 [[前馈网络]] 与 [[词元]]，还有 [[s02]]。\n", encoding="utf-8")
-            (course / "units" / "s02.md").write_text("这里提到向量空间。\n", encoding="utf-8")
-            (course / "outline.md").write_text("大纲提到 [[宏观地图]]。\n", encoding="utf-8")
-            (course / "concepts" / "_inbox.md").write_text("- 向量空间\n- 完全无关的词\n", encoding="utf-8")
-            result = scan_wikilinks.scan(course, None)
-            units = {u["unit"]: u for u in result["by_unit"]}
-            self.assertEqual((units["s01"]["concepts"], units["s01"]["scope"], units["s01"]["note_file"]), (["前馈网络", "宏观地图", "词元"], "cluster", "concepts/s01.md"))  # 宏观地图: marked in the outline, listed by s01 in the plan
-            self.assertEqual((units["s02"]["concepts"], units["s02"]["scope"]), (["向量空间"], "isolated"))   # inbox entry, matched by the unit text
-            self.assertEqual(units[None]["concepts"], ["完全无关的词"])
-            self.assertNotIn("s02", [l["concept"] for l in result["unresolved_links"]])                   # [[s02]] resolves to units/s02.md
-            self.assertIn("宏观地图", [l["concept"] for l in result["unresolved_links"]])                   # a plan concept marked in the outline
-            # a per-unit note whose aliases list its concepts resolves them
-            (course / "concepts" / "s01.md").write_text("---\nunit: s01\naliases: [前馈网络, 词元]\nscope: cluster\n---\n# 第一节\n", encoding="utf-8")
-            result = scan_wikilinks.scan(course, None)
-            self.assertEqual(units_after := {u["unit"]: u["concepts"] for u in result["by_unit"]}, {"s01": ["宏观地图"], "s02": ["向量空间"], None: ["完全无关的词"]})
-
-    def test_scan_scope_defaults_to_the_course_studied_most_recently(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "courses"
-            for name, updated, link in (("old-1", "2026-09-01T10:00:00Z", "[[旧概念]]"), ("new-2", "2026-09-13T10:00:00Z", "[[新概念]]")):
-                course = root / "目标" / name
-                (course / "concepts").mkdir(parents=True)
-                (course / "lesson-plan.json").write_text("{}", encoding="utf-8")
-                (course / "learning-progress.json").write_text(json.dumps({"updated_at": updated}), encoding="utf-8")
-                (course / "outline.md").write_text(f"提到 {link}。\n", encoding="utf-8")
-                (course / "concepts" / "_inbox.md").write_text("- 待办\n" if name == "old-1" else "", encoding="utf-8")
-            result = scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=None)
-            self.assertTrue(result["current_course"].endswith("new-2"))
-            self.assertEqual([i["concept"] for i in result["scanned"][0]["unresolved_links"]], ["新概念"])
-            self.assertEqual(len(result["scanned"]), 1)
-            self.assertEqual([(o["pack_dir"].split("/")[-1], o["inbox_pending"]) for o in result["other_courses"]], [("old-1", 1)])
-            everything = scan_wikilinks.scan_scope(root, None, scan_all=True, chosen=None)
-            self.assertEqual(len(everything["scanned"]), 2)
-            self.assertEqual(everything["other_courses"], [])
-            picked = scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=root / "目标" / "old-1")
-            self.assertTrue(picked["current_course"].endswith("old-1"))
-            with self.assertRaises(ValueError):
-                scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=root / "目标")
-            with self.assertRaises(ValueError):
-                scan_wikilinks.scan_scope(Path(temporary) / "empty", None, False, None)
-
-    def test_cli_exits_2_for_a_directory_without_courses_as_for_a_missing_one(self):
-        import subprocess, sys
-        script = CLARIFY_SCRIPT_ROOT / "scan_wikilinks.py"
-        with tempfile.TemporaryDirectory() as temporary:
-            (Path(temporary) / "empty").mkdir()
-            for target in ("empty", "missing"):
-                done = subprocess.run([sys.executable, str(script), str(Path(temporary) / target)], capture_output=True, text=True)
-                self.assertEqual(done.returncode, 2, target)
-                self.assertTrue(done.stdout.startswith("ERROR: "), done.stdout)
-                self.assertNotIn('"error"', done.stdout)
-
 
 if __name__ == "__main__":
     unittest.main()
-
-
-SKELETON_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "lesson-plan.json"
-STRUCTURE_PLAN = PLUGIN_ROOT / "skills" / "learn" / "assets" / "structure-example" / "lesson-plan.json"
-STRUCTURE_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "structure-example" / "outline.md"
-SKELETON_OUTLINE = PLUGIN_ROOT / "skills" / "learn" / "assets" / "skeleton-example" / "outline.md"
-
-
-def load_skeleton():
-    return json.loads(SKELETON_PLAN.read_text(encoding="utf-8"))
 
 
 class CourseOrganisationTests(unittest.TestCase):
@@ -2039,168 +1560,6 @@ class LearnerHomeTests(_StoreHelpers, unittest.TestCase):
             self.assertNotIn("\nconcepts:", shown.stdout)
 
 
-class LayoutTests(unittest.TestCase):
-    """A course pack is self-contained: sources.json records the material root relative to itself,
-    so validators find the sources in both layouts (<materials>/whetstone/courses/<id>/ and
-    <knowledge-base>/courses/<goal>/<id>/ with materials under material/)."""
-
-    def _materials(self, root: Path) -> Path:
-        materials = root / "material" / "spec"
-        (materials / "examples").mkdir(parents=True)
-        (materials / "examples" / "source.md").write_text("## Architecture\n\n## Course ordering\n\n## Appendix\n\n## Deployment notes\n", encoding="utf-8")
-        return materials
-
-    def test_base_path_is_relative_to_the_manifest_in_both_layouts(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            materials = self._materials(root)
-            # knowledge-base layout
-            kb_pack = root / "courses" / "目标A" / "c1"
-            kb_pack.mkdir(parents=True)
-            manifest = source_manifest.build_manifest([materials / "examples"], materials, 1024, 1024, output=kb_pack / "sources.json")
-            self.assertEqual(manifest["base_path"], "../../../material/spec")
-            self.assertEqual(manifest["roots"], ["examples"])
-            (kb_pack / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
-            self.assertEqual(validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", manifest), materials.resolve())
-            # standalone layout: <materials>/whetstone/courses/<id>/
-            sa_pack = materials / "whetstone" / "courses" / "c1"
-            sa_pack.mkdir(parents=True)
-            manifest2 = source_manifest.build_manifest([materials / "examples"], materials, 1024, 1024, output=sa_pack / "sources.json")
-            self.assertEqual(manifest2["base_path"], "../../..")
-            # legacy "." cannot be resolved
-            self.assertIsNone(validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", {"base_path": "."}))
-            # rebase migrates an old manifest in place, touching only base_path
-            (kb_pack / "sources.json").write_text(json.dumps(dict(manifest, base_path=".")), encoding="utf-8")
-            self.assertEqual(source_manifest.rebase_manifest(kb_pack / "sources.json", materials), "../../../material/spec")
-            rebased = json.loads((kb_pack / "sources.json").read_text(encoding="utf-8"))
-            self.assertEqual(rebased["roots"], ["examples"])
-            # the coverage check then works with the derived root
-            plan = load_template()
-            self.assertEqual(validate_lesson.validate_coverage_against_sources(plan, validate_lesson.sources_root_from_manifest(kb_pack / "sources.json", rebased)), [])
-
-
-class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
-    """Schema 1.4: a course spawned to fill a parent course's gap (prerequisite_of / blocked_at / depth)."""
-
-    def _prerequisite_plan(self):
-        plan = load_template()
-        plan["schema_version"] = "1.4"
-        for key in ("contrast", "cases", "ontology"):
-            plan["sections"][0]["concepts"][0].pop(key, None)  # a 1.4 plan has no 1.5 fields
-        plan["lesson_id"] = "linear-algebra-min-0"
-        plan["prerequisite_of"] = "sample-guided-lesson"
-        plan["blocked_at"] = "s01"
-        plan["depth"] = 1
-        return plan
-
-    def test_prerequisite_fields_validate_together_on_a_linear_1_4_course(self):
-        plan = self._prerequisite_plan()
-        self.assertEqual(validate_lesson.validate_plan(plan, {"examples/source.md"}), [])
-        self.assertTrue(validate_lesson.is_prerequisite_course(plan))
-        ratio = validate_lesson.fact_ratio(plan)
-        self.assertEqual(ratio["total"], len({c.get("id") or c["name"] for s in plan["sections"] for c in s["concepts"]}))
-        self.assertGreaterEqual(ratio["fact"], 1)
-
-        old = self._prerequisite_plan()
-        old["schema_version"] = "1.2"
-        self.assertTrue(any("requires schema_version '1.4'" in e for e in validate_lesson.validate_plan(old)), "1.2 must reject 1.4 keys")
-
-        for broken, needle in (
-            ({"depth": None}, "root.depth required alongside"),
-            ({"depth": 0}, "integer >= 1"),
-            ({"prerequisite_of": "linear-algebra-min-0"}, "not this course"),
-            ({"blocked_at": ""}, "blocked_at must name"),
-            ({"shape": "skeleton"}, "only allowed when shape = linear"),
-            ({"parent_course": "some-skeleton"}, "mutually exclusive"),
-        ):
-            plan = self._prerequisite_plan()
-            for key, value in broken.items():
-                if value is None:
-                    del plan[key]
-                else:
-                    plan[key] = value
-            errors = validate_lesson.validate_plan(plan, {"examples/source.md"})
-            self.assertTrue(any(needle in e for e in errors), (needle, errors))
-
-    def test_register_records_the_relation_and_export_carries_it(self):
-        plan = self._prerequisite_plan()
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            store = root / "store"
-            store_init.init_store(store, [])
-            plan_path = root / "courses" / "linear-algebra-min-0" / "lesson-plan.json"
-            plan_path.parent.mkdir(parents=True)
-            plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
-            data = store_init.register_lesson(store, plan_path)
-            entry = next(l for l in data["lessons"] if l["lesson_id"] == "linear-algebra-min-0")
-            self.assertEqual((entry["prerequisite_of"], entry["blocked_at"], entry["depth"]), ("sample-guided-lesson", "s01", 1))
-            data = store_init.register_lesson(store, plan_path)  # idempotent, relation kept
-            entry = next(l for l in data["lessons"] if l["lesson_id"] == "linear-algebra-min-0")
-            self.assertEqual(entry["depth"], 1)
-            self.assertEqual(index_match.prerequisite_courses_of(store, "sample-guided-lesson"), {"linear-algebra-min-0"})
-            self.assertEqual(index_match.prerequisite_courses_of(store, "other"), set())
-            self.assertEqual(index_match.prerequisite_courses_of(None, "sample-guided-lesson"), set())
-        public, deep = mrg_export.export(plan)
-        self.assertEqual(public["prerequisite_of"], "sample-guided-lesson")
-        self.assertEqual((deep["blocked_at"], deep["depth"]), ("s01", 1))
-
-    def test_concepts_learned_in_a_prerequisite_course_get_a_variant_not_a_diagnosis(self):
-        from datetime import datetime, timezone
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            store = self._store(root)
-            child_plan = self._prerequisite_plan()
-            child_path = root / "child" / "lesson-plan.json"
-            child_path.parent.mkdir()
-            child_path.write_text(json.dumps(child_plan, ensure_ascii=False), encoding="utf-8")
-            store_init.register_lesson(store, child_path)
-            # the child course taught macro-map, but only with immediate (checkpoint) evidence
-            event = lrg_record.build_event(
-                lesson_id="linear-algebra-min-0", section_id="s01", kind="checkpoint", attempt_number=1, response="r", feedback="",
-                verdict="mastered", confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
-                comparison=None, elapsed_seconds=None, target_concept_ids=["learning-design.macro-map"],
-            )
-            event["at"] = "2026-01-20T10:00:00Z"
-            lrg_record.append_event(store, "linear-algebra-min-0", event)
-            state = learner_state_build.build(store, now=datetime(2026, 1, 21, tzinfo=timezone.utc))
-            self.assertEqual(state["concepts"]["learning-design.macro-map"]["freshness"], "unknown")
-            plan = {"prerequisites": [{"id": "p01", "name": "macro map"}, {"id": "p02", "name": "哈希函数"}]}
-            without = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"])
-            self.assertEqual(without[0]["action"], "diagnose")
-            courses = index_match.prerequisite_courses_of(store, "sample-guided-lesson")
-            with_rule = index_match.prerequisite_plan_lookup(index_match.load_index(store), plan, state["concepts"], courses)
-            self.assertEqual((with_rule[0]["action"], with_rule[0]["via_prerequisite_course"]), ("variant", "linear-algebra-min-0"))
-            self.assertEqual((with_rule[1]["action"], with_rule[1]["via_prerequisite_course"]), ("diagnose", None))
-
-    def test_block_and_unblock_a_parent_section(self):
-        state = learning_state.create_state(load_template())
-        learning_state.block_section(state, "s01", "linear-algebra-min-0")
-        self.assertEqual(state["blocked"]["by"], "linear-algebra-min-0")
-        self.assertEqual(state["current_section_id"], "s01")
-        with self.assertRaises(ValueError):
-            learning_state.append_attempt(state, "s01", "a", "", "mastered", None)
-        with self.assertRaises(ValueError):
-            learning_state.block_section(state, "s01", "again")
-        self.assertEqual(learning_state.unblock_section(state, "s01"), "linear-algebra-min-0")
-        self.assertNotIn("blocked", state)
-        learning_state.append_attempt(state, "s01", "a", "", "mastered", None)
-        types = [e["type"] for e in state["events"]]
-        self.assertLess(types.index("section_blocked"), types.index("section_unblocked"))
-        self.assertLess(types.index("section_unblocked"), types.index("attempt_recorded"))
-        with self.assertRaises(ValueError):
-            learning_state.unblock_section(state, "s01")
-
-    def test_diagnostic_answers_are_immediate_evidence(self):
-        from datetime import datetime, timezone
-        long_ago = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        self.assertEqual(learner_state_build.tier_for("diagnostic", long_ago, datetime(2026, 2, 1, tzinfo=timezone.utc), timezone.utc), "immediate")
-        event = lrg_record.build_event(
-            lesson_id="sample-guided-lesson", section_id="s01", kind="diagnostic", attempt_number=1, response="r", feedback="",
-            verdict="partial", confidence=None, criteria_met=[], depth_reached="fact", extraction=None, comparison=None, elapsed_seconds=None,
-        )
-        self.assertEqual(event["kind"], "diagnostic")
-
-
 class Schema15Tests(unittest.TestCase):
     """Schema 1.5: contrast / cases / ontology, contested tradeoffs, sub-sections, review courses."""
 
@@ -2482,24 +1841,6 @@ class OutlineStatusTests(unittest.TestCase):
             self.assertFalse(outline_status.refresh(Path(temporary))["updated"])   # nothing to do without the three files
 
 
-class ReleasePackagingTests(unittest.TestCase):
-    def test_standalone_skill_is_renamed_and_self_contained(self):
-        release = load_module("package_release", PLUGIN_ROOT.parent)
-        with tempfile.TemporaryDirectory() as temporary:
-            folder = release.build_standalone(Path(temporary))
-            self.assertEqual(folder.name, "whetstone-learn")
-            self.assertEqual(release.check_standalone(folder), [])
-            head = (folder / "SKILL.md").read_text(encoding="utf-8")[:1200]
-            self.assertIn("\nname: whetstone-learn\n", head)
-            self.assertIn("description: " + release.STANDALONE_DESCRIPTION, head)
-            self.assertTrue((folder / "LICENSE").is_file() and (folder / "README.md").is_file())
-            self.assertIn(release.version(), (folder / "README.md").read_text(encoding="utf-8"))
-            plan_template = (folder / "assets" / "learning-plan-template.md").read_text(encoding="utf-8")
-            self.assertIn("/whetstone-learn 学习", plan_template)
-            self.assertEqual(sorted(p.name for p in (folder / "scripts").glob("*.py")), sorted(p.name for p in (PLUGIN_ROOT / "skills" / "learn" / "scripts").glob("*.py")))
-
-
-
 class MermaidFitTests(unittest.TestCase):
     """Width is what the layout engine does to a topology, so it is decided in code, not by prompt."""
 
@@ -2570,3 +1911,4 @@ class MermaidFitTests(unittest.TestCase):
                 diagram.system(plan) if kind == "--system" else diagram.section_graph(plan, "s01"))
             self.assertEqual(mermaid_fit.fit(drawn)[0], drawn, kind)
             self.assertLessEqual(mermaid_fit.estimate_width(drawn), mermaid_fit.DEFAULT_BUDGET, kind)
+
