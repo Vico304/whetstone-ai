@@ -246,7 +246,7 @@ def command_push(args: argparse.Namespace) -> int:
     now = learner_state_build.parse_time(args.now) if args.now else None
     report = push(args.store, home, args.workspace, now)
     print(f"OK: pushed workspace {report['slug']} to {home}; home now aggregates {report['workspaces']} workspace(s), "
-          f"{report['concepts']} concepts, {report['states']} learner states")
+          f"{report['concepts']} indexed concepts, {report['states']} learner states")
     for conflict in report["alias_conflicts"]:
         print(f"CONFLICT: alias '{conflict['alias']}' maps to {conflict['existing_id']} in an earlier workspace, "
               f"not re-pointed to {conflict['new_id']} ({conflict['workspace']}) — confirm manually")
@@ -257,7 +257,7 @@ def command_rebuild(args: argparse.Namespace) -> int:
     home = resolve_home(args.home)
     now = learner_state_build.parse_time(args.now) if args.now else None
     report = rebuild(home, now)
-    print(f"OK: rebuilt {home} from {report['workspaces']} snapshot(s): {report['concepts']} concepts, {report['states']} learner states")
+    print(f"OK: rebuilt {home} from {report['workspaces']} snapshot(s): {report['concepts']} indexed concepts, {report['states']} learner states")
     return 0
 
 
@@ -276,7 +276,7 @@ def command_show(args: argparse.Namespace) -> int:
         counts: dict[str, int] = {}
         for concept in state.get("concepts", {}).values():
             counts[concept["freshness"]] = counts.get(concept["freshness"], 0) + 1
-        print(f"concepts: {len(state.get('concepts', {}))} (fresh={counts.get('fresh', 0)}, stale={counts.get('stale', 0)}, unknown={counts.get('unknown', 0)})")
+        print(f"learner states: {len(state.get('concepts', {}))} (fresh={counts.get('fresh', 0)}, stale={counts.get('stale', 0)}, unknown={counts.get('unknown', 0)})")
     return 0
 
 

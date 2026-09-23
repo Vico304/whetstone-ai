@@ -229,7 +229,7 @@ def scan_scope(root: Path, inbox: Path | None, scan_all: bool, chosen: Path | No
             raise ValueError(f"not a course directory (no lesson-plan.json): {chosen}")
         courses = [chosen] + [c for c in courses if c.resolve() != chosen.resolve()]
     if not courses:
-        return {"error": f"no course directory (lesson-plan.json) under {root}", "courses": []}
+        raise ValueError(f"no course directory (lesson-plan.json) under {root}")
     targets = courses if scan_all else courses[:1]
     scanned = [scan(course, inbox if course == targets[0] else None) for course in targets]
     others = [{"pack_dir": str(c), "inbox_pending": len(inbox_entries(c / "concepts" / "_inbox.md"))}

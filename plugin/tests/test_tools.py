@@ -1089,6 +1089,24 @@ class EvalScoringTests(unittest.TestCase):
             self.assertEqual(t["high_confidence_conflict_share"], 1.0)
             self.assertEqual(score_pack.teach_metrics(store, "missing"), {"attempts": 0})
 
+    def test_cli_prints_n_a_when_no_checkpoint_has_a_duration(self):
+        import subprocess, sys
+        lesson_id = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))["lesson_id"]
+        with tempfile.TemporaryDirectory() as temporary:
+            store = Path(temporary) / "store"
+            store_init.init_store(store, [])
+            event = lrg_record.build_event(
+                lesson_id=lesson_id, section_id="s01", kind="review", attempt_number=1, response="r", feedback="",
+                verdict="mastered", confidence=None, criteria_met=[], depth_reached="mechanism", extraction=None,
+                comparison={"propositions": [], "diff": {"conflict": []}, "feedback_priority": []}, elapsed_seconds=None,
+            )
+            lrg_record.append_event(store, lesson_id, event)
+            done = subprocess.run([sys.executable, str(PLUGIN_ROOT / "evals" / "score_pack.py"), str(EXAMPLE_ROOT), "--store", str(store)],
+                                  capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn("median checkpoint n/a,", done.stdout)
+            self.assertNotIn("Nones", done.stdout)
+
 
 class ModeAndRolesTests(_StoreHelpers, unittest.TestCase):
     def test_deferred_sections_are_skipped_in_progress(self):
@@ -1250,6 +1268,21 @@ class SurveyMaterialsTests(unittest.TestCase):
             entry = result["entries"][0]
             self.assertEqual(entry["kind"], "release_tree")
             self.assertEqual(entry["files"], 6)
+
+    def test_survey_rejects_a_walk_cap_below_one(self):
+        import subprocess, sys
+        script = SCRIPT_ROOT / "survey_materials.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            (Path(temporary) / "docs").mkdir()
+            (Path(temporary) / "docs" / "a.md").write_text("# A\n", encoding="utf-8")
+            for cap in ("0", "-1"):
+                done = subprocess.run([sys.executable, str(script), temporary, "--max-files", cap], capture_output=True, text=True)
+                self.assertEqual(done.returncode, 2, cap)
+                self.assertIn("--max-files must be at least 1", done.stderr)
+                self.assertEqual(done.stdout, "")
+            done = subprocess.run([sys.executable, str(script), temporary, "--max-files", "1"], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn("`docs`", done.stdout)
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
@@ -1445,7 +1478,19 @@ class ScanWikilinksTests(unittest.TestCase):
             self.assertTrue(picked["current_course"].endswith("old-1"))
             with self.assertRaises(ValueError):
                 scan_wikilinks.scan_scope(root, None, scan_all=False, chosen=root / "目标")
-            self.assertIn("error", scan_wikilinks.scan_scope(Path(temporary) / "empty", None, False, None))
+            with self.assertRaises(ValueError):
+                scan_wikilinks.scan_scope(Path(temporary) / "empty", None, False, None)
+
+    def test_cli_exits_2_for_a_directory_without_courses_as_for_a_missing_one(self):
+        import subprocess, sys
+        script = CLARIFY_SCRIPT_ROOT / "scan_wikilinks.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            (Path(temporary) / "empty").mkdir()
+            for target in ("empty", "missing"):
+                done = subprocess.run([sys.executable, str(script), str(Path(temporary) / target)], capture_output=True, text=True)
+                self.assertEqual(done.returncode, 2, target)
+                self.assertTrue(done.stdout.startswith("ERROR: "), done.stdout)
+                self.assertNotIn('"error"', done.stdout)
 
 
 if __name__ == "__main__":
@@ -1973,6 +2018,25 @@ class LearnerHomeTests(_StoreHelpers, unittest.TestCase):
                 del os.environ["WHETSTONE_HOME"]
             self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone")).startswith("tee_dsh-"))
             self.assertTrue(store_sync.workspace_slug(Path("/x/tee_dsh/whetstone/store")).startswith("tee_dsh-"))
+
+    def test_cli_labels_indexed_concepts_and_learner_states_apart(self):
+        import subprocess, sys
+        script = SCRIPT_ROOT / "store_sync.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "ws").mkdir()
+            store = self._store(root / "ws")
+            self._append(store, "2026-01-20T10:00:00Z", "checkpoint", "mastered", depth="mechanism")
+            home = root / "home"
+            pushed = subprocess.run([sys.executable, str(script), "push", "--store", str(store), "--home", str(home)],
+                                    capture_output=True, text=True)
+            self.assertEqual(pushed.returncode, 0, pushed.stderr)
+            self.assertIn("4 indexed concepts, ", pushed.stdout)
+            state = json.loads((home / "learner-state.json").read_text(encoding="utf-8"))
+            shown = subprocess.run([sys.executable, str(script), "show", "--home", str(home)], capture_output=True, text=True)
+            self.assertEqual(shown.returncode, 0, shown.stderr)
+            self.assertIn(f"learner states: {len(state['concepts'])} (fresh=", shown.stdout)
+            self.assertNotIn("\nconcepts:", shown.stdout)
 
 
 class LayoutTests(unittest.TestCase):

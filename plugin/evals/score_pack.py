@@ -220,7 +220,8 @@ def main() -> int:
           f"locator hit {b['locator_hit_rate']}, unsupported {b['unsupported_ratio']}")
     if "teach" in result and result["teach"].get("attempts"):
         t = result["teach"]
-        print(f"  teach: {t['attempts']} attempts, median checkpoint {t['median_checkpoint_elapsed_s']}s, "
+        median = t["median_checkpoint_elapsed_s"]
+        print(f"  teach: {t['attempts']} attempts, median checkpoint {'n/a' if median is None else f'{median}s'}, "
               f"depths {t['depths']}, conflicts/attempt {t['conflicts_per_attempt']}")
     if args.baseline and args.baseline.is_file():
         try:

@@ -228,8 +228,10 @@ def main() -> int:
     parser.add_argument("root", type=Path)
     parser.add_argument("--output", type=Path, help="Write JSON here")
     parser.add_argument("--markdown", type=Path, help="Write a Markdown table here")
-    parser.add_argument("--max-files", type=int, default=20000, help="Per-directory walk cap")
+    parser.add_argument("--max-files", type=int, default=20000, help="Per-directory walk cap (at least 1)")
     args = parser.parse_args()
+    if args.max_files < 1:
+        parser.error(f"--max-files must be at least 1, got {args.max_files}")
     if not args.root.is_dir():
         print(f"ERROR: not a directory: {args.root}", file=sys.stderr)
         return 2
