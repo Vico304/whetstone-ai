@@ -23,6 +23,30 @@ class EvalScoringTests(unittest.TestCase):
         self.assertTrue(score_pack.locator_hit("## 2. 项目要解决的问题 / 第一段", "…\n## 2. 项目要解决的问题\n…"))
         self.assertFalse(score_pack.locator_hit("p. 42", "no page markers here"))
 
+    def test_organisation_metrics_absent_fields_do_not_crash(self):
+        empty = score_pack.organisation_metrics({})
+        self.assertEqual(empty, {"section_kinds": {}, "system_map": {"present": False, "components": 0},
+                                 "positioned_sections": 0, "mean_steps_per_section": None})
+        self.assertEqual(score_pack.organisation_metrics({"sections": None, "big_picture": "x"})["positioned_sections"], 0)
+
+    def test_organisation_metrics_counts_schema_1_6_fields(self):
+        plan = {
+            "big_picture": {"system_map": {"components": [{"id": "a"}, {"id": "b"}], "links": []}},
+            "sections": [
+                {"kind": "process", "position": "a", "steps": [{}, {}, {}]},
+                {"kind": "process", "steps": [{}]},
+                {"kind": "concept", "position": "b"},
+                "not-a-section",
+            ],
+        }
+        metrics = score_pack.organisation_metrics(plan)
+        self.assertEqual(metrics["section_kinds"], {"process": 2, "concept": 1})
+        self.assertEqual(metrics["system_map"], {"present": True, "components": 2})
+        self.assertEqual(metrics["positioned_sections"], 2)
+        self.assertEqual(metrics["mean_steps_per_section"], 2.0)
+        self.assertEqual(score_pack.organisation_metrics({"big_picture": {"system_map": ["x", "y"]}})["system_map"],
+                         {"present": True, "components": 2})
+
     def test_scores_template_pack_and_diffs_against_baseline(self):
         with tempfile.TemporaryDirectory() as temporary:
             pack = Path(temporary) / "pack"

@@ -46,6 +46,27 @@ def locator_hit(locator: str, text: str) -> bool:
     return bool(head) and head in text
 
 
+def organisation_metrics(plan: dict) -> dict:
+    """Schema 1.6 organisation counts; absent fields yield 0 / None, never raise."""
+    sections = [s for s in (plan.get("sections") or []) if isinstance(s, dict)] if isinstance(plan, dict) else []
+    big_picture = plan.get("big_picture") if isinstance(plan, dict) else None
+    system_map = big_picture.get("system_map") if isinstance(big_picture, dict) else None
+    if isinstance(system_map, dict):
+        components = system_map.get("components")
+        map_size = len(components) if isinstance(components, list) else 0
+    elif isinstance(system_map, list):
+        map_size = len(system_map)
+    else:
+        map_size = 0
+    step_counts = [len(s["steps"]) for s in sections if isinstance(s.get("steps"), list)]
+    return {
+        "section_kinds": dict(Counter(s.get("kind") for s in sections if isinstance(s.get("kind"), str))),
+        "system_map": {"present": system_map is not None, "components": map_size},
+        "positioned_sections": sum(1 for s in sections if s.get("position") is not None),
+        "mean_steps_per_section": round(statistics.mean(step_counts), 2) if step_counts else None,
+    }
+
+
 def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) -> dict:
     plan_path = pack / "lesson-plan.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
@@ -130,6 +151,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
         "locator_hit_rate": round(locator_found / locator_checked, 3) if locator_checked else None,
         "errors": errors[:20],
         "warnings": warnings[:20],
+        **organisation_metrics(plan),
     }
     if expect:
         low, high = expect.get("sections", [0, 10**6])

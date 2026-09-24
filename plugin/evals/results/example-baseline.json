@@ -37,6 +37,13 @@
     "locator_checked": 18,
     "locator_hit_rate": 0.944,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "section_kinds": {},
+    "system_map": {
+      "present": true,
+      "components": 7
+    },
+    "positioned_sections": 0,
+    "mean_steps_per_section": null
   }
 }
