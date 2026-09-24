@@ -27,9 +27,12 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
 ```bash
 python3 evals/score_all.py                      # 默认根目录：evals/ 与 examples/
 python3 evals/score_all.py skills/learn/assets --output-dir /tmp/scores
+python3 evals/score_all.py --baseline-dir /tmp/scores --output-dir /tmp/scores   # 与上次比较后覆盖
 ```
 
-状态三种：`ok`（无校验错误，期望满足）、`fail`（有校验错误或 `materials.json` 的期望未满足，目录名等于材料 id 时才核对期望）、`skipped`（不能打分，备注写原因：没有 `lesson-plan.json`、JSON 坏了等）。全部 `ok` 退出 0，有 `fail` 或 `skipped` 退出 1，根目录不存在或一个课程目录都没找到退出 2。`--output-dir` 每个目录写一份与 `score_pack.py --output` 同格式的结果，可作下次的 `--baseline`；`--sources-root`、`--store` 与 `score_pack.py` 同义。还没建成课程目录的材料列在表后。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；来源是冻结在 `examples/project-consensus/source/` 里的 v1 共识文本，所以定位可以被脚本核对。
+状态三种：`ok`（无校验错误，期望满足）、`fail`（有校验错误或 `materials.json` 的期望未满足，目录名等于材料 id 时才核对期望）、`skipped`（不能打分，备注写原因：没有 `lesson-plan.json`、JSON 坏了等）。全部 `ok` 退出 0，有 `fail` 或 `skipped` 退出 1，根目录不存在或一个课程目录都没找到退出 2。`--output-dir` 每个目录写一份与 `score_pack.py --output` 同格式的结果，可作下次的 `--baseline`；`--sources-root`、`--store` 与 `score_pack.py` 同义。
+
+`--baseline-dir` 在表后逐目录与上次 `--output-dir` 写出的同名文件比较，差异按 `score_pack.py --baseline` 的格式列出，末行汇总 `no change / changed / no baseline / bad` 各几个。没有同名文件记 `no baseline`，不算失败；文件读不了、不是 JSON 或根不是对象时在 stderr 打 `ERROR: bad baseline …`，退出 1；目录本身不存在退出 2。数值有差异不影响退出码。先读完比较用的文件再写结果，所以两个选项可以指向同一目录。还没建成课程目录的材料列在表后。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；来源是冻结在 `examples/project-consensus/source/` 里的 v1 共识文本，所以定位可以被脚本核对。
 
 ## 前置检查样例
 

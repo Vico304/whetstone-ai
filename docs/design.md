@@ -155,7 +155,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 | `lrg_record.py`、`learner_state_build.py`、`review_pool.py`、`review_outline.py`、`cards.py` | 追加学习记录；派生掌握状态；取匿名复习题；复习课原料；事实卡 |
 | `scan_wikilinks.py` | 找未解决的 `[[双链]]`（clarify）并按节归组，一个概念为孤立、两个以上为成簇；给工作区时只扫最近更新过进度的那门课，其他课只报 inbox 计数 |
 | `evals/score_pack.py` | 给一个课程目录打分：校验错误、概念数、support 分布、locator 命中率、角色与覆盖表指标、每节耗时与 `depth_reached` |
-| `evals/score_all.py` | 对 `evals/` 与 `examples/`（或给定目录）下全部课程目录跑 `score_pack.py`，一目录一行：状态、校验错误、节数、定位命中率；不能打分的写明原因后跳过 |
+| `evals/score_all.py` | 对 `evals/` 与 `examples/`（或给定目录）下全部课程目录跑 `score_pack.py`，一目录一行：状态、校验错误、节数、定位命中率；不能打分的写明原因后跳过；`--baseline-dir` 逐目录与上次 `--output-dir` 的结果比较 |
 
 **图的宽度由代码决定。** 一张图的宽度不是作者写下的东西，是布局算法对拓扑的副作用：横排的宽度随链路深度增长，竖排随最大扇出增长；边标签在横排里逐条累加进列间距；子图一旦有边跨出边框，Mermaid 就忽略它内部的方向声明，边框还白占一个层级。模型看不见这些，所以排版不交给模型：`diagram.py` 先写出内容，再由 `mermaid_fit.py` 比较两种方向取窄的那个，仍然超过图宽预算就依次折节点名、折边标签、剥掉与端点重复的标签、把有跨界边的子图画成盒子加虚线（包含关系不丢）。真实数据：16 门真实课程的 32 张图原先 44–757 列，18 张超过预算；改后 28–96 列，无一超出。手写的图用同一个脚本过一遍。
 
@@ -163,7 +163,7 @@ ASSESS ├ mastered → 简短巩固，下一节
 
 **五个宿主，一份技能目录。** Claude Code 插件、Claude Desktop（`.plugin` 包或 `~/.claude/skills`）、Codex、DeepSeek Harness、pi（根目录 `package.json` 的 `pi.skills`）。技能内路径按 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、pi 给出的 `<location>` 或技能目录本身解析；Claude Desktop 聊天模式下插件在云端、文件在本地，脚本复制到 `whetstone/scripts/` 本地执行。同一协议在不同模型上的遵循差异本身是数据：Claude 的 locator 命中率 0.145、DeepSeek 0.647（两次真实建课，2026-09-08），由此定下"标题原文或符号名开头"的定位约定。
 
-**测试与评测。** 135 个单元测试；CI 跑测试、校验模板与示例课程目录、知识库全链路冒烟。`plugin/evals/` 固定三份材料，`score_pack.py` 打分；提示词改动要能在同一组材料上看到指标变化。纯标准库 Python，无服务端。
+**测试与评测。** 138 个单元测试；CI 跑测试、校验模板与示例课程目录、知识库全链路冒烟。`plugin/evals/` 固定三份材料，`score_pack.py` 打分；提示词改动要能在同一组材料上看到指标变化。纯标准库 Python，无服务端。
 
 ## 9. 不做
 

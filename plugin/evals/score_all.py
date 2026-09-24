@@ -14,8 +14,17 @@ materials.json ids that have no scored course directory yet are named after the 
 
 Status: ok = scored, no validator errors, expectations met; fail = scored, with validator
 errors or an unmet expectation; skipped = could not be scored (reason in the note column).
-Exit status: 0 when every course directory found is ok; 1 when any is fail or skipped;
-2 when a root does not exist, materials.json cannot be read, or no course directory is found.
+
+--baseline-dir compares each scored directory with the file of the same name that an earlier
+--output-dir run wrote there, using score_pack.py's --baseline diff, and prints the differences
+after the table. A directory with no such file is listed as "no baseline", which is not a
+failure; a file that cannot be read or is not a JSON object is reported as an ERROR on stderr.
+Baselines are read before --output-dir writes, so both options may name the same directory.
+
+Exit status: 0 when every course directory found is ok (and, with --baseline-dir, no baseline
+file is bad); 1 when any is fail or skipped, or a baseline file is bad; 2 when a root or the
+--baseline-dir does not exist, materials.json cannot be read, or no course directory is found.
+Differences against a baseline do not change the exit status.
 """
 
 from __future__ import annotations
@@ -149,12 +158,54 @@ def output_name(root: Path, pack: Path) -> str:
     return "--".join(parts) + ".json"
 
 
+def compare_baseline(baseline_dir: Path, row: dict) -> dict:
+    """Diff one scored row against baseline_dir/<its output name> with score_pack.diff_against.
+    Returns {"state": "no baseline" | "bad" | "no change" | "changed", "lines", "error"}; never raises."""
+    path = baseline_dir / row["output"]
+    if not path.exists():
+        return {"state": "no baseline", "lines": [], "error": None}
+    try:
+        baseline = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return {"state": "bad", "lines": [], "error": f"{path}: invalid JSON: {error}"}
+    except (OSError, ValueError) as error:
+        return {"state": "bad", "lines": [], "error": f"{path}: unreadable: {error}"}
+    if not isinstance(baseline, dict):
+        return {"state": "bad", "lines": [], "error": f"{path}: not a JSON object"}
+    lines = score_pack.diff_against(baseline, row["result"])
+    return {"state": "changed" if lines else "no change", "lines": lines, "error": None}
+
+
+def baseline_report(baseline_dir: Path, rows: list[dict]) -> tuple[list[str], list[str]]:
+    """Lines for stdout and ERROR lines for stderr comparing every scored row with its baseline."""
+    out = [f"vs baseline {baseline_dir}:"]
+    errors = []
+    counts = {"no change": 0, "changed": 0, "no baseline": 0, "bad": 0}
+    for row in rows:
+        if row["result"] is None:  # skipped rows have nothing to compare
+            continue
+        compared = compare_baseline(baseline_dir, row)
+        counts[compared["state"]] += 1
+        if compared["state"] == "bad":
+            out.append(f"  {row['path']}: bad baseline {row['output']}")
+            errors.append(f"ERROR: bad baseline {compared['error']}")
+        elif compared["state"] == "changed":
+            out.append(f"  {row['path']}: {len(compared['lines'])} changed")
+            out.extend("  " + line for line in compared["lines"])
+        else:
+            out.append(f"  {row['path']}: {compared['state']}")
+    out.append(f"baseline: {counts['no change']} no change, {counts['changed']} changed, "
+               f"{counts['no baseline']} no baseline, {counts['bad']} bad")
+    return out, errors
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("roots", nargs="*", type=Path, help="Directories to search (default: plugin/evals and plugin/examples)")
     parser.add_argument("--sources-root", type=Path, help="Material root for every directory (enables the locator check); defaults to each sources.json base_path")
     parser.add_argument("--store", type=Path, help="Knowledge store; adds teach metrics from its LRG log")
     parser.add_argument("--output-dir", type=Path, help="Write one score_pack result JSON per scored directory here (usable as --baseline for score_pack.py)")
+    parser.add_argument("--baseline-dir", type=Path, help="Diff each scored directory against the same-named JSON an earlier --output-dir run wrote here; a missing file is 'no baseline', a bad one exits 1")
     args = parser.parse_args(argv)
 
     roots = args.roots or DEFAULT_ROOTS
@@ -162,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
         if not root.is_dir():
             print(f"ERROR: not a directory: {root}", file=sys.stderr)
             return 2
+    if args.baseline_dir is not None and not args.baseline_dir.is_dir():
+        print(f"ERROR: baseline directory is not a directory: {args.baseline_dir}", file=sys.stderr)
+        return 2
     try:
         expectations = load_expectations(EVALS_DIR / "materials.json")
     except (OSError, ValueError, AttributeError) as error:
@@ -193,12 +247,22 @@ def main(argv: list[str] | None = None) -> int:
         if unbuilt:
             print("materials.json entries with no scored course directory (build them into evals/results/<run>/<id>/): " + ", ".join(unbuilt))
 
+    bad_baselines = False
+    if args.baseline_dir is not None:  # read before --output-dir writes, which may be the same directory
+        report, errors = baseline_report(args.baseline_dir, rows)
+        for line in report:
+            print(line)
+        sys.stdout.flush()
+        for line in errors:
+            print(line, file=sys.stderr)
+        bad_baselines = bool(errors)
+
     if args.output_dir:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for row in rows:
             if row["result"] is not None:
                 (args.output_dir / row["output"]).write_text(json.dumps(row["result"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return 0 if counts["ok"] == len(rows) else 1
+    return 0 if counts["ok"] == len(rows) and not bad_baselines else 1
 
 
 if __name__ == "__main__":

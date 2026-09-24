@@ -178,3 +178,75 @@ class BatchScoringTests(unittest.TestCase):
             scored = json.loads((Path(temporary) / "examples--project-consensus.json").read_text(encoding="utf-8"))
         baseline = json.loads((PLUGIN_ROOT / "evals" / "results" / "example-baseline.json").read_text(encoding="utf-8"))
         self.assertEqual(score_pack.diff_against(baseline, scored), [])
+
+    def _run(self, cwd: Path, *args: str):
+        import subprocess, sys
+        return subprocess.run([sys.executable, str(PLUGIN_ROOT / "evals" / "score_all.py"), *args], capture_output=True, text=True, cwd=cwd)
+
+    def test_baseline_dir_diffs_each_directory_and_marks_the_ones_without_a_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            self._template_pack(work / "tree" / "changed")
+            self._template_pack(work / "tree" / "same")
+            self.assertEqual(self._run(work, "tree", "--output-dir", "base").returncode, 0)
+            edited = json.loads((work / "base" / "tree--changed.json").read_text(encoding="utf-8"))
+            edited["build"]["sections"] = 3
+            (work / "base" / "tree--changed.json").write_text(json.dumps(edited), encoding="utf-8")
+            self._template_pack(work / "tree" / "new")
+            # the same directory as --output-dir: baselines are read before this run overwrites them
+            done = self._run(work, "tree", "--baseline-dir", "base", "--output-dir", "base")
+            rewritten = json.loads((work / "base" / "tree--changed.json").read_text(encoding="utf-8"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stderr, "")
+        self.assertIn("\nvs baseline base:\n"
+                      "  tree/changed: 1 changed\n"
+                      "    build.sections: 3 → 1\n"
+                      "  tree/new: no baseline\n"
+                      "  tree/same: no change\n"
+                      "baseline: 1 no change, 1 changed, 1 no baseline, 0 bad\n", done.stdout)
+        self.assertEqual(rewritten["build"]["sections"], 1)
+        self.assertEqual(score_pack.diff_against(edited, rewritten), ["  build.sections: 3 → 1"])  # the same diff score_pack --baseline prints
+
+    def test_a_bad_baseline_file_is_an_error_with_exit_1_not_a_traceback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            for name in ("broken", "listed", "fine"):
+                self._template_pack(work / "tree" / name)
+            self.assertEqual(self._run(work, "tree", "--output-dir", "base").returncode, 0)
+            (work / "base" / "tree--broken.json").write_text("hello {", encoding="utf-8")
+            (work / "base" / "tree--listed.json").write_text("[]", encoding="utf-8")
+            done = self._run(work, "tree", "--baseline-dir", "base")
+            missing = self._run(work, "tree", "--baseline-dir", "nowhere")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertNotIn("Traceback", done.stdout + done.stderr)
+        self.assertIn("3 course directories: 3 ok, 0 fail, 0 skipped", done.stdout)
+        errors = done.stderr.splitlines()
+        self.assertEqual(len(errors), 2, done.stderr)
+        self.assertTrue(errors[0].startswith("ERROR: bad baseline base/tree--broken.json: invalid JSON: "), errors[0])
+        self.assertEqual(errors[1], "ERROR: bad baseline base/tree--listed.json: not a JSON object")
+        self.assertIn("  tree/broken: bad baseline tree--broken.json\n  tree/fine: no change\n", done.stdout)
+        self.assertIn("baseline: 1 no change, 0 changed, 0 no baseline, 2 bad", done.stdout)
+        self.assertEqual(missing.returncode, 2)
+        self.assertEqual(missing.stderr, "ERROR: baseline directory is not a directory: nowhere\n")
+
+    def test_without_baseline_dir_the_output_and_exit_status_are_unchanged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            self._template_pack(work / "clean" / "good")
+            self._tree(work / "mixed")
+            clean = self._run(work, "clean")
+            mixed = self._run(work, "mixed")
+            (work / "base").mkdir()
+            with_flag = self._run(work, "mixed", "--baseline-dir", "base")
+        # captured from score_all.py before --baseline-dir existed (f81eed9)
+        self.assertEqual((clean.returncode, clean.stderr), (0, ""))
+        self.assertEqual(clean.stdout,
+                         "status  course directory  schema  sections  relations  errors/warnings  locator hit  unsupported  note\n"
+                         "ok      clean/good        1.5     1         1          0/0              -            0.0\n"
+                         "1 course directories: 1 ok, 0 fail, 0 skipped\n")
+        self.assertEqual((mixed.returncode, mixed.stderr), (1, ""))
+        self.assertTrue(mixed.stdout.endswith("6 course directories: 1 ok, 2 fail, 3 skipped\n"), mixed.stdout)
+        self.assertNotIn("baseline", mixed.stdout)
+        self.assertEqual(with_flag.returncode, 1)
+        self.assertTrue(with_flag.stdout.startswith(mixed.stdout), with_flag.stdout)
+        self.assertIn("baseline: 0 no change, 0 changed, 3 no baseline, 0 bad", with_flag.stdout)
