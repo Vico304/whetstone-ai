@@ -100,5 +100,6 @@
 | `docs/design.md` | 想理解设计的人、维护者 | 设计用语 |
 | `docs/specs/*.md` | 维护者；内容可对照校验器核对 | 设计用语 |
 | `docs/evidence.md` | 想核对依据的人 | 设计用语 |
+| `docs/cli-contract.md` | 维护者、调用脚本的模型；内容可对照 `plugin/tests/test_cli.py` 核对 | 设计用语 |
 | `CHANGELOG.md` | 所有人 | 手册用语；字段以代码字体出现 |
 | `plugin/skills/**` | 模型 | 不在本规则范围内 |
