@@ -4,7 +4,7 @@
 
 ## 材料
 
-`materials.json` 列出三份来自本仓库的小材料（教材式文档、小代码库、评审式长文），各带学习目标与结构期望（小节数范围、每节概念上限、最少关系数）。用被测技能把每份材料 build 成学习包，放到 `results/<run-id>/<material-id>/`。
+`materials.json` 列出三份来自本仓库的小材料（教材式文档、小代码库、评审式长文），各带学习目标与结构期望（节数范围、每节概念上限、最少关系数）。用被测技能把每份材料 build 成课程目录，放到 `results/<run-id>/<material-id>/`。
 
 ## 打分
 
@@ -14,7 +14,7 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
   --sources-root .. --material-id doc-learning-layers \
   --output results/<run>/doc-learning-layers.json
 
-# 加上 teach 指标（需要用知识库模式教过这份包）
+# 加上 teach 指标（需要用知识库模式教过这个课程目录）
 python3 evals/score_pack.py results/<run>/doc-learning-layers \
   --sources-root .. --store <知识库目录> \
   --baseline results/<prev>/doc-learning-layers.json
