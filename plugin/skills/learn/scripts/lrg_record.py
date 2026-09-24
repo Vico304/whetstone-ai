@@ -202,6 +202,8 @@ def command_append(args: argparse.Namespace) -> int:
     attempt_number = None
     if args.progress:
         state = learning_state.read_json(args.progress)
+        if not isinstance(state, dict):
+            raise ValueError("progress state root must be an object")
         if rigor is None:
             rigor = state.get("mode", "full")
         if args.kind in CONCEPT_KINDS:

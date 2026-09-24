@@ -279,6 +279,8 @@ def command_bridge(args: argparse.Namespace) -> int:
 
 def command_show(args: argparse.Namespace) -> int:
     state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("prerequisite state root must be an object")
     if args.json:
         print(json.dumps(state, ensure_ascii=False, indent=2))
         return 0

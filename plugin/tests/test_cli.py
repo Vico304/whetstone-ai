@@ -2,8 +2,8 @@
 
 The rows pin today's behaviour of every script's ``main()``; they do not say it is right.
 Each row: script, arguments, exit code, stream that carries the message, first-line prefix. The other
-stream must stay empty. A JSON file whose root is an array is left out on purpose: four commands still
-print a traceback for it, and that fix is pending.
+stream must stay empty. ARRAY_ROOT feeds a JSON file whose root is an array to the commands that used to
+print a traceback for it.
 """
 
 from __future__ import annotations
@@ -84,6 +84,18 @@ WITH_STORE = [
     ("learner_state_build", ["show", "--store", "store"], 1, "stderr", ERROR),
 ]
 
+# Run next to the WITH_STORE store, with list.json and pack/lesson-plan.json whose roots are arrays.
+# score_pack lives under evals/, the others under the learn scripts.
+ARRAY_ROOT = [
+    ("validate_lesson", ["list.json"], 1, "stdout", ERROR),
+    ("learning_state", ["show", "--state", "list.json"], 1, "stdout", ERROR),
+    ("learning_state", ["mark", "--state", "list.json", "--type", "probe_completed"], 1, "stdout", ERROR),
+    ("prerequisite_state", ["show", "--state", "list.json"], 1, "stdout", ERROR),
+    ("lrg_record", ["append", "--store", "store", "--lesson-id", "{lesson}", "--section-id", "{section}",
+                    "--response-file", "resp.txt", "--verdict", "mastered", "--progress", "list.json"], 1, "stderr", ERROR),
+    ("score_pack", ["pack"], 1, "stderr", ERROR),
+]
+
 
 class CliBadInputTests(unittest.TestCase):
     def _run(self, cwd: Path, script: str, args: list[str]) -> subprocess.CompletedProcess:
@@ -132,6 +144,10 @@ class CliBadInputTests(unittest.TestCase):
                 done = self._run(root, script, args)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             self._check(root, WITH_STORE, fill)
+            (root / "list.json").write_text("[]", encoding="utf-8")
+            (root / "pack").mkdir()
+            (root / "pack" / "lesson-plan.json").write_text("[]", encoding="utf-8")
+            self._check(root, ARRAY_ROOT, fill)
             (root / "store" / "learner-state.json").write_text("{not json", encoding="utf-8")
             self._check(root, [
                 ("learner_state_build", ["show", "--store", "store"], 1, "stderr", ERROR),

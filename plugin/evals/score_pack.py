@@ -203,6 +203,8 @@ def main() -> int:
         expect = match.get("expect")
     try:
         plan = json.loads((args.pack / "lesson-plan.json").read_text(encoding="utf-8"))
+        if not isinstance(plan, dict):
+            raise ValueError(f"{args.pack / 'lesson-plan.json'} root must be an object")
         sources_root = args.sources_root
         if sources_root is None and (args.pack / "sources.json").is_file():
             sources_root = validate_lesson.sources_root_from_manifest(

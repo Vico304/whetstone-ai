@@ -234,6 +234,8 @@ def mark_event(state: dict, event_type: str, note: str | None = None) -> None:
 
 def command_mark(args: argparse.Namespace) -> int:
     state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("progress state root must be an object")
     mark_event(state, args.type, args.note)
     atomic_write(args.state, state)
     refresh_outline(args.state)
@@ -331,6 +333,8 @@ def command_defer(args: argparse.Namespace) -> int:
 
 def command_show(args: argparse.Namespace) -> int:
     state = read_json(args.state)
+    if not isinstance(state, dict):
+        raise ValueError("progress state root must be an object")
     if args.json:
         print(json.dumps(state, ensure_ascii=False, indent=2))
         return 0

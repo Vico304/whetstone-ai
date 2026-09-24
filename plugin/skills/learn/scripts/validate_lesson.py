@@ -1418,6 +1418,9 @@ def main() -> int:
     args = parse_args()
     try:
         plan = load_json(args.lesson_plan)
+        if not isinstance(plan, dict):  # same message as validate_plan; schema_version() below would raise first
+            print("ERROR: lesson plan root must be an object")
+            return 1
         manifest = load_json(args.manifest) if args.manifest else None
         paths = manifest_paths(manifest) if manifest is not None else None
         sources_root = args.sources_root
