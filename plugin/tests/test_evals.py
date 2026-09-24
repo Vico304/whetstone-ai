@@ -5,7 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _support import EXAMPLE_ROOT, PLUGIN_ROOT, TEMPLATE_PLAN, lrg_record, score_pack, store_init
+from _support import EXAMPLE_ROOT, PLUGIN_ROOT, TEMPLATE_PLAN, load_module, lrg_record, score_pack, store_init
+
+score_all = load_module("score_all", PLUGIN_ROOT / "evals")
 
 
 class EvalScoringTests(unittest.TestCase):
@@ -94,3 +96,85 @@ class EvalScoringTests(unittest.TestCase):
             self.assertIn("median checkpoint n/a,", done.stdout)
             self.assertNotIn("Nones", done.stdout)
 
+
+
+class BatchScoringTests(unittest.TestCase):
+    def _template_pack(self, pack: Path, sections=None) -> None:
+        pack.mkdir(parents=True)
+        plan = json.loads(TEMPLATE_PLAN.read_text(encoding="utf-8"))
+        if sections is not None:
+            plan["sections"] = sections
+        (pack / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+
+    def _tree(self, root: Path) -> None:
+        self._template_pack(root / "good")
+        broken = root / "broken"
+        broken.mkdir()
+        (broken / "lesson-plan.json").write_text("hello {", encoding="utf-8")
+        listed = root / "listed"
+        listed.mkdir()
+        (listed / "lesson-plan.json").write_text("[]", encoding="utf-8")
+        half = root / "results" / "run1" / "half-built"
+        half.mkdir(parents=True)
+        (half / "sources.json").write_text("{}", encoding="utf-8")
+        self._template_pack(root / "results" / "run1" / "doc-learning-layers")  # 1 section, material expects 3–6
+        self._template_pack(root / "no-sections", sections=[])
+        (root / "notes").mkdir()
+        (root / "notes" / "readme.md").write_text("not a course directory", encoding="utf-8")
+
+    def test_every_course_directory_gets_a_status_and_bad_ones_a_reason(self):
+        expectations = score_all.load_expectations(PLUGIN_ROOT / "evals" / "materials.json")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._tree(root)
+            packs = score_all.find_course_dirs(root)
+            self.assertEqual([p.relative_to(root).as_posix() for p in packs],
+                             ["broken", "good", "listed", "no-sections", "results/run1/doc-learning-layers", "results/run1/half-built"])
+            rows = {p.relative_to(root).as_posix(): score_all.score_one(p, None, expectations, None) for p in packs}
+        self.assertEqual(rows["good"]["status"], "ok")
+        self.assertEqual(rows["good"]["result"]["build"]["sections"], 1)
+        self.assertEqual(rows["broken"]["status"], "skipped")
+        self.assertTrue(rows["broken"]["note"].startswith("invalid JSON"), rows["broken"]["note"])
+        self.assertEqual((rows["listed"]["status"], rows["listed"]["note"]), ("skipped", "lesson-plan.json is not a JSON object"))
+        self.assertEqual((rows["results/run1/half-built"]["status"], rows["results/run1/half-built"]["note"]), ("skipped", "no lesson-plan.json"))
+        self.assertEqual(rows["no-sections"]["status"], "fail")
+        self.assertIn("validator errors, first:", rows["no-sections"]["note"])
+        material = rows["results/run1/doc-learning-layers"]
+        self.assertEqual(material["status"], "fail")
+        self.assertIn("expectation not met: sections_in_range", material["note"])
+
+    def test_cli_exit_status_tracks_the_worst_row_and_never_prints_a_traceback(self):
+        import subprocess, sys
+        script = PLUGIN_ROOT / "evals" / "score_all.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            clean, mixed, out = Path(temporary) / "clean", Path(temporary) / "mixed", Path(temporary) / "out"
+            self._template_pack(clean / "good")
+            self._tree(mixed)
+            done = subprocess.run([sys.executable, str(script), str(clean), "--output-dir", str(out)], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertIn("1 course directories: 1 ok, 0 fail, 0 skipped", done.stdout)
+            written = json.loads((out / "clean--good.json").read_text(encoding="utf-8"))
+            self.assertEqual(written["build"]["sections"], 1)
+            done = subprocess.run([sys.executable, str(script), str(mixed)], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+            self.assertIn("6 course directories: 1 ok, 2 fail, 3 skipped", done.stdout)
+            self.assertNotIn("Traceback", done.stdout + done.stderr)
+            done = subprocess.run([sys.executable, str(script), str(mixed / "notes")], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2)
+            self.assertTrue(done.stderr.startswith("ERROR: no course directory"), done.stderr)
+            done = subprocess.run([sys.executable, str(script), str(Path(temporary) / "missing")], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2)
+            self.assertTrue(done.stderr.startswith("ERROR: not a directory"), done.stderr)
+
+    def test_default_run_scores_the_example_and_names_the_unbuilt_materials(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as temporary:
+            done = subprocess.run([sys.executable, str(PLUGIN_ROOT / "evals" / "score_all.py"), "--output-dir", temporary],
+                                  capture_output=True, text=True, cwd=PLUGIN_ROOT)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertRegex(done.stdout, r"\nok +examples/project-consensus +1\.0 +8 ")
+            self.assertNotIn("prerequisites", done.stdout)
+            self.assertIn("no scored course directory (build them into evals/results/<run>/<id>/): doc-learning-layers", done.stdout)
+            scored = json.loads((Path(temporary) / "examples--project-consensus.json").read_text(encoding="utf-8"))
+        baseline = json.loads((PLUGIN_ROOT / "evals" / "results" / "example-baseline.json").read_text(encoding="utf-8"))
+        self.assertEqual(score_pack.diff_against(baseline, scored), [])
