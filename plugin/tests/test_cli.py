@@ -1,6 +1,6 @@
 """Bad input at the command line: no traceback, an ``ERROR:`` line on the usual stream, the current exit code.
 
-The rows pin today's behaviour of scripts whose ``main()`` no other test runs; they do not say it is right.
+The rows pin today's behaviour of every script's ``main()``; they do not say it is right.
 Each row: script, arguments, exit code, stream that carries the message, first-line prefix. The other
 stream must stay empty. A JSON file whose root is an array is left out on purpose: four commands still
 print a traceback for it, and that fix is pending.
@@ -16,9 +16,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _support import SCRIPT_ROOT, TEMPLATE_PLAN
+from _support import CLARIFY_SCRIPT_ROOT, PLUGIN_ROOT, SCRIPT_ROOT, TEMPLATE_PLAN
 
 ERROR = "ERROR: "
+
+# Scripts that do not live in the learn skill's scripts directory.
+OTHER_ROOTS = {"scan_wikilinks": CLARIFY_SCRIPT_ROOT, "score_pack": PLUGIN_ROOT / "evals", "score_all": PLUGIN_ROOT / "evals"}
 
 # Run in a scratch directory holding: bad.json (not JSON), resp.txt, badstore/store.json (not JSON),
 # badcourse/ (outline.md, lesson-plan.json and learning-progress.json, the two JSON files broken).
@@ -50,6 +53,21 @@ WITHOUT_STORE = [
     ("mermaid_fit", ["missing.md"], 1, "stderr", ERROR),
     ("mermaid_fit", ["badcourse"], 1, "stderr", ERROR),
     ("lrg_record", ["append", "--store", "nostore", "--lesson-id", "x", "--section-id", "s", "--response-file", "resp.txt", "--verdict", "mastered"], 1, "stderr", ERROR),
+    ("scan_wikilinks", ["missing.md"], 2, "stdout", ERROR),
+    ("score_pack", ["nocourse"], 1, "stderr", ERROR),
+    ("score_pack", ["badcourse"], 1, "stderr", ERROR),
+    ("score_all", ["nocourse"], 2, "stderr", ERROR),
+    ("prerequisite_state", ["show", "--state", "missing.json"], 1, "stdout", ERROR),
+    ("prerequisite_state", ["show", "--state", "bad.json"], 1, "stdout", ERROR),
+    ("validate_prerequisites", ["missing.json"], 2, "stdout", ERROR),
+    ("validate_prerequisites", ["bad.json"], 2, "stdout", ERROR),
+    ("survey_materials", ["nocourse"], 2, "stderr", ERROR),
+    ("store_sync", ["push", "--store", "nostore"], 1, "stderr", ERROR),
+    ("store_sync", ["push", "--store", "badstore"], 1, "stderr", ERROR),
+    ("source_manifest", ["--rebase", "missing.json"], 1, "stderr", ERROR),
+    ("source_manifest", ["--rebase", "bad.json"], 1, "stderr", ERROR),
+    ("next_step", ["--progress", "missing.json"], 1, "stderr", ERROR),
+    ("next_step", ["--progress", "bad.json"], 1, "stderr", ERROR),
 ]
 
 # Run against a store built from the lesson-plan template (store_init init + register, mrg_export), so the
@@ -70,7 +88,7 @@ WITH_STORE = [
 class CliBadInputTests(unittest.TestCase):
     def _run(self, cwd: Path, script: str, args: list[str]) -> subprocess.CompletedProcess:
         env = dict(os.environ, WHETSTONE_HOME=str(cwd / "home"))
-        return subprocess.run([sys.executable, str(SCRIPT_ROOT / f"{script}.py"), *args],
+        return subprocess.run([sys.executable, str(OTHER_ROOTS.get(script, SCRIPT_ROOT) / f"{script}.py"), *args],
                               cwd=cwd, env=env, capture_output=True, text=True)
 
     def _check(self, cwd: Path, rows, fill=None):
