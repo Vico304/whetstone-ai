@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0",
+  "lesson_id": "weave-consensus-core",
+  "scope_statement": "仅评估读懂这份项目共识主线所需的两个前置概念簇，不推断学习者的一般能力。",
+  "created_at": "2026-09-24T02:38:05.091575Z",
+  "updated_at": "2026-09-24T02:38:05.253517Z",
+  "status": "ready_for_main_course",
+  "phase": "ready",
+  "current_prerequisite_id": null,
+  "competencies": [
+    {
+      "id": "p01",
+      "name": "有向图：节点、边与方向",
+      "status": "ready",
+      "assessment_attempts": [
+        {
+          "attempt_number": 1,
+          "at": "2026-09-24T02:38:05.145617Z",
+          "response": "学生、老师、课程三个节点：老师 → 讲授 → 课程，学生 → 选修 → 课程。把“老师讲授课程”反过来成“课程讲授老师”就不成立了，方向决定了谁作用于谁。",
+          "feedback": "方向对了，也看出反向后不成立。",
+          "verdict": "ready",
+          "confidence": 4
+        }
+      ],
+      "supplement_sources": [],
+      "bridge_attempts": []
+    },
+    {
+      "id": "p02",
+      "name": "检索练习：从记忆中提取为何比重读更有效",
+      "status": "ready",
+      "assessment_attempts": [
+        {
+          "attempt_number": 1,
+          "at": "2026-09-24T02:38:05.199909Z",
+          "response": "读四遍那组吧，读得多记得牢。",
+          "feedback": "预测与延迟保持的研究结果相反，原因只归于重复次数；这个簇对本材料尚未就绪。",
+          "verdict": "gap",
+          "confidence": 4
+        }
+      ],
+      "supplement_sources": [],
+      "bridge_attempts": [
+        {
+          "attempt_number": 1,
+          "at": "2026-09-24T02:38:05.253480Z",
+          "response": "写下记得内容的那组一周后记得多。回忆本身让记忆更容易再次被提取，读四遍当场感觉熟，但这种熟悉感一周后留不住。所以共识要隔一段时间再重建才算。",
+          "feedback": "区分了即时表现与延迟保持，机制指向提取本身。",
+          "verdict": "ready",
+          "confidence": 3
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-09-24T02:38:05.091575Z",
+      "type": "prerequisite_assessment_initialized"
+    },
+    {
+      "at": "2026-09-24T02:38:05.145617Z",
+      "type": "prerequisite_assessment_recorded",
+      "prerequisite_id": "p01",
+      "verdict": "ready"
+    },
+    {
+      "at": "2026-09-24T02:38:05.199909Z",
+      "type": "prerequisite_assessment_recorded",
+      "prerequisite_id": "p02",
+      "verdict": "gap"
+    },
+    {
+      "at": "2026-09-24T02:38:05.253480Z",
+      "type": "prerequisite_bridge_recorded",
+      "prerequisite_id": "p02",
+      "verdict": "ready"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "lesson_id": "weave-consensus-core",
+  "assessment_mode": "auto",
+  "scope_statement": "仅评估读懂这份项目共识主线所需的两个前置概念簇，不推断学习者的一般能力。",
+  "prerequisites": [
+    {
+      "id": "p01",
+      "name": "有向图：节点、边与方向",
+      "why_needed": "共识把证据、机器参考和学习者理解都表示成带类型的有向关系；不会读边的方向，就分不清 A 依赖 B 与 B 依赖 A。",
+      "required_for": [
+        "s03 机器参考图的结构",
+        "s05 两张图的逐边比较"
+      ],
+      "source_refs": [
+        {
+          "path": "plugin/examples/project-consensus/source/consensus.md",
+          "locator": "### 6.4 关系必须受控",
+          "support": "entailed",
+          "note": "受控关系类型都有方向，理解这一节需要先会读有向边。"
+        }
+      ],
+      "diagnostic": {
+        "prompt": "请举一个你熟悉的例子，画出或描述三个事物之间的两条有方向的关系，并说明把其中一条反过来意思会怎样变。",
+        "criteria": [
+          "区分了节点与关系",
+          "说明了至少一条边的方向及其含义",
+          "指出反向后含义改变或不成立"
+        ],
+        "follow_up_prompt": "如果两个事物之间同时存在两条方向相反的关系，它们还能表示同一件事吗？",
+        "bridge_prompt": "在共识的 4.4 节里，学习者重建图的一条边与机器参考图的一条边方向相反，这说明了什么？"
+      },
+      "dependency_kind": "tool"
+    },
+    {
+      "id": "p02",
+      "name": "检索练习：从记忆中提取为何比重读更有效",
+      "why_needed": "共识把主动重建定为核心学习行为；不知道提取本身会强化记忆，就会把重建当成测验而不是学习。",
+      "required_for": [
+        "s01 从看过到可调用",
+        "s06 提示渐隐与延迟重建"
+      ],
+      "source_refs": [
+        {
+          "path": "plugin/examples/project-consensus/source/consensus.md",
+          "locator": "### 3.2 学习者的主动重建是核心学习行为",
+          "support": "pedagogical_inference",
+          "note": "原文给出结论，未解释机制；把检索练习列为前置是教学推断。"
+        }
+      ],
+      "diagnostic": {
+        "prompt": "两组人学同一篇短文，一组读四遍，一组读一遍后合上书写下记得的内容再读一遍。一周后哪组记得多？请说明你认为的原因。",
+        "criteria": [
+          "预测提取组在延迟测验中更好",
+          "原因指向提取过程本身，而不只是多花了时间",
+          "区分即时表现与延迟保持"
+        ],
+        "follow_up_prompt": "如果当场就测，结果会一样吗？为什么？",
+        "bridge_prompt": "共识为什么要求延迟重建之后才算掌握，而不是当场答对就算？"
+      },
+      "dependency_kind": "mech"
+    }
+  ],
+  "research_policy": {
+    "trigger": [
+      "fragile",
+      "gap",
+      "misconception"
+    ],
+    "source_priority": [
+      "official_or_primary",
+      "standards_or_textbooks",
+      "reputable_secondary"
+    ],
+    "separate_external_claims": true
+  },
+  "uncertainties": [
+    "样例的前置关系是教学推断，用来让评测覆盖前置脚本，不代表对这份材料的最终前置判断。"
+  ]
+}

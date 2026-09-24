@@ -22,6 +22,18 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
 
 `--baseline` 逐项打印数值差异。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；来源是冻结在 `examples/project-consensus/source/` 里的 v1 共识文本，所以定位可以被脚本核对。
 
+## 前置检查样例
+
+`prerequisites/` 放着 `examples/project-consensus` 的一份前置计划与一份前置作答记录，让前置检查的两个脚本也在同一份材料上可复核：
+
+```bash
+python3 skills/learn/scripts/validate_prerequisites.py evals/prerequisites/prerequisite-plan.json \
+  --manifest examples/project-consensus/sources.json
+python3 skills/learn/scripts/prerequisite_state.py show --state evals/prerequisites/prerequisite-progress.json
+```
+
+作答记录由 `prerequisite_state.py` 按计划逐条写出（一簇 `ready`；一簇 `gap` 后回程复测 `ready`），测试会按事件顺序重放并比对。
+
 ## 指标含义
 
 | 指标 | 关注什么 |

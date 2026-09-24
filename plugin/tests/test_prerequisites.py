@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from _support import (
+    EXAMPLE_ROOT,
     PLUGIN_ROOT,
     _StoreHelpers,
     index_match,
@@ -19,6 +20,8 @@ from _support import (
     validate_lesson,
     validate_prerequisites,
 )
+
+PREREQUISITE_EXAMPLE = PLUGIN_ROOT / "evals" / "prerequisites"
 
 
 class PrerequisiteValidationTests(unittest.TestCase):
@@ -113,6 +116,71 @@ class PrerequisiteStateTests(unittest.TestCase):
         self.assertEqual(state["status"], "ready_for_main_course")
         self.assertEqual(state["phase"], "ready")
         self.assertIsNone(state["current_prerequisite_id"])
+
+
+class PrerequisiteExampleTests(unittest.TestCase):
+    """evals/prerequisites holds a prerequisite plan and progress file for the example pack, so evals reach both prerequisite scripts."""
+
+    SCRIPT_ROOT = PLUGIN_ROOT / "skills" / "learn" / "scripts"
+    TIMESTAMPS = {"at", "created_at", "updated_at", "accessed_at"}
+
+    def _run(self, script, *args):
+        import subprocess, sys
+        return subprocess.run([sys.executable, str(self.SCRIPT_ROOT / script), *map(str, args)], capture_output=True, text=True)
+
+    def _without_timestamps(self, value):
+        if isinstance(value, dict):
+            return {key: self._without_timestamps(item) for key, item in value.items() if key not in self.TIMESTAMPS}
+        if isinstance(value, list):
+            return [self._without_timestamps(item) for item in value]
+        return value
+
+    def test_example_plan_validates_against_the_example_manifest(self):
+        plan_path = PREREQUISITE_EXAMPLE / "prerequisite-plan.json"
+        done = self._run("validate_prerequisites.py", plan_path, "--manifest", EXAMPLE_ROOT / "sources.json")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertTrue(done.stdout.startswith("OK: "), done.stdout)
+
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        lesson = json.loads((EXAMPLE_ROOT / "lesson-plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(plan["lesson_id"], lesson["lesson_id"])
+        headings = set((EXAMPLE_ROOT / "source" / "consensus.md").read_text(encoding="utf-8").splitlines())
+        for prerequisite in plan["prerequisites"]:
+            for ref in prerequisite["source_refs"]:
+                self.assertIn(ref["locator"], headings, f"{prerequisite['id']} locator is not a heading in the source")
+
+    def test_example_progress_is_what_the_cli_writes_for_the_example_plan(self):
+        example = json.loads((PREREQUISITE_EXAMPLE / "prerequisite-progress.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / "prerequisite-progress.json"
+            done = self._run("prerequisite_state.py", "init", "--prerequisite-plan", PREREQUISITE_EXAMPLE / "prerequisite-plan.json", "--output", state)
+            self.assertEqual(done.returncode, 0, done.stdout)
+
+            # Replay the attempts in the order the example's event log recorded them.
+            commands = {"prerequisite_assessment_recorded": ("record", "assessment_attempts"),
+                        "prerequisite_bridge_recorded": ("bridge", "bridge_attempts")}
+            competencies = {item["id"]: item for item in example["competencies"]}
+            used: dict[tuple[str, str], int] = {}
+            for number, event in enumerate(example["events"][1:]):
+                command, field = commands[event["type"]]
+                prerequisite_id = event["prerequisite_id"]
+                index = used.get((prerequisite_id, field), 0)
+                used[(prerequisite_id, field)] = index + 1
+                attempt = competencies[prerequisite_id][field][index]
+                response, feedback = root / f"r{number}.txt", root / f"f{number}.txt"
+                response.write_text(attempt["response"], encoding="utf-8")
+                feedback.write_text(attempt["feedback"], encoding="utf-8")
+                done = self._run("prerequisite_state.py", command, "--state", state, "--prerequisite-id", prerequisite_id,
+                                 "--response-file", response, "--feedback-file", feedback,
+                                 "--verdict", attempt["verdict"], "--confidence", attempt["confidence"])
+                self.assertEqual(done.returncode, 0, done.stdout)
+
+            written = json.loads(state.read_text(encoding="utf-8"))
+            self.assertEqual(self._without_timestamps(written), self._without_timestamps(example))
+            shown = self._run("prerequisite_state.py", "show", "--state", PREREQUISITE_EXAMPLE / "prerequisite-progress.json")
+            self.assertEqual(shown.returncode, 0, shown.stdout)
+            self.assertIn("status: ready_for_main_course", shown.stdout)
 
 
 class PrerequisiteCourseTests(_StoreHelpers, unittest.TestCase):
