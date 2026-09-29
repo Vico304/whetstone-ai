@@ -1,8 +1,8 @@
 # 命令行坏输入契约
 
-26 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
+27 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
 
-脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py`、`difficulty_digest.py`、`gap_ledger.py` 在 `plugin/evals/`。
+脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py`、`difficulty_digest.py`、`gap_ledger.py`、`deepseek_build.py` 在 `plugin/evals/`。
 
 ## 1. 共同约定
 
@@ -43,8 +43,9 @@
 | `score_all` | `stderr` | 2：不是目录 | 2：见第 4 节；1：有课程目录的状态是 `fail` 或 `skipped`，或基线文件读坏 |
 | `difficulty_digest` | `stderr` | 2 | 1：`--against` 列出了减少 |
 | `gap_ledger` | `stderr` | 2 | 1：`--check` 不通过，每条一行 `FAIL: ` |
+| `deepseek_build` | `stderr` | 2：用例文件、材料或档案读坏 | 1：没有停在大纲处（token 上限、请求数上限、学习者回合用完、模型调用失败，含环境变量里没有密钥）；0：停在大纲处，或 `--dry-run` 完成 |
 
-`stdout` 一组 7 个，`stderr` 一组 19 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
+`stdout` 一组 7 个，`stderr` 一组 20 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
 
 ## 3. `test_cli.py` 逐行
 
@@ -52,7 +53,7 @@
 
 临时目录里有：`bad.json`（不是 JSON）、`resp.txt`、`badstore/store.json`（不是 JSON）、`badcourse/`（`outline.md` 加两个读坏的 JSON）。`missing.*`、`nostore/`、`nocourse/` 不存在。
 
-`WITHOUT_STORE`，41 行：
+`WITHOUT_STORE`，43 行：
 
 | 脚本 | 参数 | 退出码 | 流 |
 |---|---|---|---|
@@ -90,6 +91,8 @@
 | `difficulty_digest` | `bad.json` | 2 | `stderr` |
 | `gap_ledger` | `missing.json missing.json` | 2 | `stderr` |
 | `gap_ledger` | `bad.json bad.json` | 2 | `stderr` |
+| `deepseek_build` | `--case missing.json --out-dir out --dry-run` | 2 | `stderr` |
+| `deepseek_build` | `--case bad.json --out-dir out --dry-run` | 2 | `stderr` |
 | `prerequisite_state` | `show --state missing.json` | 1 | `stdout` |
 | `prerequisite_state` | `show --state bad.json` | 1 | `stdout` |
 | `validate_prerequisites` | `missing.json` | 2 | `stdout` |
@@ -147,7 +150,7 @@
   2. 校验与导出脚本读不到或读不懂输入：`validate_lesson`、`validate_prerequisites`、`mrg_export`。用来与它们的"校验不通过 = 1"区分。
   3. 给的路径不是目录，或目录下找不到要处理的东西：`scan_wikilinks` 不是目录或没有课程；`survey_materials` 不是目录；`score_all` 任一根不是目录、`--baseline-dir` 不是目录、`materials.json` 读坏、找不到任何课程目录。
   4. `source_manifest` 生成了清单，但清单的 `problems` 非空，例如源路径不存在。清单照常写出，`stdout` 或 `--output`，没有 `ERROR:` 行。
-  5. `score_pack` 的 `--material-id` 在 `plugin/evals/materials.json` 里找不到。
+  5. `score_pack` 的 `--material-id` 在 `plugin/evals/materials.json` 里找不到；`deepseek_build` 的用例文件、材料或档案读坏。
 
 ## 5. 已知例外
 

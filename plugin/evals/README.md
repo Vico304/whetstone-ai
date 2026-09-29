@@ -45,6 +45,20 @@ python3 evals/difficulty_digest.py <课程目录>/lesson-plan.json --against bef
 
 `--against` 逐条列出变少的项（`REDUCED`：节或检查被删、判定标准变少、某一层变少、`core` 概念被移走、题面或某条判定标准的文字变了）与新增的项（`ADDED`，允许）；有变少退出 1，没有退出 0，文件读不了退出 2。`score_pack.py` 的结果里有对应的四项，`--baseline` 能直接比较：`criteria_layers_per_section`、`checkpoint_digest`（每节一个数，题面或判定标准文字一变就变）、`bridge_items_per_section`、`bridge_share`（后两项计 `role: bridge` 概念与带 `bridge_for` 的节，现行 schema 没有这两个字段，所以都是 0；没有 `units/` 时 `bridge_share` 是 `null`）。
 
+## 用托管模型建课
+
+`deepseek_build.py` 扮演宿主，让一个经 HTTP 调用的模型运行 `learn` 技能，建到大纲呈现处停下，不进入教学：
+
+```bash
+python3 evals/deepseek_build.py --case <用例>.json --out-dir <仓库外目录> --dry-run   # 只估算用量，不发请求
+python3 evals/deepseek_build.py --case <用例>.json --out-dir <仓库外目录> --max-total-tokens 630000
+python3 evals/deepseek_build.py --material-id doc-learning-layers --out-dir <仓库外目录>
+```
+
+用例文件给 `id`、`materials_root`、`materials[]`（相对路径）、`request`（第一句话），可选 `profile`（复制成工作区的 `learner-profile.md`）、`auto_reply`（模型问学习者时的固定回答，默认"你定，按默认值继续。"）、`max_auto_replies`（默认 3）。脚本把技能与材料复制进 `<out-dir>/<id>/sandbox/`，模型只有四个工具：列目录、读文件、写文件（技能与材料只读）、运行技能的 `scripts/*.py` 与 `date`，路径不能出沙盒，子进程不继承环境变量。停止条件：沙盒里有能解析的 `lesson-plan.json`、同目录有 `outline.md`，且模型把回合交还学习者（退出 0）；下一次请求可能超过 `--max-total-tokens`（输入加输出）、请求数到 `--max-requests`、固定回答用完或模型调用失败（退出 1）。`ledger.json` 逐次记输入、输出、缓存命中、缓存未命中 token 与按 `--price` 折算的金额，`transcript.jsonl`、`messages.json` 是原始对话。
+
+密钥只从环境变量 `DEEPSEEK_API_KEY` 读，不打印、不写盘。模型调用在 `ModelClient.complete` 之后：`DeepSeekClient` 连 `api.deepseek.com`，`--replies` 用 `ScriptedClient` 回放写好的回复；换成别的服务只需另写一个实现。
+
 ## 前置检查样例
 
 `prerequisites/` 放着 `examples/project-consensus` 的一份前置计划与一份前置作答记录，让前置检查的两个脚本也在同一份材料上可复核：
