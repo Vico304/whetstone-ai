@@ -44,6 +44,54 @@
       "components": 7
     },
     "positioned_sections": 0,
-    "mean_steps_per_section": null
+    "mean_steps_per_section": null,
+    "criteria_layers_per_section": {
+      "s01": {
+        "unset": 3
+      },
+      "s02": {
+        "unset": 3
+      },
+      "s03": {
+        "unset": 3
+      },
+      "s04": {
+        "unset": 3
+      },
+      "s05": {
+        "unset": 3
+      },
+      "s06": {
+        "unset": 3
+      },
+      "s07": {
+        "unset": 3
+      },
+      "s08": {
+        "unset": 3
+      }
+    },
+    "checkpoint_digest": {
+      "s01": 21149127,
+      "s02": 1513420289,
+      "s03": 2832823392,
+      "s04": 3933591952,
+      "s05": 2116344236,
+      "s06": 1195603966,
+      "s07": 183638974,
+      "s08": 1480524721,
+      "final_challenge": 397245204
+    },
+    "bridge_items_per_section": {
+      "s01": 0,
+      "s02": 0,
+      "s03": 0,
+      "s04": 0,
+      "s05": 0,
+      "s06": 0,
+      "s07": 0,
+      "s08": 0
+    },
+    "bridge_share": null
   }
 }

@@ -34,6 +34,17 @@ python3 evals/score_all.py --baseline-dir /tmp/scores --output-dir /tmp/scores  
 
 `--baseline-dir` 在表后逐目录与上次 `--output-dir` 写出的同名文件比较，差异按 `score_pack.py --baseline` 的格式列出，末行汇总 `no change / changed / no baseline / bad` 各几个。没有同名文件记 `no baseline`，不算失败；文件读不了、不是 JSON 或根不是对象时在 stderr 打 `ERROR: bad baseline …`，退出 1；目录本身不存在退出 2。数值有差异不影响退出码。先读完比较用的文件再写结果，所以两个选项可以指向同一目录。还没建成课程目录的材料列在表后。`results/example-baseline.json` 是对 `examples/project-consensus` 的一次打分，作为输出格式样例；来源是冻结在 `examples/project-consensus/source/` 里的 v1 共识文本，所以定位可以被脚本核对。
 
+## 重建难度
+
+给课程补前置内容（或重新生成大纲）之后，每节主问题要求学习者重建的内容不能变少。`difficulty_digest.py` 记下每节主问题的判定标准条数、各层条数、`core` 概念、题面与每条判定标准的摘要，骨架课的 `probe`、`supporting` 概念的 `check` 与 `final_challenge` 同样处理：
+
+```bash
+python3 evals/difficulty_digest.py <课程目录>/lesson-plan.json --output before.json
+python3 evals/difficulty_digest.py <课程目录>/lesson-plan.json --against before.json
+```
+
+`--against` 逐条列出变少的项（`REDUCED`：节或检查被删、判定标准变少、某一层变少、`core` 概念被移走、题面或某条判定标准的文字变了）与新增的项（`ADDED`，允许）；有变少退出 1，没有退出 0，文件读不了退出 2。`score_pack.py` 的结果里有对应的四项，`--baseline` 能直接比较：`criteria_layers_per_section`、`checkpoint_digest`（每节一个数，题面或判定标准文字一变就变）、`bridge_items_per_section`、`bridge_share`（后两项计 `role: bridge` 概念与带 `bridge_for` 的节，现行 schema 没有这两个字段，所以都是 0；没有 `units/` 时 `bridge_share` 是 `null`）。
+
 ## 前置检查样例
 
 `prerequisites/` 放着 `examples/project-consensus` 的一份前置计划与一份前置作答记录，让前置检查的两个脚本也在同一份材料上可复核：

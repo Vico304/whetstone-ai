@@ -8,6 +8,7 @@ from pathlib import Path
 from _support import EXAMPLE_ROOT, PLUGIN_ROOT, TEMPLATE_PLAN, load_module, lrg_record, score_pack, store_init
 
 score_all = load_module("score_all", PLUGIN_ROOT / "evals")
+difficulty_digest = load_module("difficulty_digest", PLUGIN_ROOT / "evals")
 
 
 class EvalScoringTests(unittest.TestCase):
@@ -120,6 +121,101 @@ class EvalScoringTests(unittest.TestCase):
             self.assertIn("median checkpoint n/a,", done.stdout)
             self.assertNotIn("Nones", done.stdout)
 
+
+
+class DifficultyDigestTests(unittest.TestCase):
+    """What each section asks the learner to rebuild: added prerequisite material may add to it, never lower it."""
+
+    def plan(self) -> dict:
+        return json.loads(TEMPLATE_PLAN.read_text(encoding="utf-8"))
+
+    def test_digest_counts_criteria_layers_core_ids_and_checks(self):
+        digest = difficulty_digest.digest(self.plan())
+        s01 = digest["sections"]["s01"]
+        self.assertEqual(s01["n_criteria"], 3)
+        self.assertEqual(s01["layers"], {"mechanism": 2, "rationale": 1})
+        self.assertEqual(s01["core_ids"], ["learning-design.macro-map", "learning-design.system-boundary"])
+        self.assertEqual(len(s01["criteria_sha"]), 3)
+        self.assertIn("learning-design.problem-chain", s01["checks"])
+        self.assertEqual(digest["final"]["n_criteria"], 2)
+        self.assertEqual(digest["final"]["layers"], {"unset": 2})
+        self.assertEqual(difficulty_digest.compare(digest, difficulty_digest.digest(self.plan())), ([], []))
+
+    def test_every_kind_of_reduction_is_listed_and_additions_are_allowed(self):
+        before = difficulty_digest.digest(self.plan())
+        cases = {
+            "criteria 3 → 2": lambda p: p["sections"][0]["checkpoint"]["criteria"].pop(),
+            "rationale criteria 1 → 0": lambda p: p["sections"][0]["checkpoint"]["criteria"][2].update(layer="fact"),
+            "prompt changed": lambda p: p["sections"][0]["checkpoint"].update(prompt="更容易的问题"),
+            "criterion text changed or removed (#2)": lambda p: p["sections"][0]["checkpoint"]["criteria"][1].update(text="改写"),
+            "core concepts removed: learning-design.macro-map": lambda p: p["sections"][0]["concepts"][1].update(role="supporting"),
+            "check[learning-design.problem-chain]: removed": lambda p: p["sections"][0]["concepts"][2].pop("check"),
+            "final_challenge: criteria 2 → 1": lambda p: p["final_challenge"]["criteria"].pop(),
+            "s01: removed": lambda p: p["sections"].pop(0),
+        }
+        for expected, change in cases.items():
+            with self.subTest(expected):
+                plan = self.plan()
+                change(plan)
+                reductions, _ = difficulty_digest.compare(before, difficulty_digest.digest(plan))
+                self.assertTrue(any(expected in line for line in reductions), reductions)
+        plan = self.plan()
+        plan["sections"][0]["checkpoint"]["criteria"].append({"id": "c4", "text": "验收：用新例子复述", "layer": "mechanism"})
+        plan["sections"][0]["concepts"].append({"id": "x.bridge", "name": "补", "role": "bridge", "explanation": "两三句"})
+        reductions, additions = difficulty_digest.compare(before, difficulty_digest.digest(plan))
+        self.assertEqual(reductions, [])
+        self.assertEqual(additions, ["s01: criteria 3 → 4"])
+
+    def test_cli_exit_status_is_1_on_a_reduction_and_0_otherwise(self):
+        import subprocess, sys
+        script = PLUGIN_ROOT / "evals" / "difficulty_digest.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = root / "digest.json"
+            done = subprocess.run([sys.executable, str(script), str(TEMPLATE_PLAN), "--output", str(baseline)], capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""))
+            done = subprocess.run([sys.executable, str(script), str(TEMPLATE_PLAN), "--against", str(baseline)], capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stdout), (0, "0 reductions, 0 additions\n"))
+            plan = self.plan()
+            plan["sections"][0]["checkpoint"]["criteria"].pop()
+            (root / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            done = subprocess.run([sys.executable, str(script), str(root / "lesson-plan.json"), "--against", str(baseline)], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 1)
+            self.assertIn("REDUCED s01: criteria 3 → 2", done.stdout)
+            done = subprocess.run([sys.executable, str(script), str(TEMPLATE_PLAN), "--against", str(TEMPLATE_PLAN)], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2)
+            self.assertTrue(done.stderr.startswith("ERROR: "))
+            self.assertNotIn("Traceback", done.stderr)
+
+    def test_score_pack_difficulty_fields_and_baseline_diff(self):
+        plan = self.plan()
+        metrics = score_pack.difficulty_metrics(plan, Path("/nonexistent"), 0)
+        self.assertEqual(metrics["criteria_layers_per_section"]["s01"], {"mechanism": 2, "rationale": 1})
+        self.assertEqual(set(metrics["checkpoint_digest"]), {s["id"] for s in plan["sections"]} | {"final_challenge"})
+        self.assertTrue(all(isinstance(v, int) for v in metrics["checkpoint_digest"].values()))
+        self.assertEqual(set(metrics["bridge_items_per_section"].values()), {0})
+        self.assertIsNone(metrics["bridge_share"])
+        plan["sections"][0]["checkpoint"]["criteria"][2]["layer"] = "fact"
+        changed = score_pack.difficulty_metrics(plan, Path("/nonexistent"), 0)
+        lines = score_pack.diff_against({"build": metrics}, {"build": changed})
+        self.assertEqual([line.split(":")[0].strip() for line in lines],
+                         ["build.criteria_layers_per_section.s01.fact", "build.criteria_layers_per_section.s01.rationale"])
+        plan["sections"][0]["checkpoint"]["prompt"] = "更容易的问题"
+        lines = score_pack.diff_against({"build": metrics}, {"build": score_pack.difficulty_metrics(plan, Path("/nonexistent"), 0)})
+        self.assertIn("build.checkpoint_digest.s01", [line.split(":")[0].strip() for line in lines])
+
+    def test_bridge_share_counts_bridge_explanations_and_bridge_sections_against_unit_text(self):
+        plan = {"sections": [
+            {"id": "s01", "concepts": [{"id": "a", "role": "bridge", "explanation": "x" * 20}, {"id": "b", "role": "core"}]},
+            {"id": "s02", "bridge_for": "s03", "concepts": []},
+            {"id": "s03", "concepts": []},
+        ]}
+        with tempfile.TemporaryDirectory() as temporary:
+            units = Path(temporary)
+            (units / "s02.md").write_text("y" * 30, encoding="utf-8")
+            metrics = score_pack.difficulty_metrics(plan, units, 200)
+        self.assertEqual(metrics["bridge_items_per_section"], {"s01": 1, "s02": 0, "s03": 0})
+        self.assertEqual(metrics["bridge_share"], 0.25)
 
 
 class BatchScoringTests(unittest.TestCase):

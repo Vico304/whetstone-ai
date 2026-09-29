@@ -6,7 +6,10 @@ Build metrics (from lesson-plan.json / teaching-guide.md):
   validator errors & warnings, section count in range, max concepts per section,
   support distribution and unsupported ratio, relations count, layer distribution,
   criteria per section, guide length, locator hit rate (does each source_ref.locator
-  actually occur in the referenced file?)
+  actually occur in the referenced file?), and for checking that added prerequisite material
+  does not lower what a section asks the learner to rebuild: criteria layers per section, one
+  checkpoint digest number per section (changes whenever the prompt or a criterion text does),
+  bridge concepts per section and the bridge share of unit text (see difficulty_digest.py)
 Teach metrics (from <store>/lrg/<lesson>.jsonl when --store is given):
   attempts, median elapsed seconds per checkpoint, depth distribution, conflict rate,
   share of high-confidence conflicts, evidence tier mix
@@ -27,8 +30,8 @@ EVALS_DIR = Path(__file__).resolve().parent
 SCRIPTS = EVALS_DIR.parent / "skills" / "learn" / "scripts"
 
 
-def _load(name: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+def _load(name: str, root: Path = SCRIPTS):
+    spec = importlib.util.spec_from_file_location(name, root / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -36,6 +39,7 @@ def _load(name: str):
 
 
 validate_lesson = _load("validate_lesson")
+difficulty_digest = _load("difficulty_digest", EVALS_DIR)
 
 
 def locator_hit(locator: str, text: str) -> bool:
@@ -64,6 +68,40 @@ def organisation_metrics(plan: dict) -> dict:
         "system_map": {"present": system_map is not None, "components": map_size},
         "positioned_sections": sum(1 for s in sections if s.get("position") is not None),
         "mean_steps_per_section": round(statistics.mean(step_counts), 2) if step_counts else None,
+    }
+
+
+def difficulty_metrics(plan: dict, units_dir: Path, unit_chars: int) -> dict:
+    """Per-section fields keyed by section id, so diff_against compares them one by one.
+
+    checkpoint_digest is a number, not a hex string, because diff_against only compares numbers.
+    bridge_share = (explanation length of role "bridge" concepts + unit length of sections with
+    bridge_for) / all unit length; None without units. Both are 0 until a plan uses them."""
+    sections = [s for s in (plan.get("sections") or []) if isinstance(s, dict)]
+    keys = [s["id"] if isinstance(s.get("id"), str) else f"#{i}" for i, s in enumerate(sections)]
+
+    def number(block) -> int:
+        digest = difficulty_digest.block_digest(block)
+        return int(difficulty_digest.text_digest(json.dumps([digest["prompt_sha"], digest["criteria_sha"]]))[:8], 16)
+
+    layers, digests, bridges = {}, {}, {}
+    bridge_chars = 0
+    for key, section in zip(keys, sections):
+        layers[key] = difficulty_digest.block_digest(section.get("checkpoint"))["layers"]
+        digests[key] = number(section.get("checkpoint"))
+        concepts = [c for c in (section.get("concepts") or []) if isinstance(c, dict) and c.get("role") == "bridge"]
+        bridges[key] = len(concepts)
+        bridge_chars += sum(len(c["explanation"]) for c in concepts if isinstance(c.get("explanation"), str))
+        if section.get("bridge_for") and (units_dir / f"{key}.md").is_file():
+            bridge_chars += len((units_dir / f"{key}.md").read_text(encoding="utf-8"))
+    final = plan.get("final_challenge")
+    if isinstance(final, dict):
+        digests["final_challenge"] = number(final)
+    return {
+        "criteria_layers_per_section": layers,
+        "checkpoint_digest": digests,
+        "bridge_items_per_section": bridges,
+        "bridge_share": round(bridge_chars / unit_chars, 3) if unit_chars else None,
     }
 
 
@@ -152,6 +190,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
         "errors": errors[:20],
         "warnings": warnings[:20],
         **organisation_metrics(plan),
+        **difficulty_metrics(plan, units_dir, unit_chars),
     }
     if expect:
         low, high = expect.get("sections", [0, 10**6])
