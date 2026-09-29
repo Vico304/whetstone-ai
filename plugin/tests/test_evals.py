@@ -370,3 +370,141 @@ class BatchScoringTests(unittest.TestCase):
         self.assertEqual(with_flag.returncode, 1)
         self.assertTrue(with_flag.stdout.startswith(mixed.stdout), with_flag.stdout)
         self.assertIn("baseline: 0 no change, 0 changed, 3 no baseline, 0 bad", with_flag.stdout)
+
+
+gap_ledger = load_module("gap_ledger", PLUGIN_ROOT / "evals")
+
+
+class GapLedgerTests(unittest.TestCase):
+    """One case per disposition rule R1–R6 of the gap ledger, plus the 9-section limit and the CLI."""
+
+    PROFILE = "\n".join([
+        "## 一、相关背景", "",
+        "| 领域 | 自述水平 | 说过的具体概念 | 证据 |",
+        "| --- | --- | --- | --- |",
+        "| stats | 未接触 | | 自述 |",
+        "| code | 听过 | | 自述 |",
+        "| finance | 熟练 | 做空 | 自述 |",
+        "| finance.basics | 未接触 | | 自述 |",
+    ])
+
+    def lesson(self, n=4):
+        return {"lesson_id": "demo", "sections": [{"id": f"s{i:02d}"} for i in range(1, n + 1)]}
+
+    def item(self, pid, concept_id, kind="mech", required_by=("s02",), **extra):
+        return {"id": pid, "concept_id": concept_id, "dependency_kind": kind, "required_by": list(required_by), **extra}
+
+    def ledger(self, items, mode="auto", n=4, **inputs):
+        plan = {"schema_version": "1.1", "lesson_id": "demo", "assessment_mode": mode, "prerequisites": items}
+        return gap_ledger.build_ledger(plan, self.lesson(n), inputs.pop("background", self.PROFILE), **inputs)
+
+    def by_id(self, ledger):
+        return {i["id"]: (i["disposition"], i["placed_at"], i["rule"]) for i in ledger["items"]}
+
+    def test_r1_known_needs_tier_3_to_drop_the_reminder(self):
+        progress = {"competencies": [{"id": "p01", "status": "ready",
+                                      "assessment_attempts": [{"at": "2026-09-01T00:00:00Z", "verdict": "ready", "confidence": 5}]}]}
+        ledger = self.ledger([self.item("p01", "stats.mean"), self.item("p02", "finance.short-selling", name="做空")],
+                             progress=progress)
+        self.assertEqual(self.by_id(ledger), {"p01": ("none", None, "R1"), "p02": ("T0", "s02", "R1")})
+        self.assertEqual(ledger["items"][0]["evidence"]["tier"], 4)
+        self.assertEqual(ledger["items"][1]["evidence"], {"source": "profile:自述", "tier": 1, "confidence": 3})
+
+    def test_r2_scope_defers_to_an_earlier_course_or_raises_to_t3(self):
+        plan = {"courses": [{"id": "intro", "core": ["stats.sqrt-time"]}, {"id": "demo"},
+                            {"id": "later", "needs": ["stats.std"]}]}
+        ledger = self.ledger([
+            self.item("p01", "stats.sqrt-time", "tool"),
+            self.item("p02", "stats.std"),
+            self.item("p03", "stats.random", "tool", depends_on=["stats.python"]),
+            self.item("p04", "code.loop", required_by=["s03"]),
+        ], learning_plan=plan)
+        self.assertEqual(self.by_id(ledger), {
+            "p01": ("defer_to_course", "intro", "R2"),
+            "p02": ("T3", "prerequisite-course:p02", "R2"),
+            "p03": ("T3", "prerequisite-course:p03", "R2"),
+            "p04": ("T1", "s03", "R4"),
+        })
+
+    def test_r2_leaves_partial_items_to_r4_even_when_an_earlier_course_teaches_them(self):
+        plan = {"courses": [{"id": "intro", "core": ["code.loop"]}, {"id": "demo"}]}
+        ledger = self.ledger([self.item("p01", "code.loop")], learning_plan=plan)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T1", "s02", "R4")})
+
+    def test_r3_a_missing_definition_is_one_sentence_in_the_first_section_that_needs_it(self):
+        ledger = self.ledger([self.item("p01", "finance.basics.strategy", "def", required_by=["s03", "s01"])])
+        self.assertEqual(self.by_id(ledger), {"p01": ("T0", "s01", "R3")})
+
+    def test_r4_partial_mechanism_is_a_t1_item_until_the_section_has_three(self):
+        items = [self.item(f"p0{i}", f"code.c{i}") for i in range(1, 5)]
+        items.append(self.item("p05", "code.c5", required_by=["s01", "s02", "s03"]))
+        ledger = self.ledger(items)
+        self.assertEqual([d for d, _, _ in self.by_id(ledger).values()], ["T1", "T1", "T1", "T2", "T2"])
+        self.assertEqual(ledger["summary"]["t1_per_section"], {"s02": 3})
+        self.assertEqual(gap_ledger.check(ledger), [])
+
+    def test_r4_mastered_but_stale_learner_state_reads_as_partial(self):
+        state = {"concepts": {"stats.mean": {"attempts": 2, "last_verdict": "mastered", "freshness": "stale",
+                                              "evidence_tier": "delayed", "last_evidence_at": "2026-08-01T00:00:00Z"}}}
+        ledger = self.ledger([self.item("p01", "stats.mean")], learner_state=state)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T1", "s02", "R4")})
+        self.assertEqual(ledger["items"][0]["evidence"]["tier"], 3)
+
+    def test_r5_gap_mechanism_is_a_bridge_section_unless_its_cluster_is_too_big(self):
+        small = [self.item("p01", "stats.a", cluster="one")]
+        big = [self.item(f"q0{i}", f"stats.b{i}", cluster="two") for i in range(1, 5)]
+        ledger = self.ledger(small + big)
+        self.assertEqual(self.by_id(ledger)["p01"], ("T2", "s02", "R5"))
+        self.assertEqual({d for d, _, _ in list(self.by_id(ledger).values())[1:]}, {"T3"})
+        self.assertEqual(ledger["summary"]["bridge_sections"], 1)
+
+    def test_r6_unknown_follows_the_assessment_mode(self):
+        item = self.item("p01", "physics.force")
+        expected = {"always": ("T2", "s02", "R6+R5"), "auto": ("T1", "s02", "R6+R4"), "skip": ("T0", "s02", "R6+R1")}
+        for mode, disposition in expected.items():
+            with self.subTest(mode=mode):
+                ledger = self.ledger([item], mode=mode)
+                self.assertEqual(self.by_id(ledger)["p01"], disposition)
+                self.assertEqual(ledger["items"][0]["state"], {"always": "gap", "auto": "partial", "skip": "known"}[mode])
+
+    def test_bridge_sections_past_nine_are_raised_to_a_prerequisite_course(self):
+        items = [self.item("p01", "stats.a", cluster="one"), self.item("p02", "stats.b", cluster="two"),
+                 self.item("p03", "stats.c", cluster="two")]
+        ledger = self.ledger(items, n=8)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T2", "s02", "R5"),
+                                              "p02": ("T3", "prerequisite-course:two", "R5+9"),
+                                              "p03": ("T3", "prerequisite-course:two", "R5+9")})
+        self.assertEqual(ledger["summary"]["sections"] + ledger["summary"]["bridge_sections"], 9)
+        self.assertEqual(gap_ledger.check(ledger), [])
+
+    def test_coverage_is_one_and_check_reports_unknown_sections(self):
+        ledger = self.ledger([self.item("p01", "stats.a", required_by=["s99"])])
+        self.assertEqual(ledger["summary"]["coverage"], 1.0)
+        self.assertEqual(gap_ledger.check(ledger), ["required_by names s99, which is not a section of the lesson plan"])
+
+    def test_cli_exit_codes(self):
+        import subprocess, sys
+        script = PLUGIN_ROOT / "evals" / "gap_ledger.py"
+        prerequisites = PLUGIN_ROOT / "evals" / "prerequisites"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lesson = root / "lesson-plan.json"
+            lesson.write_text(json.dumps({"sections": [{"id": "s03"}, {"id": "s05"}]}), encoding="utf-8")
+            args = [sys.executable, str(script), str(prerequisites / "prerequisite-plan.json"), str(lesson),
+                    "--progress", str(prerequisites / "prerequisite-progress.json"), "--check"]
+            done = subprocess.run(args, capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stderr), (0, ""))
+            ledger = json.loads(done.stdout)
+            self.assertEqual([(i["required_by"], i["disposition"], i["evidence"]["tier"]) for i in ledger["items"]],
+                             [(["s03", "s05"], "none", 4), ([], "none", 4)])
+            plan = root / "plan.json"
+            plan.write_text(json.dumps({"lesson_id": "demo", "prerequisites": [self.item("p01", "stats.a", required_by=["s99"])]}),
+                            encoding="utf-8")
+            done = subprocess.run([sys.executable, str(script), str(plan), str(lesson), "--check", "--output", str(root / "out.json")],
+                                  capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stdout, done.stderr),
+                             (1, "", "FAIL: required_by names s99, which is not a section of the lesson plan\n"))
+            self.assertTrue((root / "out.json").is_file())
+            done = subprocess.run([sys.executable, str(script), str(lesson), str(root / "missing.json")], capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stdout), (2, ""))
+            self.assertTrue(done.stderr.startswith("ERROR: "))

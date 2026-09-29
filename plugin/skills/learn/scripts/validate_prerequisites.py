@@ -39,14 +39,28 @@ def require_text_list(
 
 
 DEPENDENCY_KINDS = {"def", "mech", "tool"}
+SCHEMA_VERSIONS = {"1.0", "1.1"}
+DEPTHS = {"fact", "mechanism", "tool"}
+
+
+def validate_ledger_fields(prerequisite: dict, location: str, errors: list[str]) -> None:
+    """Schema 1.1 fields for the gap ledger: all optional, checked only when present; a 1.0 plan is read as before."""
+    for key in ("concept_id", "cluster"):
+        if key in prerequisite and not nonempty(prerequisite[key]):
+            errors.append(f"{location}.{key} must be a non-empty string")
+    for key in ("required_by", "depends_on"):
+        if key in prerequisite:
+            require_text_list(prerequisite, key, location, errors)
+    if "depth_required" in prerequisite and prerequisite["depth_required"] not in DEPTHS:
+        errors.append(f"{location}.depth_required must be one of {sorted(DEPTHS)}")
 
 
 def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(plan, dict):
         return ["prerequisite plan root must be an object"]
-    if plan.get("schema_version") != "1.0":
-        errors.append("schema_version must equal '1.0'")
+    if plan.get("schema_version") not in SCHEMA_VERSIONS:
+        errors.append(f"schema_version must be one of {sorted(SCHEMA_VERSIONS)}")
     for key in ("lesson_id", "scope_statement"):
         require_text(plan, key, "root", errors)
     if plan.get("assessment_mode") not in ASSESSMENT_MODES:
@@ -71,6 +85,8 @@ def validate_plan(plan: Any, manifest_paths: set[str] | None = None) -> list[str
                 errors.append(f"{location}.id duplicates '{prerequisite_id}'")
             seen.add(prerequisite_id)
         require_text_list(prerequisite, "required_for", location, errors)
+        if plan.get("schema_version") == "1.1":
+            validate_ledger_fields(prerequisite, location, errors)
 
         refs = prerequisite.get("source_refs")
         if not isinstance(refs, list) or not refs:

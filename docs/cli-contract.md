@@ -1,8 +1,8 @@
 # 命令行坏输入契约
 
-24 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
+26 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
 
-脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py` 在 `plugin/evals/`。
+脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py`、`difficulty_digest.py`、`gap_ledger.py` 在 `plugin/evals/`。
 
 ## 1. 共同约定
 
@@ -41,8 +41,10 @@
 | `survey_materials` | `stderr` | 2：不是目录 | `--max-files` 小于 1 时走 `argparse`，退出 2 |
 | `score_pack` | `stderr` | 1 | 2：`--material-id` 在 `materials.json` 里没有 |
 | `score_all` | `stderr` | 2：不是目录 | 2：见第 4 节；1：有课程目录的状态是 `fail` 或 `skipped`，或基线文件读坏 |
+| `difficulty_digest` | `stderr` | 2 | 1：`--against` 列出了减少 |
+| `gap_ledger` | `stderr` | 2 | 1：`--check` 不通过，每条一行 `FAIL: ` |
 
-`stdout` 一组 7 个，`stderr` 一组 17 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
+`stdout` 一组 7 个，`stderr` 一组 19 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
 
 ## 3. `test_cli.py` 逐行
 
@@ -84,6 +86,10 @@
 | `score_pack` | `nocourse` | 1 | `stderr` |
 | `score_pack` | `badcourse` | 1 | `stderr` |
 | `score_all` | `nocourse` | 2 | `stderr` |
+| `difficulty_digest` | `missing.json` | 2 | `stderr` |
+| `difficulty_digest` | `bad.json` | 2 | `stderr` |
+| `gap_ledger` | `missing.json missing.json` | 2 | `stderr` |
+| `gap_ledger` | `bad.json bad.json` | 2 | `stderr` |
 | `prerequisite_state` | `show --state missing.json` | 1 | `stdout` |
 | `prerequisite_state` | `show --state bad.json` | 1 | `stdout` |
 | `validate_prerequisites` | `missing.json` | 2 | `stdout` |

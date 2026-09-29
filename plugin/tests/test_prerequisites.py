@@ -33,6 +33,24 @@ class PrerequisiteValidationTests(unittest.TestCase):
         self.assertEqual(validate_prerequisites.validate_plan(plan), [])
         self.assertEqual(validate_prerequisites.validate_guide(guide), [])
 
+    def test_schema_1_1_accepts_the_gap_ledger_fields_and_checks_them(self):
+        plan = json.loads((PREREQUISITE_EXAMPLE / "prerequisite-plan.json").read_text(encoding="utf-8"))
+        plan["prerequisites"][0].update(concept_id="math.directed-graph", cluster="graphs",
+                                        required_by=["s03", "s05"], depth_required="tool", depends_on=["p02"])
+        self.assertEqual(validate_prerequisites.validate_plan(plan), [])  # 1.0 still ignores fields it does not know
+        plan["schema_version"] = "1.1"
+        self.assertEqual(validate_prerequisites.validate_plan(plan), [])
+        plan["prerequisites"][0].update(depth_required="principle", required_by="s03", cluster="")
+        self.assertEqual(validate_prerequisites.validate_plan(plan), [
+            "prerequisites[0].cluster must be a non-empty string",
+            "prerequisites[0].required_by must be a list of non-empty strings",
+            "prerequisites[0].depth_required must be one of ['fact', 'mechanism', 'tool']",
+        ])
+        plan["schema_version"] = "1.0"
+        self.assertEqual(validate_prerequisites.validate_plan(plan), [])
+        plan["schema_version"] = "1.2"
+        self.assertEqual(validate_prerequisites.validate_plan(plan), ["schema_version must be one of ['1.0', '1.1']"])
+
     def test_duplicate_prerequisite_id_is_rejected(self):
         plan_path = (
             PLUGIN_ROOT
