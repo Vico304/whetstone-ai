@@ -102,6 +102,15 @@ class DeepSeekBuildTests(unittest.TestCase):
         (course / "outline.md").rename(course / "notes.md")
         self.assertFalse(sandbox.outline_ready())
 
+    def test_host_notes_warn_against_the_two_waste_patterns_of_the_calibration_run(self):
+        # 2026-09 calibration run: the model read validate_lesson.py (~15k tokens kept in context) and lost one
+        # reply to an 8192-token cut while writing lesson-plan.json in one go.
+        prompt = deepseek_build.system_prompt(deepseek_build.Sandbox(self.tmp / "box"))
+        self.assertIn("--help", prompt)
+        self.assertIn("不必读 scripts/ 下的源码", prompt)
+        self.assertIn("一开始就分块写", prompt)
+        self.assertIn("append=true", prompt)
+
     def test_learner_turns_get_the_fixed_reply_then_the_run_stops(self):
         replies = [{"message": {"role": "assistant", "content": "你想学什么？"}, "usage": usage(10, 5, 0)}] * 2
         code, _, _ = self.run_main(replies)

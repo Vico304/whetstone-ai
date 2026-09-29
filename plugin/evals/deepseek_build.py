@@ -349,7 +349,10 @@ def system_prompt(sandbox: Sandbox) -> str:
         f"- 宿主打开的目录（工作区，当前目录）：{sandbox.workspace}\n"
         "- 工具：list_dir、read_file、write_file、run_command（只能运行 `python3 <技能目录>/scripts/<名>.py …` 与 `date …`）。"
         "路径一律用绝对路径。\n"
-        "- 你的一次回复最多约 8000 token：长文件分几次 write_file，第二次起 append=true。\n"
+        "- 技能脚本按协议文件里的写法运行，用法不清时运行 `python3 <脚本> --help`；不必读 scripts/ 下的源码，"
+        "校验规则以协议文件与校验输出为准。\n"
+        "- 你的一次回复最多约 8000 token：lesson-plan.json 这类大文件一开始就分块写，"
+        "每次 write_file 不超过约 12000 字符，第二次起 append=true；不要先试一次写完整个文件。\n"
         "- 不带工具调用的回复就是对学习者说的话，学习者会回答你。\n\n"
         "以下是技能被调用时载入的 SKILL.md 全文：\n\n" + skill_md)
 
