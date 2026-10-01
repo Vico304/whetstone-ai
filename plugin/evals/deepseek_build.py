@@ -41,6 +41,13 @@ KEY_ENV = "DEEPSEEK_API_KEY"
 # the V4 models listed by /models in 2026-09 may cost otherwise; pass --price with the current list price.
 DEFAULT_PRICE = (0.2, 2.0, 3.0)
 DEFAULT_REPLY = "你定，按默认值继续。"
+# Output cap per reply, thinking included. 8192 was cut twice in 2026-09-30 by thinking alone; the API took 16384.
+DEFAULT_MAX_OUTPUT = 16384
+CUT_WITH_OUTPUT = "（宿主提示）上一条回复超出输出上限被截断；请把长文件分几次 write_file，第二次起 append=true。"
+# A cut reply with neither text nor a tool call is dropped from the context (only the transcript keeps it): its
+# thinking would ride along in every later request, and it wrote nothing to build on.
+CUT_THINKING_ONLY = ("（宿主提示）上一条回复的思考占满了输出上限，一个字都没写出来，已丢弃。不要在思考里起草整份文件："
+                     "先把节骨架（id、标题、问题、方案）写进文件，再逐节补细节。")
 READ_LIMIT = 60000
 TOOL_OUTPUT_LIMIT = 20000
 
@@ -177,13 +184,16 @@ class Ledger:
         total["all"] = total["input"] + total["output"]
         return total
 
-    def book(self, usage: dict, finish_reason: str, tool_calls: int, seconds: float) -> dict:
+    def book(self, usage: dict, finish_reason: str, tool_calls: int, seconds: float, reasoning_chars: int = 0,
+             in_context: bool = True) -> dict:
         prompt = int(usage.get("prompt_tokens") or 0)
         hit = int(usage.get("prompt_cache_hit_tokens") or 0)
         miss = int(usage.get("prompt_cache_miss_tokens") if usage.get("prompt_cache_miss_tokens") is not None else prompt - hit)
+        details = usage.get("completion_tokens_details") or {}
         row = {"n": len(self.rows) + 1, "input": prompt, "output": int(usage.get("completion_tokens") or 0),
                "cache_hit": hit, "cache_miss": miss, "finish_reason": finish_reason, "tool_calls": tool_calls,
-               "seconds": round(seconds, 1)}
+               "reasoning_chars": reasoning_chars, "reasoning_tokens": details.get("reasoning_tokens"),
+               "in_context": in_context, "seconds": round(seconds, 1)}
         self.rows.append(row)
         return row
 
@@ -340,7 +350,7 @@ def run_command(sandbox: Sandbox, argv: list) -> str:
 
 # ---------------------------------------------------------------- prompts
 
-def system_prompt(sandbox: Sandbox) -> str:
+def system_prompt(sandbox: Sandbox, max_output_tokens: int = DEFAULT_MAX_OUTPUT) -> str:
     skill_md = (SKILL_SOURCE / "SKILL.md").read_text(encoding="utf-8")
     return (
         "你是运行 whetstone `learn` 技能的宿主模型（宿主类型同 DeepSeek Harness：技能目录即安装目录）。\n"
@@ -351,7 +361,7 @@ def system_prompt(sandbox: Sandbox) -> str:
         "路径一律用绝对路径。\n"
         "- 技能脚本按协议文件里的写法运行，用法不清时运行 `python3 <脚本> --help`；不必读 scripts/ 下的源码，"
         "校验规则以协议文件与校验输出为准。\n"
-        "- 你的一次回复最多约 8000 token：lesson-plan.json 这类大文件一开始就分块写，"
+        f"- 你的一次回复（思考加正文）最多约 {max_output_tokens // 1000 * 1000} token：lesson-plan.json 这类大文件一开始就分块写，"
         "每次 write_file 不超过约 12000 字符，第二次起 append=true；不要先试一次写完整个文件。\n"
         "- 不带工具调用的回复就是对学习者说的话，学习者会回答你。\n\n"
         "以下是技能被调用时载入的 SKILL.md 全文：\n\n" + skill_md)
@@ -360,7 +370,7 @@ def system_prompt(sandbox: Sandbox) -> str:
 def dry_run_estimate(case: dict, max_output_tokens: int, price=DEFAULT_PRICE) -> dict:
     """Usage estimate for one build to the outline pause, without any request (see evals/README.md)."""
     sandbox = Sandbox(Path("/sandbox"))
-    prefix = estimate_tokens(system_prompt(sandbox)) + estimate_tokens(json.dumps(TOOLS)) + estimate_tokens(case["request"])
+    prefix = estimate_tokens(system_prompt(sandbox, max_output_tokens)) + estimate_tokens(json.dumps(TOOLS)) + estimate_tokens(case["request"])
     root = Path(case["materials_root"])
     material_text = "".join((root / rel).read_text(encoding="utf-8", errors="replace") for rel in case["materials"])
     material_bytes = sum((root / rel).stat().st_size for rel in case["materials"])
@@ -402,7 +412,8 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
     ledger = Ledger(cap)
     reply_text = case.get("auto_reply") or DEFAULT_REPLY
     max_replies = int(case.get("max_auto_replies", 3))
-    messages = [{"role": "system", "content": system_prompt(sandbox)}, {"role": "user", "content": case["request"]}]
+    messages = [{"role": "system", "content": system_prompt(sandbox, max_output_tokens)},
+                {"role": "user", "content": case["request"]}]
     started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     stop, error, replies, booked_messages = "max_requests", None, 0, 0
     transcript = (run_dir / "transcript.jsonl").open("w", encoding="utf-8")
@@ -422,12 +433,24 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
                 stop, error = "model_error", str(exc)
                 break
             message = {"role": "assistant", "content": reply.message.get("content") or ""}
-            if reply.message.get("reasoning_content"):  # thinking models want it back inside a tool loop
-                message["reasoning_content"] = reply.message["reasoning_content"]
+            reasoning = reply.message.get("reasoning_content") or ""
+            if reasoning:  # thinking models want it back inside a tool loop
+                message["reasoning_content"] = reasoning
             calls = reply.message.get("tool_calls") or []
             if calls:
                 message["tool_calls"] = calls
-            row = ledger.book(reply.usage, reply.finish_reason, len(calls), time.monotonic() - began)
+            thinking_only = reply.finish_reason == "length" and not calls and not message["content"].strip()
+            row = ledger.book(reply.usage, reply.finish_reason, len(calls), time.monotonic() - began,
+                              reasoning_chars=len(reasoning), in_context=not thinking_only)
+            if thinking_only:
+                transcript.write(json.dumps({"row": row, "message": message, "tool_results": []}, ensure_ascii=False) + "\n")
+                transcript.flush()
+                if messages[-1]["role"] == "user":  # keep roles alternating: fold the note into the last user turn
+                    messages[-1] = {**messages[-1], "content": messages[-1]["content"] + "\n\n" + CUT_THINKING_ONLY}
+                else:
+                    messages.append({"role": "user", "content": CUT_THINKING_ONLY})
+                booked_messages = len(messages) - 1  # over-counts the dropped reply once, which only errs early
+                continue
             messages.append(message)
             booked_messages = len(messages)  # everything up to here is inside the last input + output
             results = []
@@ -440,7 +463,7 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
             if calls:
                 continue
             if reply.finish_reason == "length":
-                messages.append({"role": "user", "content": "（宿主提示）上一条回复超出输出上限被截断；请把长文件分几次 write_file，第二次起 append=true。"})
+                messages.append({"role": "user", "content": CUT_WITH_OUTPUT})
                 continue
             if sandbox.outline_ready():
                 stop = "outline"
@@ -476,7 +499,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="estimate usage only; no request, no key needed")
     parser.add_argument("--max-total-tokens", type=int, default=700_000, help="stop before a request would pass this input+output total")
     parser.add_argument("--max-requests", type=int, default=40)
-    parser.add_argument("--max-output-tokens", type=int, default=8192)
+    parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT,
+                        help="per-reply output cap, thinking included (default %(default)s)")
     parser.add_argument("--model", default="deepseek-flash", help="model id as listed by the API's /models")
     parser.add_argument("--price", help="CNY per million tokens as HIT,MISS,OUTPUT (default %s)" % ",".join(map(str, DEFAULT_PRICE)))
     parser.add_argument("--replies", help="replay scripted replies from this JSON file instead of calling a model")

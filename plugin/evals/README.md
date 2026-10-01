@@ -22,6 +22,7 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
 
 `--baseline` 逐项打印数值差异。
 
+
 一条命令给 `evals/` 与 `examples/` 下全部课程目录（含 `lesson-plan.json` 的目录）打分，一目录一行：
 
 ```bash
@@ -58,6 +59,8 @@ python3 evals/deepseek_build.py --material-id doc-learning-layers --out-dir <仓
 用例文件给 `id`、`materials_root`、`materials[]`（相对路径）、`request`（第一句话），可选 `profile`（复制成工作区的 `learner-profile.md`）、`auto_reply`（模型问学习者时的固定回答，默认"你定，按默认值继续。"）、`max_auto_replies`（默认 3）。脚本把技能与材料复制进 `<out-dir>/<id>/sandbox/`，模型只有四个工具：列目录、读文件、写文件（技能与材料只读）、运行技能的 `scripts/*.py` 与 `date`，路径不能出沙盒，子进程不继承环境变量。停止条件：沙盒里有能解析的 `lesson-plan.json`、同目录有 `outline.md`，且模型把回合交还学习者（退出 0）；下一次请求可能超过 `--max-total-tokens`（输入加输出）、请求数到 `--max-requests`、固定回答用完或模型调用失败（退出 1）。`ledger.json` 逐次记输入、输出、缓存命中、缓存未命中 token 与按 `--price` 折算的金额，`transcript.jsonl`、`messages.json` 是原始对话。
 
 系统提示里的宿主说明写明两件事：技能脚本按协议写法运行、用法不清看 `--help`，不必读 `scripts/` 的源码；`lesson-plan.json` 这类大文件一开始就分块写（每次不超过约 12000 字符，之后 `append=true`）。起因是 2026-09 的第一次校准：模型读了 `validate_lesson.py` 源码，约 1.5 万 token 此后每次请求都带着；又想一次写完 `lesson-plan.json`，被输出上限截断作废一次。
+
+`--max-output-tokens` 默认 16384（思考加正文）：2026-09-30 的重跑里两次截断都是思考吃满 8192。被截断的回复如果既没有正文也没有工具调用，就不放进后续请求的上下文（`transcript.jsonl` 照记），改发一句提示：先把节骨架写进文件，再逐节补细节；`ledger.json` 每次请求另记 `reasoning_chars`（思考字符数）、`reasoning_tokens`（接口回报的思考 token）与 `in_context`。
 
 密钥只从环境变量 `DEEPSEEK_API_KEY` 读，不打印、不写盘。模型调用在 `ModelClient.complete` 之后：`DeepSeekClient` 连 `api.deepseek.com`，`--replies` 用 `ScriptedClient` 回放写好的回复；换成别的服务只需另写一个实现。
 

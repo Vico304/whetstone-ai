@@ -111,6 +111,42 @@ class DeepSeekBuildTests(unittest.TestCase):
         self.assertIn("一开始就分块写", prompt)
         self.assertIn("append=true", prompt)
 
+    def test_a_cut_reply_with_only_thinking_stays_out_of_the_context(self):
+        # 2026-09-30 run, request 11: 8192 tokens of thinking, no text, no tool call; it then rode along in 17 requests.
+        replies = [
+            {"message": {"role": "assistant", "content": "", "reasoning_content": "想" * 500},
+             "usage": {**usage(1000, 16384, 0), "completion_tokens_details": {"reasoning_tokens": 16384}},
+             "finish_reason": "length"},
+            {"message": {"role": "assistant", "content": "", "reasoning_content": "写骨架",
+                         "tool_calls": [call(1, "list_dir", path=".")]},
+             "usage": usage(1100, 300, 1000), "finish_reason": "length"},
+            {"message": {"role": "assistant", "content": "你想学什么？"}, "usage": usage(1300, 20, 1000)},
+            {"message": {"role": "assistant", "content": "好的。"}, "usage": usage(1400, 20, 1000)},
+        ]
+        path = self.tmp / "replies-cut.json"
+        path.write_text(json.dumps(replies), encoding="utf-8")
+        client = deepseek_build.ScriptedClient(path)
+        case = deepseek_build.load_case(mock.Mock(case=str(self.case_path), material_id=None))
+        summary = deepseek_build.drive(case, client, self.out, 10**6, 10, 16384)
+        second, third = client.calls[1], client.calls[2]
+        self.assertNotIn("想" * 500, json.dumps(second, ensure_ascii=False))
+        self.assertEqual([m["role"] for m in second], ["system", "user"])  # note folded into the request turn
+        self.assertTrue(second[-1]["content"].endswith(deepseek_build.CUT_THINKING_ONLY))
+        # a cut reply that did call a tool keeps its thinking: the tool loop needs it back
+        self.assertEqual([m["role"] for m in third], ["system", "user", "assistant", "tool"])
+        self.assertEqual(third[2]["reasoning_content"], "写骨架")
+        rows = summary["requests"]
+        self.assertEqual([(r["in_context"], r["reasoning_chars"]) for r in rows[:2]], [(False, 500), (True, 3)])
+        self.assertEqual(rows[0]["reasoning_tokens"], 16384)
+        lines = (self.out / "t1" / "transcript.jsonl").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(json.loads(lines[0])["message"]["reasoning_content"], "想" * 500)  # kept for review
+
+    def test_output_cap_defaults_to_16384_and_the_host_note_follows_it(self):
+        self.assertEqual(deepseek_build.DEFAULT_MAX_OUTPUT, 16384)
+        box = deepseek_build.Sandbox(self.tmp / "box")
+        self.assertIn("最多约 16000 token", deepseek_build.system_prompt(box))
+        self.assertIn("最多约 8000 token", deepseek_build.system_prompt(box, 8192))
+
     def test_learner_turns_get_the_fixed_reply_then_the_run_stops(self):
         replies = [{"message": {"role": "assistant", "content": "你想学什么？"}, "usage": usage(10, 5, 0)}] * 2
         code, _, _ = self.run_main(replies)
