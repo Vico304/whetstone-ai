@@ -9,7 +9,10 @@ Build metrics (from lesson-plan.json / teaching-guide.md):
   actually occur in the referenced file?), and for checking that added prerequisite material
   does not lower what a section asks the learner to rebuild: criteria layers per section, one
   checkpoint digest number per section (changes whenever the prompt or a criterion text does),
-  bridge concepts per section and the bridge share of unit text (see difficulty_digest.py)
+  bridge concepts per section and the bridge share of unit text (see difficulty_digest.py);
+  informational shape signals (see shape_metrics): questions per checkpoint prompt, criteria
+  including concept checks, relation depth inside a section, final-challenge core coverage,
+  and whether the units' turn block asks the learner to close the material
 Teach metrics (from <store>/lrg/<lesson>.jsonl when --store is given):
   attempts, median elapsed seconds per checkpoint, depth distribution, conflict rate,
   share of high-confidence conflicts, evidence tier mix
@@ -105,6 +108,83 @@ def difficulty_metrics(plan: dict, units_dir: Path, unit_chars: int) -> dict:
     }
 
 
+def _relation_depth(edges: list[tuple[str, str]]) -> int:
+    """Longest chain (in edges) through a directed graph; a cycle counts each edge once."""
+    following: dict[str, list[str]] = {}
+    for a, b in edges:
+        following.setdefault(a, []).append(b)
+
+    def longest(node: str, seen: frozenset) -> int:
+        return max((1 + longest(nxt, seen | {nxt}) for nxt in following.get(node, []) if nxt not in seen), default=0)
+
+    return max((longest(a, frozenset({a})) for a in following), default=0)
+
+
+def _turn_block(text: str) -> str | None:
+    """The '轮到你…' block of a unit file: from its heading to the next heading of the same or a higher level."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("#") and "轮到你" in line:
+            level = len(line) - len(line.lstrip("#"))
+            end = next((j for j in range(i + 1, len(lines))
+                        if lines[j].startswith("#") and len(lines[j]) - len(lines[j].lstrip("#")) <= level), len(lines))
+            return "\n".join(lines[i:end])
+    return None
+
+
+def shape_metrics(plan: dict, units_dir: Path) -> dict:
+    """Informational shape signals from the 2026-10-01 review of a DeepSeek-built course; no thresholds,
+    never errors or warnings, exit code unchanged.
+
+    prompt_questions_per_section: question marks in checkpoint.prompt; checklist_prompt_sections lists the
+    sections whose prompt asks at least as many questions as it has criteria (the prompt spells out the rubric).
+    criteria_incl_checks_per_section: checkpoint criteria plus the criteria of every concept check in the section.
+    intra_section_relation_depth: longest relation chain with both ends inside the section; 2 or more marks a
+    split candidate (two central mechanisms in one section).
+    final_core_coverage: sections with a core concept whose name or alias occurs in the final challenge text,
+    over sections with a core concept; a plain substring match, so it under-counts paraphrase.
+    units_turn_block_close: unit files whose '轮到你' block tells the learner to close the material (合上),
+    over unit files; None without units."""
+    sections = [s for s in (plan.get("sections") or []) if isinstance(s, dict)]
+    keys = [s["id"] if isinstance(s.get("id"), str) else f"#{i}" for i, s in enumerate(sections)]
+    relations = [r for r in (plan.get("relations") or []) if isinstance(r, dict)
+                 and isinstance(r.get("from"), str) and isinstance(r.get("to"), str)]
+    questions, with_checks, depth, checklist = {}, {}, {}, []
+    for key, section in zip(keys, sections):
+        checkpoint = section.get("checkpoint") if isinstance(section.get("checkpoint"), dict) else {}
+        prompt = checkpoint.get("prompt") if isinstance(checkpoint.get("prompt"), str) else ""
+        questions[key] = prompt.count("？") + prompt.count("?")
+        criteria = len(validate_lesson.criteria_texts(checkpoint))
+        if criteria and questions[key] >= criteria:
+            checklist.append(key)
+        concepts = [c for c in (section.get("concepts") or []) if isinstance(c, dict)]
+        with_checks[key] = criteria + sum(len(validate_lesson.criteria_texts(c.get("check"))) for c in concepts
+                                          if isinstance(c.get("check"), dict))
+        ids = {c.get("id") for c in concepts}
+        depth[key] = _relation_depth([(r["from"], r["to"]) for r in relations if r["from"] in ids and r["to"] in ids])
+    final = plan.get("final_challenge") if isinstance(plan.get("final_challenge"), dict) else {}
+    final_text = " ".join([final.get("prompt") if isinstance(final.get("prompt"), str) else "",
+                           *validate_lesson.criteria_texts(final)])
+    with_core = hit = 0
+    for section in sections:
+        names = [n for c in (section.get("concepts") or []) if isinstance(c, dict) and c.get("role", "core") == "core"
+                 for n in [c.get("name"), *(c.get("aliases") or [])] if isinstance(n, str) and n.strip()]
+        if names:
+            with_core += 1
+            hit += any(n in final_text for n in names)
+    units = sorted(units_dir.glob("*.md")) if units_dir.is_dir() else []
+    blocks = [_turn_block(p.read_text(encoding="utf-8")) for p in units]
+    return {
+        "prompt_questions_per_section": questions,
+        "checklist_prompt_sections": checklist,
+        "criteria_incl_checks_per_section": with_checks,
+        "intra_section_relation_depth": depth,
+        "final_core_coverage": {"sections_hit": hit, "sections": with_core},
+        "units_turn_block_close": {"with_close": sum(1 for b in blocks if b and "合上" in b), "units": len(units)}
+        if units else None,
+    }
+
+
 def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) -> dict:
     plan_path = pack / "lesson-plan.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
@@ -113,8 +193,9 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
     units_dir = pack / "units"
     manifest_path = pack / "sources.json"
     manifest = validate_lesson.manifest_paths(json.loads(manifest_path.read_text(encoding="utf-8"))) if manifest_path.is_file() else None
-    errors = validate_lesson.validate_plan(plan, manifest)
-    warnings = validate_lesson.collect_warnings(plan)
+    warnings: list[str] = []  # validate_plan adds the schema 1.6 warnings here, as validate_lesson.py's CLI does
+    errors = validate_lesson.validate_plan(plan, manifest, warnings=warnings)
+    warnings += validate_lesson.collect_warnings(plan)
     guide = guide_path.read_text(encoding="utf-8") if guide_path.is_file() else ""
     if guide:
         errors += validate_lesson.validate_guide(guide, plan)
@@ -191,6 +272,7 @@ def build_metrics(pack: Path, sources_root: Path | None, expect: dict | None) ->
         "warnings": warnings[:20],
         **organisation_metrics(plan),
         **difficulty_metrics(plan, units_dir, unit_chars),
+        **shape_metrics(plan, units_dir),
     }
     if expect:
         low, high = expect.get("sections", [0, 10**6])

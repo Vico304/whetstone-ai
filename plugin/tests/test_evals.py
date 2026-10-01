@@ -48,6 +48,56 @@ class EvalScoringTests(unittest.TestCase):
         self.assertEqual(score_pack.organisation_metrics({"big_picture": {"system_map": ["x", "y"]}})["system_map"],
                          {"present": True, "components": 2})
 
+    def test_schema_1_6_warnings_are_counted_as_the_validator_cli_counts_them(self):
+        # 2026-09-30 DeepSeek build: validate_lesson.py printed 1 warning, score_pack recorded 0.
+        plan = json.loads((PLUGIN_ROOT / "skills" / "learn" / "assets" / "structure-example" / "lesson-plan.json")
+                          .read_text(encoding="utf-8"))
+        system_map = plan["big_picture"]["system_map"]
+        system_map["components"] = [c for c in system_map["components"] if c["id"] != "example.accelerator"]
+        system_map["links"] = [l for l in system_map["links"] if "example.accelerator" not in (l["from"], l["to"])]
+        with tempfile.TemporaryDirectory() as temporary:
+            pack = Path(temporary)
+            (pack / "lesson-plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            metrics = score_pack.build_metrics(pack, None, None)
+        self.assertEqual(metrics["validator_errors"], 0, metrics["errors"])
+        self.assertEqual(metrics["validator_warnings"], 1)
+        self.assertIn("not on the system map", metrics["warnings"][0])
+
+    def test_shape_metrics_flag_checklist_prompts_deep_sections_and_final_coverage(self):
+        crit = lambda n: [{"id": f"c{i}", "text": f"标准{i}", "layer": "mechanism"} for i in range(n)]
+        plan = {
+            "sections": [
+                {"id": "s01", "checkpoint": {"prompt": "为什么 A？B 又怎样？", "criteria": crit(2)},
+                 "concepts": [{"id": "a", "name": "多重检验", "role": "core"},
+                              {"id": "b", "name": "样本外", "role": "core"},
+                              {"id": "c", "name": "数据窥探", "role": "supporting",
+                               "check": {"prompt": "?", "criteria": crit(3)}}]},
+                {"id": "s02", "checkpoint": {"prompt": "合上材料，解释前视偏差。", "criteria": crit(3)},
+                 "concepts": [{"id": "d", "name": "前视", "aliases": ["前视偏差"], "role": "core"}]},
+                {"id": "s03", "checkpoint": {"prompt": "解释幸存者。", "criteria": crit(3)},
+                 "concepts": [{"id": "e", "name": "幸存者偏差", "role": "core"}]},
+                {"id": "s04", "checkpoint": {"prompt": "讲一遍流程。", "criteria": crit(1)}, "concepts": []},
+            ],
+            "relations": [{"from": "c", "to": "b"}, {"from": "b", "to": "a"}, {"from": "a", "to": "d"},
+                          {"from": "d", "to": "e"}, {"from": "e", "to": "d"}],
+            "final_challenge": {"prompt": "拿到一份报告", "criteria": ["指出前视偏差", "说出多重检验的惩罚"]},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            units = Path(temporary) / "units"
+            metrics = score_pack.shape_metrics(plan, units)
+            self.assertIsNone(metrics["units_turn_block_close"])
+            units.mkdir()
+            (units / "s01.md").write_text("# s01\n\n## 轮到你解释\n\n合上本文档作答：…\n\n## 来源\n", encoding="utf-8")
+            (units / "s02.md").write_text("# s02\n\n合上\n\n## 轮到你解释\n\n解释前视偏差。\n", encoding="utf-8")
+            self.assertEqual(score_pack.shape_metrics(plan, units)["units_turn_block_close"], {"with_close": 1, "units": 2})
+        self.assertEqual(metrics["prompt_questions_per_section"], {"s01": 2, "s02": 0, "s03": 0, "s04": 0})
+        self.assertEqual(metrics["checklist_prompt_sections"], ["s01"])
+        self.assertEqual(metrics["criteria_incl_checks_per_section"], {"s01": 5, "s02": 3, "s03": 3, "s04": 1})
+        self.assertEqual(metrics["intra_section_relation_depth"], {"s01": 2, "s02": 0, "s03": 0, "s04": 0})
+        self.assertEqual(metrics["final_core_coverage"], {"sections_hit": 2, "sections": 3})
+        self.assertEqual(score_pack.shape_metrics({}, Path("/nonexistent"))["final_core_coverage"],
+                         {"sections_hit": 0, "sections": 0})
+
     def test_scores_template_pack_and_diffs_against_baseline(self):
         with tempfile.TemporaryDirectory() as temporary:
             pack = Path(temporary) / "pack"

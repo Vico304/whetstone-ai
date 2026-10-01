@@ -22,6 +22,7 @@ python3 evals/score_pack.py results/<run>/doc-learning-layers \
 
 `--baseline` 逐项打印数值差异。
 
+结果里另有六项形态信号，只记录、不设阈值、不进错误与警告：`prompt_questions_per_section`（主问题题面的问号数）与 `checklist_prompt_sections`（问号不少于判定标准条数的节，题面把判定标准逐条问了出来）；`criteria_incl_checks_per_section`（主问题加本节各概念 `check` 的判定标准条数）；`intra_section_relation_depth`（两端都在本节的 `relations` 最长链，≥ 2 是一节装了两个中心机制、可拆节的信号）；`final_core_coverage`（`final_challenge` 文字里出现核心概念名或别名的节数 / 有核心概念的节数，逐字匹配，换说法就漏计）；`units_turn_block_close`（`units/` 下「轮到你」一节写了「合上」的文件数，没有 `units/` 时为 `null`）。来由是 2026-10-01 对第一门由 DeepSeek 建的课的复核。`validator_warnings` 与 `validate_lesson.py` 命令行的计数一致，含 schema 1.6 的警告。
 
 一条命令给 `evals/` 与 `examples/` 下全部课程目录（含 `lesson-plan.json` 的目录）打分，一目录一行：
 
