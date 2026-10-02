@@ -51,7 +51,7 @@ class DeepSeekBuildTests(unittest.TestCase):
         return json.loads((self.out / "t1" / "ledger.json").read_text(encoding="utf-8"))
 
     def test_stops_at_the_outline_pause_and_books_every_request(self):
-        sandbox = self.out / "t1" / "sandbox"
+        sandbox = deepseek_build.sandbox_dir(self.out, "t1")
         plan = sandbox / "workspace" / "courses" / "c" / "lesson-plan.json"
         replies = [
             {"message": {"role": "assistant", "content": "", "tool_calls": [
@@ -75,9 +75,24 @@ class DeepSeekBuildTests(unittest.TestCase):
                         if m["role"] == "tool"]
         self.assertIn("Guided Learning Tutor", tool_outputs[0])
         self.assertTrue(tool_outputs[4].startswith("exit "))
-        for path in (self.out / "t1").rglob("*"):
+        self.assertEqual(ledger["sandbox"], str(sandbox))
+        self.assertEqual(ledger["lesson_plans"], ["workspace/courses/c/lesson-plan.json"])
+        for path in self.out.rglob("*"):
             if path.is_file():
                 self.assertNotIn(SECRET, path.read_text(encoding="utf-8", errors="replace"), path)
+
+    def test_the_sandbox_path_does_not_give_away_the_case_id(self):
+        replies = [{"message": {"role": "assistant", "content": "好的。"}, "usage": usage(100, 10, 0)}] * 2
+        self.run_main(replies)
+        sandbox = deepseek_build.sandbox_dir(self.out, "t1")
+        self.assertTrue((sandbox / "workspace").is_dir())
+        self.assertNotIn("t1", str(sandbox.relative_to(self.out)))
+        system = json.loads((self.out / "t1" / "messages.json").read_text(encoding="utf-8"))[0]["content"]
+        self.assertNotIn(str(self.out / "t1"), system)
+        self.assertIn(str(sandbox / "workspace"), system)
+        code, _, stderr = self.run_main(replies)  # a second run with the same id never overwrites
+        self.assertEqual(code, 2)
+        self.assertIn("already exists", stderr)
 
     def test_token_cap_stops_before_the_request_that_would_pass_it(self):
         replies = [{"message": {"role": "assistant", "content": "", "tool_calls": [call(1, "list_dir", path=".")]},

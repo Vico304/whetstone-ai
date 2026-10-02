@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -233,6 +234,12 @@ def load_case(args) -> dict:
     return case
 
 
+def sandbox_dir(out_dir: Path, case_id: str) -> Path:
+    """Where the sandbox goes: a neutral name, so the paths the model sees do not give away the case id
+    (2026-10-01 the model read ``backtest-zero-always`` in a path and took it for a test scenario)."""
+    return out_dir / "ws" / ("w" + hashlib.sha256(case_id.encode("utf-8")).hexdigest()[:8])
+
+
 class Sandbox:
     def __init__(self, root: Path):
         self.root = root
@@ -407,8 +414,11 @@ def dry_run_estimate(case: dict, max_output_tokens: int, price=DEFAULT_PRICE) ->
 def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests: int, max_output_tokens: int,
           price=DEFAULT_PRICE) -> dict:
     run_dir = out_dir / case["id"]
-    sandbox = Sandbox(run_dir / "sandbox")
+    sandbox = Sandbox(sandbox_dir(out_dir, case["id"]))
+    if run_dir.exists():
+        raise InputError(f"run directory already exists (runs never overwrite): {run_dir}")
     sandbox.build(case)
+    run_dir.mkdir(parents=True)
     ledger = Ledger(cap)
     reply_text = case.get("auto_reply") or DEFAULT_REPLY
     max_replies = int(case.get("max_auto_replies", 3))
@@ -481,7 +491,8 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
         "started": started, "ended": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "stop_reason": stop, "error": error, "token_cap": cap, "max_requests": max_requests,
         "http_attempts": getattr(client, "http_attempts", None), "auto_replies": replies,
-        "lesson_plans": [str(p.relative_to(run_dir)) for p in sandbox.lesson_plans()],
+        "sandbox": str(sandbox.root),
+        "lesson_plans": [str(p.relative_to(sandbox.root)) for p in sandbox.lesson_plans()],
         "totals": totals, "cost_cny": cost_cny(totals["cache_hit"], totals["cache_miss"], totals["output"], price),
         "price_cny_per_million": list(price), "requests": ledger.rows,
     }
