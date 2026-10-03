@@ -214,6 +214,62 @@ class DeepSeekBuildTests(unittest.TestCase):
         self.assertEqual(estimate["low"]["input"], estimate["low"]["cache_hit"] + estimate["low"]["cache_miss"])
         self.assertFalse((self.out / "t1").exists())
 
+    def test_materials_lose_the_directories_all_their_paths_share(self):
+        # 2026-10-02: one file from plugin/evals/materials/ sat three levels deep and the model probed the nesting.
+        layout = deepseek_build.material_layout
+        self.assertEqual(layout(["plugin/evals/materials/a.md"]), {"plugin/evals/materials/a.md": "a.md"})
+        self.assertEqual(layout(["p/s/x.py", "p/s/y.py", "p/t/z.py"]), {"p/s/x.py": "s/x.py", "p/s/y.py": "s/y.py", "p/t/z.py": "t/z.py"})
+        self.assertEqual(layout(["a.md", "code/a.py"]), {"a.md": "a.md", "code/a.py": "code/a.py"})
+        (self.tmp / "src" / "deep" / "er").mkdir(parents=True)
+        (self.tmp / "src" / "deep" / "er" / "n.md").write_text("x", encoding="utf-8")
+        case = json.loads(self.case_path.read_text(encoding="utf-8"))
+        case["materials"] = ["deep/er/n.md"]
+        self.case_path.write_text(json.dumps(case), encoding="utf-8")
+        sandbox = deepseek_build.Sandbox(self.tmp / "box")
+        sandbox.build(deepseek_build.load_case(mock.Mock(case=str(self.case_path), material_id=None)))
+        self.assertEqual([p.name for p in sandbox.materials.iterdir()], ["n.md"])
+
+    def test_edit_file_replaces_one_unique_piece_and_respects_read_only(self):
+        sandbox = deepseek_build.Sandbox(self.tmp / "box")
+        sandbox.build(deepseek_build.load_case(mock.Mock(case=str(self.case_path), material_id=None)))
+        target = sandbox.workspace / "plan.json"
+        target.write_text('{"a": 1, "b": 1}', encoding="utf-8")
+        run = deepseek_build.run_tool
+        self.assertIn("occurs 2 times", run(sandbox, "edit_file", json.dumps({"path": str(target), "old": "1", "new": "2"})))
+        self.assertIn("occurs 0 times", run(sandbox, "edit_file", json.dumps({"path": str(target), "old": "zz", "new": "2"})))
+        self.assertIn("replaced", run(sandbox, "edit_file", json.dumps({"path": str(target), "old": '"b": 1', "new": '"b": 2'})))
+        self.assertEqual(target.read_text(encoding="utf-8"), '{"a": 1, "b": 2}')
+        self.assertIn("read-only", run(sandbox, "edit_file", json.dumps(
+            {"path": str(sandbox.materials / "notes.md"), "old": "材料", "new": "x"})))
+        self.assertIn("edit_file", deepseek_build.system_prompt(sandbox))
+
+    def test_a_write_replaced_by_a_later_whole_write_leaves_the_context(self):
+        sandbox = deepseek_build.sandbox_dir(self.out, "t1")
+        plan = str(sandbox / "workspace" / "lesson-plan.json")
+        replies = [
+            {"message": {"role": "assistant", "content": "", "tool_calls": [
+                call(1, "write_file", path=plan, content="A" * 300), call(2, "write_file", path=plan, content="B" * 200, append=True)]},
+             "usage": usage(1000, 200, 0)},
+            {"message": {"role": "assistant", "content": "", "tool_calls": [call(3, "write_file", path=plan, content="C" * 100)]},
+             "usage": usage(1300, 100, 1000)},
+            {"message": {"role": "assistant", "content": "好的。"}, "usage": usage(1400, 10, 1000)},
+            {"message": {"role": "assistant", "content": "好的。"}, "usage": usage(1400, 10, 1000)},
+        ]
+        path = self.tmp / "replies-sup.json"
+        path.write_text(json.dumps(replies), encoding="utf-8")
+        client = deepseek_build.ScriptedClient(path)
+        case = deepseek_build.load_case(mock.Mock(case=str(self.case_path), material_id=None))
+        summary = deepseek_build.drive(case, client, self.out, 10**6, 10, 16384)
+        second, third = (json.dumps(c, ensure_ascii=False) for c in client.calls[1:3])
+        self.assertIn("A" * 300, second)  # nothing replaced it yet
+        self.assertNotIn("A" * 300, third)
+        self.assertNotIn("B" * 200, third)
+        self.assertIn("C" * 100, third)
+        self.assertIn("原 300 字符", third)
+        self.assertEqual(summary["superseded_chars_dropped"], 500)
+        first = json.loads((self.out / "t1" / "transcript.jsonl").read_text(encoding="utf-8").splitlines()[0])
+        self.assertIn("A" * 300, json.dumps(first))  # the transcript keeps what the model wrote
+
     def test_estimate_counts_cjk_heavier_than_ascii(self):
         self.assertEqual(deepseek_build.estimate_tokens("中文字符"), 2)
         self.assertEqual(deepseek_build.estimate_tokens("abcdefghij"), 3)

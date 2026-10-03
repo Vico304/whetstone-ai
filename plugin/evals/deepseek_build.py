@@ -3,8 +3,8 @@
 
 The skill is host-neutral (skills/learn/references/hosts.md): a host model reads SKILL.md, reads the
 stage files it points to, writes the course files and runs the scripts. This driver plays that host for
-a model behind an HTTP API. It copies the skill and the materials into a sandbox, exposes four tools
-(list_dir, read_file, write_file, run_command) confined to that sandbox, answers the model's questions
+a model behind an HTTP API. It copies the skill and the materials into a sandbox, exposes five tools
+(list_dir, read_file, write_file, edit_file, run_command) confined to that sandbox, answers the model's questions
 to the learner with one fixed reply, and stops when a parseable lesson-plan.json with an outline.md beside it
 exists and the model hands the turn back (the outline pause), or when a limit is reached. Every request is booked in ledger.json with
 input, output, cache-hit and cache-miss tokens kept apart.
@@ -31,7 +31,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PLUGIN_ROOT.parent
@@ -51,6 +51,8 @@ CUT_THINKING_ONLY = ("（宿主提示）上一条回复的思考占满了输出�
                      "先把节骨架（id、标题、问题、方案）写进文件，再逐节补细节。")
 READ_LIMIT = 60000
 TOOL_OUTPUT_LIMIT = 20000
+# Stands in for the content of a write_file call once a later whole write of the same file replaced it.
+SUPERSEDED = "[宿主省略：这段内容已被之后对同一文件的整份重写取代，原 {n} 字符]"
 
 TOOLS = [
     {"type": "function", "function": {
@@ -66,6 +68,11 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "path": {"type": "string"}, "content": {"type": "string"}, "append": {"type": "boolean"}},
             "required": ["path", "content"]}}},
+    {"type": "function", "function": {
+        "name": "edit_file", "description": "Replace one exact piece of text that occurs once in a file. Fix what the validator reported with it instead of rewriting the file.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}},
+            "required": ["path", "old", "new"]}}},
     {"type": "function", "function": {
         "name": "run_command", "description": "Run a command without a shell, cwd = workspace. Allowed: python3 <skill scripts>/<name>.py args..., or date args...",
         "parameters": {"type": "object", "properties": {"argv": {"type": "array", "items": {"type": "string"}}},
@@ -240,6 +247,16 @@ def sandbox_dir(out_dir: Path, case_id: str) -> Path:
     return out_dir / "ws" / ("w" + hashlib.sha256(case_id.encode("utf-8")).hexdigest()[:8])
 
 
+def material_layout(materials: list[str]) -> dict[str, str]:
+    """Where each material lands under materials/: the leading directories every path shares are dropped
+    (2026-10-02 a lone file sat at materials/plugin/evals/materials/ and the model probed the nesting)."""
+    dirs = [PurePosixPath(rel).parts[:-1] for rel in materials]
+    shared = 0
+    while all(len(d) > shared for d in dirs) and len({d[shared] for d in dirs}) == 1:
+        shared += 1
+    return {rel: str(PurePosixPath(*PurePosixPath(rel).parts[shared:])) for rel in materials}
+
+
 class Sandbox:
     def __init__(self, root: Path):
         self.root = root
@@ -260,8 +277,8 @@ class Sandbox:
         if self.root.exists():
             raise InputError(f"sandbox already exists (runs never overwrite): {self.root}")
         shutil.copytree(SKILL_SOURCE, self.skill, ignore=shutil.ignore_patterns("__pycache__"))
-        for rel in case["materials"]:
-            target = self.materials / rel
+        for rel, placed in material_layout(case["materials"]).items():
+            target = self.materials / placed
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(Path(case["materials_root"]) / rel, target)
         self.workspace.mkdir(parents=True)
@@ -318,6 +335,19 @@ def run_tool(sandbox: Sandbox, name: str, raw_args: str) -> str:
             with path.open("a" if args.get("append") else "w", encoding="utf-8") as handle:
                 handle.write(args["content"])
             return f"wrote {len(args['content'])} characters to {path}"
+        if name == "edit_file":
+            path = sandbox.resolve(args["path"])
+            if not sandbox.writable(path):
+                return "ERROR: the skill directory and the materials are read-only"
+            old, new = args["old"], args["new"]
+            if not isinstance(old, str) or not isinstance(new, str) or not old:
+                return "ERROR: old and new must be strings, old not empty"
+            text = path.read_text(encoding="utf-8")
+            found = text.count(old)
+            if found != 1:
+                return f"ERROR: old occurs {found} times in {path}; quote a longer piece that occurs exactly once"
+            path.write_text(text.replace(old, new, 1), encoding="utf-8")
+            return f"replaced {len(old)} characters with {len(new)} in {path}"
         if name == "run_command":
             return run_command(sandbox, args["argv"])
         return f"ERROR: unknown tool {name}"
@@ -364,12 +394,13 @@ def system_prompt(sandbox: Sandbox, max_output_tokens: int = DEFAULT_MAX_OUTPUT)
         f"- 技能目录（SKILL.md 所在目录，只读）：{sandbox.skill}\n"
         f"- 材料（只读）：{sandbox.materials}\n"
         f"- 宿主打开的目录（工作区，当前目录）：{sandbox.workspace}\n"
-        "- 工具：list_dir、read_file、write_file、run_command（只能运行 `python3 <技能目录>/scripts/<名>.py …` 与 `date …`）。"
+        "- 工具：list_dir、read_file、write_file、edit_file、run_command（只能运行 `python3 <技能目录>/scripts/<名>.py …` 与 `date …`）。"
         "路径一律用绝对路径。\n"
         "- 技能脚本按协议文件里的写法运行，用法不清时运行 `python3 <脚本> --help`；不必读 scripts/ 下的源码，"
         "校验规则以协议文件与校验输出为准。\n"
         f"- 你的一次回复（思考加正文）最多约 {max_output_tokens // 1000 * 1000} token：lesson-plan.json 这类大文件一开始就分块写，"
         "每次 write_file 不超过约 12000 字符，第二次起 append=true；不要先试一次写完整个文件。\n"
+        "- 校验报错时用 edit_file 只改报错的那几处（old 取文件里原样且只出现一次的一段），不要整份重写 lesson-plan.json。\n"
         "- 不带工具调用的回复就是对学习者说的话，学习者会回答你。\n\n"
         "以下是技能被调用时载入的 SKILL.md 全文：\n\n" + skill_md)
 
@@ -411,6 +442,37 @@ def dry_run_estimate(case: dict, max_output_tokens: int, price=DEFAULT_PRICE) ->
 
 # ---------------------------------------------------------------- driver
 
+def drop_superseded_writes(messages: list[dict]) -> int:
+    """Blank the content of every write_file call that a later whole write (append false) of the same file
+    replaced; returns the characters dropped. 2026-10-02 three of five runs hit the cap while rewriting the
+    whole lesson-plan.json after failed validation, every old version still riding in the context."""
+    def writes():
+        for i, message in enumerate(messages):
+            for j, call in enumerate(message.get("tool_calls") or []):
+                if call.get("function", {}).get("name") != "write_file":
+                    continue
+                try:
+                    args = json.loads(call["function"].get("arguments") or "{}")
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(args, dict) and isinstance(args.get("path"), str) and isinstance(args.get("content"), str):
+                    yield (i, j), os.path.normpath(args["path"]), args
+    last_whole = {}
+    for at, path, args in writes():
+        if not args.get("append"):
+            last_whole[path] = at
+    dropped = 0
+    for (i, j), path, args in list(writes()):
+        if path not in last_whole or (i, j) >= last_whole[path] or args["content"].startswith("[宿主省略"):
+            continue
+        dropped += len(args["content"])
+        calls = [dict(c) for c in messages[i]["tool_calls"]]
+        calls[j]["function"] = {**calls[j]["function"], "arguments": json.dumps(
+            {**args, "content": SUPERSEDED.format(n=len(args["content"]))}, ensure_ascii=False)}
+        messages[i] = {**messages[i], "tool_calls": calls}
+    return dropped
+
+
 def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests: int, max_output_tokens: int,
           price=DEFAULT_PRICE) -> dict:
     run_dir = out_dir / case["id"]
@@ -425,10 +487,11 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
     messages = [{"role": "system", "content": system_prompt(sandbox, max_output_tokens)},
                 {"role": "user", "content": case["request"]}]
     started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-    stop, error, replies, booked_messages = "max_requests", None, 0, 0
+    stop, error, replies, booked_messages, dropped = "max_requests", None, 0, 0, 0
     transcript = (run_dir / "transcript.jsonl").open("w", encoding="utf-8")
     try:
         while len(ledger.rows) < max_requests:
+            dropped += drop_superseded_writes(messages)  # the estimate below still counts them, which only errs early
             last_input = ledger.rows[-1]["input"] + ledger.rows[-1]["output"] if ledger.rows else 0
             next_input = last_input + sum(estimate_tokens(json.dumps(m, ensure_ascii=False)) for m in messages[booked_messages:])
             if not ledger.rows:
@@ -491,7 +554,7 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
         "started": started, "ended": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "stop_reason": stop, "error": error, "token_cap": cap, "max_requests": max_requests,
         "http_attempts": getattr(client, "http_attempts", None), "auto_replies": replies,
-        "sandbox": str(sandbox.root),
+        "sandbox": str(sandbox.root), "superseded_chars_dropped": dropped,
         "lesson_plans": [str(p.relative_to(sandbox.root)) for p in sandbox.lesson_plans()],
         "totals": totals, "cost_cny": cost_cny(totals["cache_hit"], totals["cache_miss"], totals["output"], price),
         "price_cny_per_million": list(price), "requests": ledger.rows,
