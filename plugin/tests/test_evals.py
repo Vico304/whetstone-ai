@@ -625,3 +625,85 @@ class GapLedgerTests(unittest.TestCase):
             done = subprocess.run([sys.executable, str(script), str(lesson), str(root / "missing.json")], capture_output=True, text=True)
             self.assertEqual((done.returncode, done.stdout), (2, ""))
             self.assertTrue(done.stderr.startswith("ERROR: "))
+
+
+learning_plan_build = load_module("learning_plan_build", PLUGIN_ROOT / "evals")
+
+
+class LearningPlanBuildTests(unittest.TestCase):
+    """A synthetic plan directory: a parent course, its prerequisite course (undeclared), one unbuilt course."""
+
+    PLAN_MD = "\n".join([
+        "# 学习计划", "", "## 3. 建议的课程序列", "",
+        "### 骨架课 2　`later-1`《后面的课》　状态：待确认（依赖课程 1）　`shape: skeleton`", "",
+        "- 材料：`a.md`、`b.md`、`c.md`、`d.md`", "- 核心概念：x.shared, x.own", "- 前置依赖：课程 1（见下）", "",
+        "### 课程 1：《父课》　状态：已确认", "", "- 前置依赖：无", "",
+        "### 课程 3：`dropped-1`《不学的课》　状态：暂不学", "", "- 前置依赖：`later-1`", "",
+        "### 骨架课 2　`later-1`《后面的课》　状态：待确认（重排后再声明一次）", "",
+    ])
+
+    def lesson(self, lesson_id, title, concepts, **extra):
+        return {"lesson_id": lesson_id, "title": title, "outline_confirmed_at": "2026-09-01T00:00:00Z", **extra,
+                "sections": [{"id": "s01", "concepts": [{"id": cid, "role": role} for cid, role in concepts]}]}
+
+    def plan_dir(self, root: Path) -> Path:
+        plan = root / "目标"
+        for directory, lesson in {
+            "parent-1": self.lesson("parent-1", "父课", [("x.shared", "core"), ("x.base", "supporting")]),
+            "base-1": self.lesson("base-1", "底座", [("x.base", "core"), ("x.shared", "core")],
+                                  prerequisite_of="parent-1", depth=2, blocked_at="s01"),
+        }.items():
+            (plan / directory).mkdir(parents=True)
+            (plan / directory / "lesson-plan.json").write_text(json.dumps(lesson, ensure_ascii=False), encoding="utf-8")
+        (plan / "parent-1" / "learning-progress.json").write_text(json.dumps(
+            {"status": "in_progress", "updated_at": "2026-08-01T00:00:00Z", "blocked": {"by": "base-1"},
+             "sections": [{"id": "s01", "status": "pending"}]}), encoding="utf-8")
+        (plan / "learning-plan.md").write_text(self.PLAN_MD, encoding="utf-8")
+        return plan
+
+    def test_build_orders_prerequisites_first_and_derives_each_field(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            plan = learning_plan_build.build(self.plan_dir(Path(temporary)), now="2026-10-03T00:00:00Z")
+        courses = {c["id"]: c for c in plan["courses"]}
+        self.assertEqual([(c["id"], c["order"]) for c in plan["courses"]],
+                         [("base-1", 1), ("parent-1", 2), ("dropped-1", 3), ("later-1", 4)])
+        self.assertEqual(courses["parent-1"]["depends_on"], ["base-1"])
+        self.assertEqual(courses["parent-1"]["needs"], ["x.base"])
+        self.assertEqual(courses["parent-1"]["needs_source"], "earlier-core")
+        self.assertEqual((courses["later-1"]["core"], courses["later-1"]["core_source"]), (["x.shared", "x.own"], "plan-md"))
+        self.assertEqual(courses["later-1"]["depends_on"], ["parent-1"])
+        self.assertEqual((courses["later-1"]["shape"], courses["later-1"]["size_estimate"]), ("skeleton", 12))
+        self.assertEqual(courses["dropped-1"]["declared_status"], "暂不学")
+        self.assertEqual(plan["unlisted"], ["base-1"])
+        ledger = gap_ledger.build_ledger(
+            {"lesson_id": "later-1", "assessment_mode": "always", "prerequisites": [
+                {"id": "p01", "concept_id": "x.base", "dependency_kind": "mech", "required_by": ["s01"]}]},
+            {"sections": [{"id": "s01"}]}, learning_plan=plan)
+        self.assertEqual((ledger["items"][0]["disposition"], ledger["items"][0]["placed_at"]), ("defer_to_course", "base-1"))
+
+    def test_check_reports_and_fails_only_on_a_dependency_that_comes_later(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            plan = learning_plan_build.build(self.plan_dir(Path(temporary)), now="2026-10-03T00:00:00Z")
+        reports, failures = learning_plan_build.check(plan)
+        self.assertEqual(reports, ["DUP-CORE: x.shared is core in base-1, parent-1, later-1 (owner base-1)",
+                                   "DEPTH: base-1 is a prerequisite course at depth 2",
+                                   "SPLIT: later-1 预计 12 节 (max 9)",
+                                   "UNLISTED: base-1 has a course directory but no course heading in learning-plan.md"])
+        self.assertEqual(failures, ["ORDER: dropped-1 depends on later-1, which comes later"])
+
+    def test_status_and_cli(self):
+        import subprocess, sys
+        script = PLUGIN_ROOT / "evals" / "learning_plan_build.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            plan_dir = self.plan_dir(Path(temporary))
+            run = lambda *args: subprocess.run([sys.executable, str(script), *args, "--plan-dir", str(plan_dir),
+                                                "--now", "2026-10-03T00:00:00Z"], capture_output=True, text=True)
+            status, check, built = run("--status"), run("--check"), run("build", "--output", str(plan_dir / "out.json"))
+            written = json.loads((plan_dir / "out.json").read_text(encoding="utf-8"))
+        lines = status.stdout.splitlines()
+        self.assertEqual((status.returncode, len(lines)), (0, 7))
+        self.assertEqual([line.split()[2] for line in lines[1:5]], ["未开始", "等前置", "暂不学", "未建"])
+        self.assertEqual(lines[5], "courses: 0/3 completed; 未开始 1, 等前置 1, 未建 1")
+        self.assertEqual(lines[6], "current: parent-1; next: later-1; sections done: 0/1")
+        self.assertEqual((check.returncode, check.stdout.splitlines()[-1]), (1, "ORDER: dropped-1 depends on later-1, which comes later"))
+        self.assertEqual((built.returncode, built.stdout, written["schema_version"]), (0, "", "1.0"))
