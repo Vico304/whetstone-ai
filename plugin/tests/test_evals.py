@@ -527,6 +527,73 @@ class GapLedgerTests(unittest.TestCase):
         self.assertEqual(ledger["summary"]["sections"] + ledger["summary"]["bridge_sections"], 9)
         self.assertEqual(gap_ledger.check(ledger), [])
 
+    def plan_file(self, *courses, **extra):
+        return {"schema_version": "1.0", "courses": list(courses), **extra}
+
+    def test_a_learning_plan_file_sorts_by_order_skips_dropped_courses_and_reads_built_cores(self):
+        bare = {"courses": [{"id": "intro", "core": ["stats.std"]}, {"id": "demo"}]}
+        items = [self.item("p01", "stats.std"), self.item("p02", "stats.mean")]
+        old = self.ledger(items, learning_plan=bare)
+        self.assertEqual(old["schema_version"], "1.0")
+        self.assertNotIn("plan_courses", old["summary"])
+        self.assertEqual(self.by_id(old)["p01"], ("defer_to_course", "intro", "R2"))
+        with tempfile.TemporaryDirectory() as temporary:
+            built = Path(temporary) / "intro"
+            built.mkdir()
+            (built / "lesson-plan.json").write_text(json.dumps({"sections": [{"id": "s01", "concepts": [
+                {"id": "stats.mean", "role": "core"}, {"id": "stats.std", "role": "supporting"}]}]}), encoding="utf-8")
+            plan = self.plan_file({"id": "demo", "order": 3},
+                                  {"id": "intro", "order": 1, "dir": "intro/", "core": ["stats.std"], "core_source": "declared"},
+                                  {"id": "dropped", "order": 2, "core": ["stats.mean"], "declared_status": "暂不学"})
+            ledger = self.ledger(items, learning_plan=plan, plan_dir=Path(temporary))
+            without_dir = self.ledger(items, learning_plan=plan)
+        self.assertEqual(ledger["schema_version"], "1.1")
+        self.assertEqual(self.by_id(ledger)["p02"], ("defer_to_course", "intro", "R2"))
+        self.assertEqual(self.by_id(ledger)["p01"][0], "T2")
+        self.assertEqual(self.by_id(without_dir)["p01"], ("defer_to_course", "intro", "R2"))
+        self.assertEqual(ledger["summary"]["reorder_suggestions"], [])
+
+    def test_s4_a_gap_needed_by_two_courses_becomes_a_plan_course(self):
+        items = [self.item("p01", "stats.std"), self.item("p02", "stats.random", "tool", depends_on=["stats.python"])]
+        plan = self.plan_file({"id": "first", "order": 1, "needs": ["stats.std"]}, {"id": "demo", "order": 2})
+        ledger = self.ledger(items, learning_plan=plan)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T3", "plan-course:p01", "R2"),
+                                              "p02": ("T3", "prerequisite-course:p02", "R2")})
+        self.assertEqual(ledger["summary"]["plan_courses"],
+                         [{"cluster": "p01", "items": ["p01"], "needed_by": ["first", "demo"], "before": "first"}])
+
+    def test_s3_a_gap_owned_by_a_later_course_is_supplied_here_with_a_reorder_suggestion(self):
+        items = [self.item("p01", "stats.std"), self.item("p02", "stats.var")]
+        plan = self.plan_file({"id": "demo", "order": 1}, {"id": "later", "order": 2, "core": ["stats.std"]},
+                              {"id": "last", "order": 3, "core": ["stats.var"], "depends_on": ["demo"]},
+                              {"id": "other", "order": 4, "needs": ["stats.std"]})
+        ledger = self.ledger(items, learning_plan=plan)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T2", "s02", "R5"), "p02": ("T2", "s02", "R5")})
+        self.assertEqual(ledger["items"][0]["reason"], "fits in one bridge section; owner later: later")
+        self.assertEqual(ledger["summary"]["reorder_suggestions"],
+                         [{"item": "p01", "concept_id": "stats.std", "move": "later", "before": "demo"}])
+        self.assertEqual(gap_ledger.suggestions(ledger), ["move later before demo (stats.std)"])
+        self.assertEqual(gap_ledger.check(ledger), [])
+
+    def test_s5_a_course_in_another_plan_is_evidence_only(self):
+        plan = self.plan_file({"id": "demo", "order": 1},
+                              external_courses=[{"id": "elsewhere", "core": ["stats.std"], "use": "evidence"}])
+        ledger = self.ledger([self.item("p01", "stats.std")], learning_plan=plan)
+        self.assertEqual(self.by_id(ledger), {"p01": ("T2", "s02", "R5")})
+        self.assertTrue(ledger["items"][0]["reason"].endswith("; owner in another plan: elsewhere"))
+
+    def test_s6_only_gap_bridge_sections_are_raised_past_nine(self):
+        items = [self.item("p01", "code.a", cluster="a-partly", required_by=["s01", "s02", "s03"]),
+                 self.item("p02", "stats.b", cluster="b-gap")]
+        bare = self.ledger(items, n=8)
+        self.assertEqual(self.by_id(bare)["p01"], ("T3", "prerequisite-course:a-partly", "R4+9"))
+        ledger = self.ledger(items, n=8, learning_plan=self.plan_file({"id": "demo", "order": 1}))
+        self.assertEqual(self.by_id(ledger), {"p01": ("T2", "s01", "R4"), "p02": ("T3", "prerequisite-course:b-gap", "R5+9")})
+        self.assertEqual(gap_ledger.check(ledger), [])
+        items.append(self.item("p03", "code.c", cluster="c-partly", required_by=["s01", "s02", "s03"]))
+        ledger = self.ledger(items, n=8, learning_plan=self.plan_file({"id": "demo", "order": 1}))
+        self.assertEqual(gap_ledger.check(ledger), ["10 sections with bridge sections (max 9): split the course"])
+
     def test_coverage_is_one_and_check_reports_unknown_sections(self):
         ledger = self.ledger([self.item("p01", "stats.a", required_by=["s99"])])
         self.assertEqual(ledger["summary"]["coverage"], 1.0)

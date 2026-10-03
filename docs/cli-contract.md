@@ -42,7 +42,7 @@
 | `score_pack` | `stderr` | 1 | 2：`--material-id` 在 `materials.json` 里没有 |
 | `score_all` | `stderr` | 2：不是目录 | 2：见第 4 节；1：有课程目录的状态是 `fail` 或 `skipped`，或基线文件读坏 |
 | `difficulty_digest` | `stderr` | 2 | 1：`--against` 列出了减少 |
-| `gap_ledger` | `stderr` | 2 | 1：`--check` 不通过，每条一行 `FAIL: ` |
+| `gap_ledger` | `stderr` | 2 | 1：`--check` 不通过，每条一行 `FAIL: `；带 `schema_version` 的 `--learning-plan` 另有 `SUGGEST: ` 行（调序建议），不影响退出码 |
 | `deepseek_build` | `stderr` | 2：用例文件、材料或档案读坏 | 1：没有停在大纲处（token 上限、请求数上限、学习者回合用完、模型调用失败，含环境变量里没有密钥）；0：停在大纲处，或 `--dry-run` 完成 |
 
 `stdout` 一组 7 个，`stderr` 一组 20 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
