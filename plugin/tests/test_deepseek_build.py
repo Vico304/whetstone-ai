@@ -104,6 +104,40 @@ class DeepSeekBuildTests(unittest.TestCase):
         self.assertLessEqual(ledger["totals"]["all"], 12000)
         self.assertEqual(ledger["totals"]["requests"], 2)  # a third (8200 + ~4200 + 1000) would pass 12000
 
+    def test_a_prerequisites_case_answers_the_outline_and_runs_on_to_the_prerequisite_plan(self):
+        case = json.loads(self.case_path.read_text(encoding="utf-8"))
+        self.case_path.write_text(json.dumps({**case, "stop_after": "prerequisites", "outline_reply": "完整，就这样。",
+                                              "max_auto_replies": 3}), encoding="utf-8")
+        course = deepseek_build.sandbox_dir(self.out, "t1") / "workspace" / "courses" / "c"
+        replies = [
+            {"message": {"role": "assistant", "content": "", "tool_calls": [
+                call(1, "write_file", path=str(course / "lesson-plan.json"), content="{}"),
+                call(2, "write_file", path=str(course / "outline.md"), content="# 大纲\n")]},
+             "usage": usage(100, 10, 0), "finish_reason": "tool_calls"},
+            {"message": {"role": "assistant", "content": "大纲在这里，请确认。"}, "usage": usage(200, 10, 100)},
+            {"message": {"role": "assistant", "content": "要先测一下基础吗？"}, "usage": usage(300, 10, 200)},
+            {"message": {"role": "assistant", "content": "", "tool_calls": [
+                call(3, "write_file", path=str(course / "prerequisite-plan.json"), content="{}")]},
+             "usage": usage(400, 10, 300), "finish_reason": "tool_calls"},
+            {"message": {"role": "assistant", "content": "前置计划写好了，待作答。"}, "usage": usage(500, 10, 400)},
+        ]
+        code, stdout, _ = self.run_main(replies)
+        self.assertEqual(code, 0)
+        ledger = self.ledger()
+        self.assertEqual((ledger["stop_reason"], ledger["stop_after"], ledger["auto_replies"]), ("prerequisites", "prerequisites", 2))
+        self.assertEqual(ledger["prerequisite_plans"], ["workspace/courses/c/prerequisite-plan.json"])
+        users = [m["content"] for m in json.loads((self.out / "t1" / "messages.json").read_text(encoding="utf-8"))
+                 if m["role"] == "user"][1:]
+        self.assertEqual(users, ["完整，就这样。", "你定。"])  # the outline reply goes once, then the fixed reply
+        self.assertIn("prerequisites; 5 requests", stdout)
+
+    def test_an_unknown_stop_point_is_bad_input(self):
+        case = json.loads(self.case_path.read_text(encoding="utf-8"))
+        self.case_path.write_text(json.dumps({**case, "stop_after": "units"}), encoding="utf-8")
+        code, _, stderr = self.run_main([])
+        self.assertEqual(code, 2)
+        self.assertIn("stop_after must be one of outline, prerequisites", stderr)
+
     def test_a_half_written_plan_or_a_plan_without_outline_is_not_the_pause(self):
         sandbox = deepseek_build.Sandbox(self.tmp / "box")
         sandbox.build(deepseek_build.load_case(mock.Mock(case=str(self.case_path), material_id=None)))

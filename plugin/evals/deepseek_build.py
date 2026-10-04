@@ -6,7 +6,9 @@ stage files it points to, writes the course files and runs the scripts. This dri
 a model behind an HTTP API. It copies the skill and the materials into a sandbox, exposes five tools
 (list_dir, read_file, write_file, edit_file, run_command) confined to that sandbox, answers the model's questions
 to the learner with one fixed reply, and stops when a parseable lesson-plan.json with an outline.md beside it
-exists and the model hands the turn back (the outline pause), or when a limit is reached. Every request is booked in ledger.json with
+exists and the model hands the turn back (the outline pause), or when a limit is reached. A case with
+``stop_after: "prerequisites"`` answers the outline pause with ``outline_reply`` instead and runs on until a
+parseable prerequisite-plan.json exists when the model hands the turn back. Every request is booked in ledger.json with
 input, output, cache-hit and cache-miss tokens kept apart.
 
 The model call sits behind ``ModelClient``; ``DeepSeekClient`` talks to api.deepseek.com and reads the
@@ -14,7 +16,7 @@ key only from the ``DEEPSEEK_API_KEY`` environment variable (never printed, neve
 Another backend (a server in front of the model) implements ``complete`` and plugs in the same way.
 ``--dry-run`` estimates the usage without any request.
 
-Exit codes: 0 outline reached (or dry-run done), 1 stopped early (cap, limits, model error), 2 bad input.
+Exit codes: 0 the case's stop point reached (or dry-run done), 1 stopped early (cap, limits, model error), 2 bad input.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ KEY_ENV = "DEEPSEEK_API_KEY"
 # the V4 models listed by /models in 2026-09 may cost otherwise; pass --price with the current list price.
 DEFAULT_PRICE = (0.2, 2.0, 3.0)
 DEFAULT_REPLY = "你定，按默认值继续。"
+STOP_POINTS = ("outline", "prerequisites")
 # Output cap per reply, thinking included. 8192 was cut twice in 2026-09-30 by thinking alone; the API took 16384.
 DEFAULT_MAX_OUTPUT = 16384
 CUT_WITH_OUTPUT = "（宿主提示）上一条回复超出输出上限被截断；请把长文件分几次 write_file，第二次起 append=true。"
@@ -238,6 +241,8 @@ def load_case(args) -> dict:
             raise InputError(f"material not found: {root / rel}")
     if case.get("profile") and not Path(case["profile"]).is_file():
         raise InputError(f"profile not found: {case['profile']}")
+    if case.setdefault("stop_after", "outline") not in STOP_POINTS:
+        raise InputError(f"stop_after must be one of {', '.join(STOP_POINTS)}")
     return case
 
 
@@ -302,6 +307,22 @@ class Sandbox:
         for base in (self.workspace, self.materials):
             found += sorted(base.rglob("lesson-plan.json"))
         return found
+
+    def prerequisite_plans(self) -> list[Path]:
+        found = []
+        for base in (self.workspace, self.materials):
+            found += sorted(base.rglob("prerequisite-plan.json"))
+        return found
+
+    def prerequisites_ready(self) -> bool:
+        """A parseable prerequisite-plan.json: the prerequisite stage wrote its plan (answered or not)."""
+        for plan in self.prerequisite_plans():
+            try:
+                json.loads(plan.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            return True
+        return False
 
     def outline_ready(self) -> bool:
         """A parseable lesson-plan.json with an outline.md beside it: the outline stage wrote its two files."""
@@ -484,6 +505,8 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
     ledger = Ledger(cap)
     reply_text = case.get("auto_reply") or DEFAULT_REPLY
     max_replies = int(case.get("max_auto_replies", 3))
+    stop_after = case.get("stop_after", "outline")
+    outline_reply, outline_answered = case.get("outline_reply") or reply_text, False
     messages = [{"role": "system", "content": system_prompt(sandbox, max_output_tokens)},
                 {"role": "user", "content": case["request"]}]
     started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -538,14 +561,20 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
             if reply.finish_reason == "length":
                 messages.append({"role": "user", "content": CUT_WITH_OUTPUT})
                 continue
-            if sandbox.outline_ready():
+            if stop_after == "outline" and sandbox.outline_ready():
                 stop = "outline"
+                break
+            if stop_after == "prerequisites" and sandbox.prerequisites_ready():
+                stop = "prerequisites"
                 break
             if replies >= max_replies:
                 stop = "learner_turns"
                 break
             replies += 1
-            messages.append({"role": "user", "content": reply_text})
+            text = reply_text
+            if stop_after != "outline" and not outline_answered and sandbox.outline_ready():
+                text, outline_answered = outline_reply, True
+            messages.append({"role": "user", "content": text})
     finally:
         transcript.close()
     totals = ledger.totals
@@ -555,7 +584,9 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
         "stop_reason": stop, "error": error, "token_cap": cap, "max_requests": max_requests,
         "http_attempts": getattr(client, "http_attempts", None), "auto_replies": replies,
         "sandbox": str(sandbox.root), "superseded_chars_dropped": dropped,
+        "stop_after": stop_after, "outline_answered": outline_answered,
         "lesson_plans": [str(p.relative_to(sandbox.root)) for p in sandbox.lesson_plans()],
+        "prerequisite_plans": [str(p.relative_to(sandbox.root)) for p in sandbox.prerequisite_plans()],
         "totals": totals, "cost_cny": cost_cny(totals["cache_hit"], totals["cache_miss"], totals["output"], price),
         "price_cny_per_million": list(price), "requests": ledger.rows,
     }
@@ -567,7 +598,8 @@ def drive(case: dict, client: ModelClient, out_dir: Path, cap: int, max_requests
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--case", help="case JSON: id, materials_root, materials[], request, profile?, auto_reply?, max_auto_replies?")
+    source.add_argument("--case", help="case JSON: id, materials_root, materials[], request, profile?, auto_reply?, max_auto_replies?, "
+                        "stop_after? (outline | prerequisites), outline_reply?")
     source.add_argument("--material-id", help="build one entry of evals/materials.json")
     parser.add_argument("--out-dir", required=True, help="run output directory (outside the repository)")
     parser.add_argument("--dry-run", action="store_true", help="estimate usage only; no request, no key needed")
@@ -611,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
           f"(cache hit {t['cache_hit']}, miss {t['cache_miss']}), output {t['output']}, about {summary['cost_cny']} CNY")
     if summary["error"]:
         print(f"ERROR: {summary['error']}", file=sys.stderr)
-    return 0 if summary["stop_reason"] == "outline" else 1
+    return 0 if summary["stop_reason"] == summary["stop_after"] else 1
 
 
 if __name__ == "__main__":
