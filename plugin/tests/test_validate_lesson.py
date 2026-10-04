@@ -95,6 +95,49 @@ class LessonValidationTests(unittest.TestCase):
         self.assertTrue(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text(guide)))
         self.assertFalse(validate_lesson.criterion_leaked(criterion, validate_lesson.normalize_text("完全无关的讲义正文")))
 
+    def test_outline_leak_error_quotes_the_leaked_text(self):
+        plan = load_template()
+        outline = (PLUGIN_ROOT / "skills" / "learn" / "assets" / "outline-template.md").read_text(encoding="utf-8")
+        tradeoff = "先画全局图再讲细节，代价是开头几分钟看不到任何可运行的代码，学习者容易以为这一节只是目录。"
+        plan["sections"][0]["tradeoffs"] = [{"text": tradeoff}]
+        self.assertEqual(validate_lesson.validate_outline(outline, plan), [])
+
+        leaked = outline + "\n注意：代价是开头几分钟看不到任何可运行的代码！\n"
+        errors = validate_lesson.validate_outline(leaked, plan)
+
+        self.assertIn("outline leaks rationale-layer tradeoff from sections[0]: '代价是开头几分钟看不到任何可运行的代码'", errors)
+
+    def test_leaked_fragment_keeps_original_wording_and_truncates(self):
+        text = "Deflated Sharpe ratio, PBO and the haircut all answer one question: how many trials did you run?"
+        guide = validate_lesson.normalize_text("Ask: How many TRIALS did you run")
+
+        self.assertEqual(validate_lesson.leaked_fragment(text, guide), "how many trials did you run")
+        long_guide = validate_lesson.normalize_text(text)
+        fragment = validate_lesson.leaked_fragment(text, long_guide)
+        self.assertEqual(fragment, text[: validate_lesson.LEAK_FRAGMENT_CHARS] + "…")
+        self.assertIsNone(validate_lesson.leaked_fragment(text, validate_lesson.normalize_text("完全无关的大纲")))
+
+    def test_outline_leak_check_ignores_the_sections_own_concept_names(self):
+        # A hidden text that names a long concept collided with "the outline must list every concept":
+        # listing the name counted as leaking the text (DeepSeek run 2026-10-04, E2, 25 requests).
+        plan = load_template()
+        outline = (PLUGIN_ROOT / "skills" / "learn" / "assets" / "outline-template.md").read_text(encoding="utf-8")
+        name = "Deflated Sharpe 与 PBO"
+        plan["sections"][0]["concepts"].append({"id": "learning-design.deflated-sharpe", "name": name})
+        plan["sections"][0]["tradeoffs"] = [{"text": f"{name} 只给出过拟合的概率，不告诉你哪一条策略是真的"}]
+        outline = outline + f"\n- {name}\n"
+        self.assertTrue(validate_lesson.criterion_leaked(f"{name} 只给出过拟合的概率", validate_lesson.normalize_text(outline)))
+
+        self.assertEqual(validate_lesson.validate_outline(outline, plan), [])
+
+        errors = validate_lesson.validate_outline(outline + "它只给出过拟合的概率，不告诉你哪一条策略是真的\n", plan)
+        self.assertIn("outline leaks rationale-layer tradeoff from sections[0]: '只给出过拟合的概率，不告诉你哪一条策略是真的'", errors)
+
+        other = load_template()
+        other["sections"][0]["tradeoffs"] = plan["sections"][0]["tradeoffs"]
+        errors = validate_lesson.validate_outline(outline, other)
+        self.assertTrue(any(e.startswith("outline leaks rationale-layer tradeoff from sections[0]: 'Deflated Sharpe 与 PBO") for e in errors), errors)
+
     def test_schema_11_rejects_bad_ids_layers_relations_and_criteria(self):
         plan = load_template()
         plan["sections"][0]["concepts"][0]["id"] = "NoDot"

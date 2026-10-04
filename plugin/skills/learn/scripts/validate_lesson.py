@@ -1214,9 +1214,12 @@ def validate_outline(outline: str, plan: dict) -> list[str]:
         for concept in section.get("concepts") or []:
             if isinstance(concept, dict) and nonempty(concept.get("name")) and normalize_text(concept["name"]) not in normalized:
                 errors.append(f"outline does not list concept '{concept['name']}' of sections[{index}]")
+        # The outline must list every concept name, so a name inside hidden text is public by design.
+        names = [c["name"] for c in section.get("concepts") or [] if isinstance(c, dict) and nonempty(c.get("name"))]
         for label, text in hidden_texts(section):
-            if criterion_leaked(text, normalized):
-                errors.append(f"outline leaks {label} from sections[{index}]")
+            fragment = leaked_fragment(text, normalized, exclude=names)
+            if fragment is not None:
+                errors.append(f"outline leaks {label} from sections[{index}]: '{fragment}'")
     if plan_shape(plan) == "skeleton":
         for item in plan.get("branch_candidates") or []:
             if isinstance(item, dict) and nonempty(item.get("title")) and normalize_text(item["title"]) not in normalized:
@@ -1374,6 +1377,85 @@ def normalize_text(text: str) -> str:
     return NORMALIZE_STRIP.sub("", text).casefold()
 
 
+LEAK_FRAGMENT_CHARS = 40
+
+
+def normalize_with_offsets(text: str) -> tuple[str, list[int]]:
+    """normalize_text(text), plus the index in `text` that each normalized character came from."""
+    chars: list[str] = []
+    offsets: list[int] = []
+    for index, char in enumerate(text):
+        if NORMALIZE_STRIP.fullmatch(char):
+            continue
+        folded = char.casefold()
+        chars.append(folded)
+        offsets.extend([index] * len(folded))
+    return "".join(chars), offsets
+
+
+def leaked_span(normalized: str, normalized_guide: str) -> tuple[int, int] | None:
+    """The first leaked stretch of `normalized`, as [start, end) in normalized characters."""
+    if len(normalized) < LEAK_MIN_CHARS:
+        return (0, len(normalized)) if normalized and normalized in normalized_guide else None
+    if normalized in normalized_guide:
+        return 0, len(normalized)
+    if len(normalized) <= LEAK_WINDOW_CHARS:
+        return None
+    hits = [
+        normalized[start : start + LEAK_WINDOW_CHARS] in normalized_guide
+        for start in range(0, len(normalized) - LEAK_WINDOW_CHARS + 1)
+    ]
+    if True not in hits:
+        return None
+    first = hits.index(True)
+    last = first
+    while last + 1 < len(hits) and hits[last + 1]:
+        last += 1
+    return first, last + LEAK_WINDOW_CHARS
+
+
+def leaked_fragment(text: str, normalized_guide: str, exclude: list[str] | tuple[str, ...] = ()) -> str | None:
+    """The leaked part of `text` as it is written there (at most LEAK_FRAGMENT_CHARS), or None.
+
+    Names in `exclude` are public by design (the outline must list every concept
+    name), so they are cut out of `text` before the check and a window never spans
+    them. What remains is checked piece by piece; a piece shorter than
+    LEAK_MIN_CHARS is too short to count as a leak on its own.
+    """
+    normalized, offsets = normalize_with_offsets(text)
+    public = [False] * len(normalized)
+    for name in exclude:
+        target = normalize_text(name)
+        start = normalized.find(target) if target else -1
+        while start != -1:
+            public[start : start + len(target)] = [True] * len(target)
+            start = normalized.find(target, start + 1)
+    if True in public:
+        pieces, start = [], None
+        for index, flag in enumerate([*public, True]):
+            if not flag and start is None:
+                start = index
+            elif flag and start is not None:
+                pieces.append((start, index))
+                start = None
+        span = None
+        for piece_start, piece_end in pieces:
+            if piece_end - piece_start < LEAK_MIN_CHARS:
+                continue
+            found = leaked_span(normalized[piece_start:piece_end], normalized_guide)
+            if found:
+                span = (piece_start + found[0], piece_start + found[1])
+                break
+    else:
+        span = leaked_span(normalized, normalized_guide)
+    if span is None:
+        return None
+    fragment = text[offsets[span[0]] : offsets[span[1] - 1] + 1].strip()
+    if len(fragment) > LEAK_FRAGMENT_CHARS:
+        fragment = fragment[:LEAK_FRAGMENT_CHARS] + "…"
+    return fragment
+
+
 def criterion_leaked(criterion: str, normalized_guide: str) -> bool:
     """Guardrail, not a proof: catches verbatim and near-verbatim copies.
 
@@ -1383,18 +1465,7 @@ def criterion_leaked(criterion: str, normalized_guide: str) -> bool:
     Paraphrase remains undetectable by construction; that judgment stays with
     the model and the author.
     """
-    normalized = normalize_text(criterion)
-    if len(normalized) < LEAK_MIN_CHARS:
-        return bool(normalized) and normalized in normalized_guide
-    if normalized in normalized_guide:
-        return True
-    if len(normalized) <= LEAK_WINDOW_CHARS:
-        return False
-    return any(
-        normalized[start : start + LEAK_WINDOW_CHARS] in normalized_guide
-        for start in range(0, len(normalized) - LEAK_WINDOW_CHARS + 1)
-    )
-
+    return leaked_span(normalize_text(criterion), normalized_guide) is not None
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
