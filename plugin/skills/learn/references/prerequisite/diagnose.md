@@ -3,9 +3,9 @@
 ## 阶段一：建立最小前置地图
 
 1. 先读取足以识别主题、边界和关键推理的原材料，不先用外部资料替代原文分析。
-2. 对每个候选前置项记录：名称、为何是前置、它支撑哪一段主线、材料位置、当前确定性。
+2. 对每个候选前置项记录：名称、为何是前置、它支撑哪一段主线、材料位置、当前确定性；并写 1.1 的四个字段：`concept_id`（写法同概念 id）、`required_by`（本课的节 id）、`cluster`、`depth_required`（`fact / mechanism / tool`）。候选除了从正文找，再看两处：材料自己说"假定读者已经知道"的段落；删除思想实验——去掉这个概念，主线哪一步最先讲不通。
 3. 按相互依赖的概念簇组织，不用大量孤立术语考察。
-4. 用 `assets/prerequisite-plan-template.json` 写 `prerequisite-plan.json`，运行 `scripts/validate_prerequisites.py`。
+4. 用 `assets/prerequisite-plan-template.json` 写 `prerequisite-plan.json`（`schema_version: "1.1"`），运行 `scripts/validate_prerequisites.py`。
 
 前置地图是组织诊断的机器参考，不是对学习者的判决，也不是标准答案。
 

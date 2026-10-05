@@ -187,8 +187,8 @@ class DifficultyDigestTests(unittest.TestCase):
         self.assertEqual(s01["core_ids"], ["learning-design.macro-map", "learning-design.system-boundary"])
         self.assertEqual(len(s01["criteria_sha"]), 3)
         self.assertIn("learning-design.problem-chain", s01["checks"])
-        self.assertEqual(digest["final"]["n_criteria"], 2)
-        self.assertEqual(digest["final"]["layers"], {"unset": 2})
+        self.assertEqual(digest["final"]["n_criteria"], 3)
+        self.assertEqual(digest["final"]["layers"], {"unset": 3})
         self.assertEqual(difficulty_digest.compare(digest, difficulty_digest.digest(self.plan())), ([], []))
 
     def test_every_kind_of_reduction_is_listed_and_additions_are_allowed(self):
@@ -200,7 +200,7 @@ class DifficultyDigestTests(unittest.TestCase):
             "criterion text changed or removed (#2)": lambda p: p["sections"][0]["checkpoint"]["criteria"][1].update(text="改写"),
             "core concepts removed: learning-design.macro-map": lambda p: p["sections"][0]["concepts"][1].update(role="supporting"),
             "check[learning-design.problem-chain]: removed": lambda p: p["sections"][0]["concepts"][2].pop("check"),
-            "final_challenge: criteria 2 → 1": lambda p: p["final_challenge"]["criteria"].pop(),
+            "final_challenge: criteria 3 → 2": lambda p: p["final_challenge"]["criteria"].pop(),
             "s01: removed": lambda p: p["sections"].pop(0),
         }
         for expected, change in cases.items():

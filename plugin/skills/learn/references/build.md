@@ -31,7 +31,7 @@
 
 ## 2. 检查并补足前置知识
 
-**骨架课（`shape: skeleton`）把这一阶段推迟到 units 生成之后**：先按 [protocol/probe.md](protocol/probe.md) 为"单元正文用到而本课未定义"的概念做一次前置地图（阶段一、二，深度按 `prerequisite_check`），再做一轮原理探测；两者暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段。运行时先读取 [prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
+**骨架课（`shape: skeleton`）把这一阶段推迟到 units 生成之后**：先按 [protocol/probe.md](protocol/probe.md) 为"单元正文用到而本课未定义"的概念做一次前置地图（阶段一、二，深度按 `prerequisite_check`），再做一轮原理探测；两者暴露地板太低时同样进入下面的诊断与建课。其余课程根据 `prerequisite_check` 判断是否运行前置阶段；`always` 时第 1 步提前到大纲校验后、呈现之前（[stages/outline.md](stages/outline.md)），第 2 步起仍在大纲确认、units 生成之后，直接用那份计划，学习者确认大纲时纠正过的项先改。运行时先读取 [prerequisite/_index.md](prerequisite/_index.md)，再按其加载表只读当前阶段的文件，并按以下顺序执行：
 
 1. 从原材料抽取会阻断主线理解的最小前置概念簇，建立 `prerequisite-plan.json`；
 2. 初始化 `prerequisite-progress.json`，在不显示参考答案的情况下一次询问一个诊断问题（开启知识库时先查索引，前置课里学过的概念直接出变式题）；
@@ -39,7 +39,7 @@
 4. 有任何 `fragile | gap | misconception` 的簇，就为它们建**一门前置课**（[prerequisite/course.md](prerequisite/course.md)）：外部存档作来源、`schema 1.4`、模式跟随本课、大纲照常确认、逐节教学与记录；本课在当前节 `learning_state.py block`；
 5. 前置课结课后回程（[prerequisite/return.md](prerequisite/return.md)）：`unblock`、对被卡簇出变式题，再从被卡的节继续。
 
-小缺口也建课，不再生成补充文档。前置课自己暴露缺口时同一协议递归；`learning-plan.md` 的"前置栈"随时可见。在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中可生成待作答的前置计划，但必须把准备度标记为未评估，不得伪造回答或背景结论。
+小缺口也建课，不再生成补充文档。前置课自己暴露缺口时同一协议递归；`learning-plan.md` 的"前置栈"随时可见。在 `build + teach` 模式中，前置阶段启动后，首次回复到提出第一个诊断问题为止，不提前生成学习者画像或直接进入正课。在纯 `build` 模式中：`prerequisite_check=always` 时必须生成待作答的前置计划，其余档位可生成；准备度一律标记为未评估，不得伪造回答或背景结论。
 
 ## 3. 大纲：从大框架建立问题链，并列出全部概念
 
@@ -107,7 +107,8 @@
 - 检查点要求学习者解释概念、关系或机制，而不是只复述句子或回答选择题；复用的概念带着库里的错误命题时，`criteria` 里有一条直接对准那个误解（来源见 §3）。按节类型出题，一律**合上文档作答**（结构图与步骤表学习期间随时可回查，验收时合上）：
   - 结构讲解节：给一个起点和一个终点，请学习者说出中间经过哪些部件、谁装在谁里面、每条连线上走的是什么。只判这一条路径，不要求复述整张图。`criteria` 三条——定位、职责、连接，`layer: fact`；
   - 过程讲解节：请学习者按顺序说出这次运行的步骤、每步谁做的、什么变了。`criteria` 三条——步骤、参与者、变化，`layer: mechanism`；
-  - 问题链节不变。
+  - 问题链节：一个场景一个任务，不逐条翻译判定标准；问句数不超过判定标准条数。
+- `final_challenge.criteria` 写 3–5 条，一条只判一件事；以易错点为主的节，至少有一条点到它。
 - 快速模式下只保留主线 core unit，其余进 `deferred[]`；被略过的内容在 outline 里可见，日后可补。
 
 ## 完成标准（建课与首节教学）

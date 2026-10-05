@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "lesson_id": "sample-guided-lesson",
   "assessment_mode": "auto",
   "scope_statement": "仅评估理解当前材料主线所需的前置能力，不推断学习者的一般智力或整体学习能力。",
@@ -7,6 +7,12 @@
     {
       "id": "p01",
       "name": "输入、处理与输出的基本区分",
+      "concept_id": "systems.input-process-output",
+      "cluster": "系统边界",
+      "required_by": [
+        "s01"
+      ],
+      "depth_required": "mechanism",
       "why_needed": "材料用端到端流程组织多个组件，需要先能区分一个系统接收什么、变换什么和产生什么。",
       "required_for": [
         "建立宏观系统地图",

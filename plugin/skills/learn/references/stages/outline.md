@@ -8,7 +8,8 @@
 2. 建立来源范围（[../build.md](../build.md) §1）；
 3. 从大框架建立问题链、给每个 unit 分配全部概念并标角色、填覆盖账本（[../build.md](../build.md) §3）；
 4. 写 `lesson-plan.json`（schema 1.6，`outline_confirmed_at: null`）与 `outline.md`——问题链图与系统框图用 `scripts/diagram.py <plan> --chain` / `--system` 生成后贴入，不手画——运行
-   `validate_lesson.py <plan> --outline outline.md [--sources-root <材料根>]`。
+   `validate_lesson.py <plan> --outline outline.md [--sources-root <材料根>]`；
+5. `prerequisite_check=always`（档案自述从零开始或基础薄弱）时，校验通过后、呈现之前按 [../build.md](../build.md) §2 第 1 步写待作答的 `prerequisite-plan.json`（`schema_version: "1.1"`，`required_by` 填本课的节 id）并运行 `validate_prerequisites.py`。只写计划：不出诊断题，不建 `prerequisite-progress.json`，`uncertainties` 写一句"准备度未评估，开课前诊断"。
 
 ## 呈现与确认
 大纲生成并通过校验后，**停下**，把下面这些呈现给学习者（直接给 `outline.md` 的路径，并在对话里摘要）：
@@ -17,17 +18,21 @@
 2. 问题链：每个 unit 一行"问题 → 方案"；
 3. 全部概念清单（按 unit、按角色）；
 4. 覆盖账本里的 `excluded` 项及理由——学习者应该知道什么被明确不讲；
-5. 预计 unit 数与深度。
+5. 预计 unit 数与深度；
+6. 写了待作答的前置计划时：推测你还缺的基础——每个簇一行"名字、为什么需要、支撑哪一节"，注明只是按档案和材料推测，不出题，开课前再诊断。有 `learning-plan.md` 时另注两类：计划里更早的课已经教的（本课只提一句，不补），排在后面的课才教的（建议把那门课提前，由学习者定）。
 
 然后**只问一件事**，一段话说完：
 
 > "两个决定请你定：① 模式——**完整**（每个 unit 都预测、重建、追问，core 概念全部进检查点）还是**快速**（只保留主线 unit，回答方向对就给修正继续，最后用整体框架重述验收）？② 上面的 unit 里有想略过或想加深的吗、有想从 listed 升成 core 的概念吗？直接回"完整，就这样"或"快速，略过 4 和 6"都可以。"
+
+呈现了第 6 项时，在这段话末尾加一句："上面推测你还缺的基础里，有已经会的吗？"
 
 学习者回答后：
 
 - 写回 `lesson-plan.json`：`mode`、`deferred[]`（略过的 unit 用 `type: section`，理由写"学习者选择略过"或快速模式默认）、`outline_confirmed_at`（**用 `date -u +%FT%TZ` 取真实时间**，不要写 00:00:00 占位；校验器会警告）；升级的概念改 `role`；
 - 快速模式默认略过：非主线的 unit（大纲里标为可略过的）、以及所有 `listed` 概念保持 listed；不擅自略过 core unit；
 - 更新 `outline.md` 的模式与状态列，重新校验；
+- 学习者说已经会的前置项不删，在 `prerequisite-plan.json` 的 `uncertainties` 记"<名字>：学习者自述已会，诊断时先问"，重新运行 `validate_prerequisites.py`；
 - **确认前不得生成任何 `units/<id>.md`。**
 
 学习者在确认时说"我不懂 X、Y"（大纲里的概念或它们依赖的更基础的东西）：这些视为已诊断为 `gap`，写回大纲后不生成 units，直接按 [../prerequisite/course.md](../prerequisite/course.md) 为它们建前置课，本课在第一个未 deferred 的节上 `block`。

@@ -6,9 +6,9 @@
 |---|---|---|---|
 | 1 目标与背景 | `<工作区>/learner-profile.md`（跨课；统一布局下计划目录可再放一份只写本目标的） | [profile.md](profile.md) | 档案已存在且学习者没说要改 |
 | 2 材料评估 | `<计划目录>/survey/materials-survey.md/json` | [triage.md](triage.md) | 材料是单个 ≤ 30 KB 文件 |
-| 3 学习计划 | `<计划目录>/learning-plan.md`（课程序列，逐门确认） | [plan.md](plan.md) | 只有一门课的规模 |
-| 4 课程大纲 | `<计划目录>/<course-id>/outline.md` + `lesson-plan.json`（`outline_confirmed_at`） | [outline.md](outline.md)；骨架课改读 [skeleton.md](skeleton.md) | 该课已有确认过的大纲 |
-| 5 生成 units → 前置（骨架课：原理探测）→ 教学 | `units/`、进度、知识库 | [../build.md](../build.md) §4–§5，教学读 `../protocol/`；骨架课的探测轮读 [../protocol/probe.md](../protocol/probe.md) | — |
+| 3 学习计划 | `<计划目录>/learning-plan.md`（课程序列，逐门确认） | [plan.md](plan.md) | 只有一门课的规模：材料 ≤ 30 KB 文档，或 ≤ 3000 行代码、≤ 10 个文件（[triage.md](triage.md)「切分」）；跳过时目标情境写进本课 `outline.md` 的学习目标 |
+| 4 课程大纲 | `<计划目录>/<course-id>/outline.md` + `lesson-plan.json`（`outline_confirmed_at`）；`prerequisite_check=always` 时另写待作答的 `prerequisite-plan.json`（大纲校验后、呈现前，准备度未评估） | [outline.md](outline.md)；骨架课改读 [skeleton.md](skeleton.md) | 该课已有确认过的大纲 |
+| 5 生成 units → 前置检查的诊断与建课（骨架课：前置地图与原理探测）→ 教学 | `units/`、进度、知识库 | [../build.md](../build.md) §4–§5，教学读 `../protocol/`；骨架课的探测轮读 [../protocol/probe.md](../protocol/probe.md) | — |
 
 工作区与计划目录的定义见 [../workspace.md](../workspace.md)：宿主打开的目录里有 `courses/` / `store/` / `learner-profile.md` → 它是工作区，计划目录是 `courses/<目标>/`；否则工作区是材料根下的 `whetstone/`，计划目录就是它。判断顺序（learn 启动时静默执行）：
 

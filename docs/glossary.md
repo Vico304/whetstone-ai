@@ -40,6 +40,9 @@
 | 复习课 | `shape: review`、`review_of[]`、`review_kind: repeat / deepen` | 为已学过的一门或几门课建的课，侧重薄弱处，先作答再揭示；子节在这里学 |
 | 事实卡 | `cards/<lesson-id>.json`、`kind: recall` | 事实层与仅列出的概念的名字对定义，按到期复习；只落在那个概念上，不给机制、本质、思想做卡 |
 | 接缝题 | 复习课结课的迁移题（`review_of` 多于一门时） | 一个必须同时用到两门课机制的情境 |
+| 学习计划 | 学程、学程文件（`learning-plan.json`，schema 1.0） | 一个学习目标下按先后排好的一组课。`learning-plan.md` 是学习者逐门确认、可以手改的那份；学程文件由 `plugin/evals/learning_plan_build.py` 从它和课程目录推出，先后取 `courses[].order`，每次重推覆盖，模型不写 |
+| 共用基础课 | 学程课（`gap_ledger.py` 的落点 `plan-course:<簇>`） | 学程里两门及以上的课都缺的一个前置簇，建成学程里的一门普通课，排在第一门需要它的课之前；不写 `prerequisite_of`，不进前置栈。只有一门课需要的缺口不是学程课 |
+| 交给更早的课 | 前移（`gap_ledger.py` 的补法 `defer_to_course`） | 本课缺的前置（状态 `gap`）正是学程里更早一门课的核心概念：本课不补，落点记那门课的 id |
 
 规则：
 
