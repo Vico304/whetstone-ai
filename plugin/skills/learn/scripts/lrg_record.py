@@ -245,6 +245,7 @@ def command_append(args: argparse.Namespace) -> int:
 
 
 def command_show(args: argparse.Namespace) -> int:
+    store_init.load_store(args.store)  # like append: a missing store is an error, not an empty log
     events = read_events(args.store, args.lesson_id)
     attempts = [e for e in events if e.get("event") == "attempt"]
     print(f"lesson: {args.lesson_id}  attempts: {len(attempts)}")

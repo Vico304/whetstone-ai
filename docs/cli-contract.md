@@ -34,7 +34,7 @@
 | `index_match` | `stderr` | 1 | — |
 | `outline_status` | `stderr` | 1 | 0 且 `stdout` 打 `skipped: `：课程目录缺三个文件之一，含目录不存在 |
 | `mermaid_fit` | `stderr` | 1 | — |
-| `lrg_record` | `stderr` | 1 | `show` 的知识库或课程不存在时 0，见第 5 节，待定 |
+| `lrg_record` | `stderr` | 1：含 `show` 的知识库不存在或读坏 | 0：`show` 的知识库里还没有这门课的学习记录，打 `attempts: 0` |
 | `store_sync` | `stderr` | 1 | — |
 | `source_manifest` | `stderr` | 1 | 1 且无前缀：两处参数检查；2：清单生成了但有 `problems` |
 | `next_step` | `stderr` | 1 | — |
@@ -54,7 +54,7 @@
 
 临时目录里有：`bad.json`（不是 JSON）、`resp.txt`、`badstore/store.json`（不是 JSON）、`badcourse/`（`outline.md` 加两个读坏的 JSON）。`missing.*`、`nostore/`、`nocourse/` 不存在。
 
-`WITHOUT_STORE`，43 行：
+`WITHOUT_STORE`，50 行：
 
 | 脚本 | 参数 | 退出码 | 流 |
 |---|---|---|---|
@@ -84,6 +84,8 @@
 | `mermaid_fit` | `missing.md` | 1 | `stderr` |
 | `mermaid_fit` | `badcourse` | 1 | `stderr` |
 | `lrg_record` | `append --store nostore --lesson-id x --section-id s --response-file resp.txt --verdict mastered` | 1 | `stderr` |
+| `lrg_record` | `show --store nostore --lesson-id x` | 1 | `stderr` |
+| `lrg_record` | `show --store badstore --lesson-id x` | 1 | `stderr` |
 | `scan_wikilinks` | `missing.md` | 2 | `stdout` |
 | `score_pack` | `nocourse` | 1 | `stderr` |
 | `score_pack` | `badcourse` | 1 | `stderr` |
@@ -109,7 +111,7 @@
 
 后三组先用课程模板建好知识库 `store/`：`store_init init`、`store_init register`、`mrg_export --store`。`{lesson}`、`{section}` 是模板的课程 id 与第一节 id；`append …` 省略的是 `--store store --lesson-id {lesson} --section-id {section}`。
 
-`WITH_STORE`，8 行，全部退出 1、走 `stderr`：
+`WITH_STORE`，9 行，除注明外都退出 1、走 `stderr`：
 
 | 脚本 | 参数 |
 |---|---|
@@ -118,6 +120,7 @@
 | `index_match` | `recall --store store --candidates bad.json` |
 | `lrg_record` | `append … --response-file missing.txt --verdict mastered` |
 | `lrg_record` | `append … --response-file resp.txt --verdict mastered --extraction bad.json` |
+| `lrg_record` | `show --store store --lesson-id nosuch`：退出 0，`stdout` 打 `lesson: nosuch  attempts: 0` |
 | `cards` | `build --store store --lesson-id nosuch` |
 | `review_outline` | `--store store --lesson-id {lesson}`，尚无 `learner-state.json` |
 | `learner_state_build` | `show --store store`，尚无 `learner-state.json` |
@@ -145,7 +148,7 @@
 
 ## 4. 退出码
 
-- 0：成功。另有两处坏输入也是 0：`outline_status` 打 `skipped: `；`lrg_record show` 见第 5 节。
+- 0：成功。另有一处坏输入也是 0：`outline_status` 打 `skipped: `。`lrg_record show` 对还没有学习记录的课打 `attempts: 0`，是正常情况，不算坏输入。
 - 1：多数脚本读坏文件或执行失败时的退出码。`validate_lesson`、`validate_prerequisites`、`mrg_export` 的 1 专指校验不通过；`mrg_export` 的输出文件已存在而没给 `--force` 也是 1。`score_all` 的 1 是有课程目录的状态是 `fail` 或 `skipped`，或基线文件读坏。
 - 2 有五种含义：
   1. `argparse` 参数错误，包括 `survey_materials` 的 `--max-files` 小于 1。前缀 `usage:`，走 `stderr`。
@@ -156,5 +159,4 @@
 
 ## 5. 已知例外
 
-- `lrg_record show` 遇到不存在的知识库目录，或知识库里没有这门课的学习记录（LRG，`lrg/<lesson-id>.jsonl`），退出 0，`stdout` 打 `lesson: <id>  attempts: 0`，`stderr` 为空，不创建目录。待定：这是否应当报错尚未决定，`test_cli.py` 不收这一条，本文不把它当作规范。
 - `source_manifest` 的两处参数检查用 `raise SystemExit("…")`：没给源路径也没给 `--rebase`，`--max-text-bytes` 或 `--max-hash-bytes` 小于 1。退出 1，消息走 `stderr`，没有 `ERROR:` 前缀。
