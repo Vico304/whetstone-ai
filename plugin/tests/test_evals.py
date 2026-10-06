@@ -707,3 +707,86 @@ class LearningPlanBuildTests(unittest.TestCase):
         self.assertEqual(lines[6], "current: parent-1; next: later-1; sections done: 0/1")
         self.assertEqual((check.returncode, check.stdout.splitlines()[-1]), (1, "ORDER: dropped-1 depends on later-1, which comes later"))
         self.assertEqual((built.returncode, built.stdout, written["schema_version"]), (0, "", "1.0"))
+
+
+prereq_seed = load_module("prereq_seed", PLUGIN_ROOT / "evals")
+
+
+class PrereqSeedTests(unittest.TestCase):
+    """The draft prerequisite plan prereq_seed.py infers from a lesson plan, and its comparison with a written plan."""
+
+    PROFILE = "| 领域 | 自述水平 | 说过的具体概念 | 证据 |\n| --- | --- | --- | --- |\n| quant | 未接触 | | 自述 |\n" \
+              "| code | 熟练 | | 自述 |\n\n- 前置检查：`prerequisite_check=always`\n"
+
+    def lesson(self, uncertainties=(), known_heading="## 你已经知道的", path="L2-回测.md"):
+        return {
+            "lesson_id": "demo",
+            "sections": [
+                {"id": "s01", "source_refs": [{"path": "code/run.py", "locator": "run"}],
+                 "concepts": [{"id": "quant.signal", "name": "信号", "layer": "fact"}]},
+                {"id": "s02", "concepts": [{"id": "quant.vol", "name": "年化波动", "layer": "fact", "role": "listed",
+                                            "domain_path": ["量化", "统计"], "explanation": "日收益标准差乘根号 252（来源 `## 你已经知道的`）"}]},
+                {"id": "s03", "concepts": [{"id": "quant.overfit", "name": "过拟合", "layer": "mechanism"}]},
+            ],
+            "coverage": [
+                {"path": path, "heading": known_heading, "disposition": "listed", "section_id": "s02"},
+                {"path": path, "heading": "## 引出的新问题", "disposition": "excluded",
+                 "reason": "指向后续节点 L2-交易成本与滑点、L3-数据管理"},
+            ],
+            "uncertainties": list(uncertainties),
+        }
+
+    def test_nodes_assumed_concepts_and_code_feed_the_gap_ledger(self):
+        lesson = self.lesson(["讲义依赖的前置内容（L0-收益率的度量、L1-随机游走与市场有效性）不在本批材料内",
+                              "材料自述依赖 L0（收益率的度量、风险是什么）节点"])
+        draft = prereq_seed.seed(lesson, self.PROFILE)
+        items = [(i["seed"]["rule"], i["name"], i["required_by"], i["dependency_kind"]) for i in draft["prerequisites"]]
+        self.assertEqual(items, [
+            ("node", "L0-收益率的度量", ["s02"], "mech"),
+            ("node", "L1-随机游走与市场有效性", ["s02"], "mech"),
+            ("node", "L0-风险是什么", ["s02"], "mech"),
+            ("assumed", "年化波动", ["s02"], "def"),
+            ("code", "读懂配套代码", ["s01"], "tool"),
+        ])  # L2 / L3 nodes point forward and are left out; nodes were found, so no 「你已经知道的」 row item
+        self.assertEqual((draft["assessment_mode"], draft["seed_summary"]["material_level"]), ("always", 2))
+        self.assertEqual(draft["prerequisites"][3]["concept_id"], "quant.vol")
+        ledger = gap_ledger.build_ledger(draft, lesson, self.PROFILE)
+        self.assertEqual([(i["state"], i["disposition"]) for i in ledger["items"]],
+                         [("gap", "T2"), ("gap", "T2"), ("gap", "T2"), ("gap", "T0"), ("known", "T0")])
+        self.assertEqual(gap_ledger.check(ledger), [])
+
+    def test_known_part_rows_stand_in_when_no_node_is_named(self):
+        draft = prereq_seed.seed(self.lesson())
+        self.assertEqual([(i["seed"]["rule"], i["required_by"]) for i in draft["prerequisites"]],
+                         [("assumed", ["s02"]), ("section", ["s02"]), ("code", ["s01"])])
+        self.assertEqual(draft["assessment_mode"], "auto")
+        # Without a level in the file names a node counts only in a sentence about prerequisites.
+        lesson = self.lesson(["课程提到 L1-随机游走 的结论", "依赖 L0-收益率的度量"], known_heading="复习", path="notes.md")
+        self.assertEqual([i["name"] for i in prereq_seed.seed(lesson)["prerequisites"] if i["seed"]["rule"] == "node"],
+                         ["L0-收益率的度量"])
+
+    def test_against_a_written_plan_and_the_command_line(self):
+        import subprocess, sys
+        written = {"lesson_id": "demo", "prerequisites": [
+            {"id": "p01", "name": "收益率的度量：简单收益与年化", "concept_id": "quant.return"},
+            {"id": "p02", "name": "用表格数据写代码", "concept_id": "code.table", "dependency_kind": "tool"},
+            {"id": "p03", "name": "显著性检验", "concept_id": "stats.significance"},
+        ]}
+        lesson = self.lesson(["依赖 L0-收益率的度量"])
+        result = prereq_seed.compare(prereq_seed.seed(lesson), written)
+        self.assertEqual([(link["draft"], link["written"]) for link in result["links"]], [("q01", "p01"), ("q03", "p02")])
+        self.assertEqual(([m["id"] for m in result["written_missed"]], [m["id"] for m in result["draft_unmatched"]]),
+                         (["p03"], ["q02"]))
+        self.assertEqual((result["recall"], result["precision"]), (0.667, 0.667))
+        script = PLUGIN_ROOT / "evals" / "prereq_seed.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "lesson-plan.json").write_text(json.dumps(lesson, ensure_ascii=False), encoding="utf-8")
+            (root / "written.json").write_text(json.dumps(written, ensure_ascii=False), encoding="utf-8")
+            done = subprocess.run([sys.executable, str(script), str(root / "lesson-plan.json"), "--against", str(root / "written.json"),
+                                   "--output", str(root / "draft.json")], capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stderr, json.loads(done.stdout)["recall"]), (0, "", 0.667))
+            self.assertEqual(len(json.loads((root / "draft.json").read_text(encoding="utf-8"))["prerequisites"]), 3)
+            done = subprocess.run([sys.executable, str(script), str(root / "missing.json")], capture_output=True, text=True)
+            self.assertEqual((done.returncode, done.stdout), (2, ""))
+            self.assertTrue(done.stderr.startswith("ERROR: "))
