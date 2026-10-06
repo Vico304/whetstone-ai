@@ -1,8 +1,8 @@
 # 命令行坏输入契约
 
-28 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
+29 个脚本在坏输入下的现行行为：消息的首行前缀、消息所在的流、退出码。给调用这些脚本的模型与维护者对照。本文记录的是代码现在的行为，不表示它是对的；要改其中任何一条，先改 `plugin/tests/test_cli.py` 里对应的行，再改脚本。
 
-脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py`、`difficulty_digest.py`、`gap_ledger.py`、`deepseek_build.py`、`learning_plan_build.py` 在 `plugin/evals/`。
+脚本位置：`plugin/skills/learn/scripts/` 下 21 个；`scan_wikilinks.py` 在 `plugin/skills/clarify/scripts/`；`score_pack.py`、`score_all.py`、`difficulty_digest.py`、`gap_ledger.py`、`deepseek_build.py`、`learning_plan_build.py`、`prereq_seed.py` 在 `plugin/evals/`。
 
 ## 1. 共同约定
 
@@ -45,8 +45,9 @@
 | `gap_ledger` | `stderr` | 2 | 1：`--check` 不通过，每条一行 `FAIL: `；带 `schema_version` 的 `--learning-plan` 另有 `SUGGEST: ` 行（调序建议），不影响退出码 |
 | `deepseek_build` | `stderr` | 2：用例文件、材料或档案读坏 | 1：没有停在大纲处（token 上限、请求数上限、学习者回合用完、模型调用失败，含环境变量里没有密钥）；0：停在大纲处，或 `--dry-run` 完成 |
 | `learning_plan_build` | `stderr` | 2：`--plan-dir` 不是目录，或其中的 JSON 读坏 | 1：`--check` 有 `ORDER: ` 行（`depends_on` 指向排在后面的课）；其余检查行只报告 |
+| `prereq_seed` | `stderr` | 2：课程计划、`--profile` 或 `--against` 读坏 | — |
 
-`stdout` 一组 7 个，`stderr` 一组 21 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
+`stdout` 一组 7 个，`stderr` 一组 22 个。`stdout` 一组里的前四个是校验、导出与扫描类，输出本来就给模型读；`learning_state`、`store_init`、`prerequisite_state` 与同类的 `stderr` 脚本不一致，原因没有记录，是否统一未定。
 
 ## 3. `test_cli.py` 逐行
 
@@ -54,7 +55,7 @@
 
 临时目录里有：`bad.json`（不是 JSON）、`resp.txt`、`badstore/store.json`（不是 JSON）、`badcourse/`（`outline.md` 加两个读坏的 JSON）。`missing.*`、`nostore/`、`nocourse/` 不存在。
 
-`WITHOUT_STORE`，50 行：
+`WITHOUT_STORE`，52 行：
 
 | 脚本 | 参数 | 退出码 | 流 |
 |---|---|---|---|
@@ -97,6 +98,8 @@
 | `deepseek_build` | `--case missing.json --out-dir out --dry-run` | 2 | `stderr` |
 | `deepseek_build` | `--case bad.json --out-dir out --dry-run` | 2 | `stderr` |
 | `learning_plan_build` | `--plan-dir missing` | 2 | `stderr` |
+| `prereq_seed` | `missing.json` | 2 | `stderr` |
+| `prereq_seed` | `bad.json` | 2 | `stderr` |
 | `prerequisite_state` | `show --state missing.json` | 1 | `stdout` |
 | `prerequisite_state` | `show --state bad.json` | 1 | `stdout` |
 | `validate_prerequisites` | `missing.json` | 2 | `stdout` |

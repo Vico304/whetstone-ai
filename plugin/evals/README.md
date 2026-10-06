@@ -77,6 +77,20 @@ python3 skills/learn/scripts/prerequisite_state.py show --state evals/prerequisi
 
 作答记录由 `prerequisite_state.py` 按计划逐条写出（一簇 `ready`；一簇 `gap` 后回程复测 `ready`），测试会按事件顺序重放并比对。
 
+## 从大纲推前置计划草稿
+
+建课的模型没写 `prerequisite-plan.json` 时，`gap_ledger.py` 没有输入。`prereq_seed.py` 从 `lesson-plan.json` 里模型已经写下的内容推一份 schema 1.1 的草稿：
+
+```bash
+python3 evals/prereq_seed.py <课程目录>/lesson-plan.json --profile learner-profile.md --output draft.json
+python3 evals/gap_ledger.py draft.json <课程目录>/lesson-plan.json --profile learner-profile.md
+python3 evals/prereq_seed.py <课程目录>/lesson-plan.json --against <课程目录>/prerequisite-plan.json
+```
+
+四条规则，每项在 `seed.rule` 记来自哪条：`node`，`uncertainties[]`、`coverage[]` 或 `deferred[]` 的理由里点名的低一级材料节点（如 `L0-收益率的度量`，级别比材料文件名里最低的 `L<n>` 小；文件名不带级别时，句子里还要有"前置""依赖""已经知道""准备度"之一）；`assumed`，说明或 `source_refs` 引用了材料"你已经知道的"那部分的概念；`section`，一个节点都没找到时，每条"你已经知道的"覆盖行算一项；`code`，课程引用了代码文件时，读懂代码算一项 `tool`。档案里的 `prerequisite_check` 定 `assessment_mode`（默认 `auto`）。草稿没有诊断题，不过 `validate_prerequisites.py`，只作量尺。
+
+`--against` 把草稿与模型写的计划逐项对：`concept_id` 相同，或草稿的 `code` 项遇上 `tool` 项，或草稿项名字的某一段（按"与""和""、"切开，去掉"是什么""的"）有一半以上的相邻两字出现在对方的文字里，算对上；打印对上的配对、模型写了而草稿没推出的项、草稿多出的项，以及两个比例 `recall`、`precision`。读不了输入退出 2。
+
 ## 指标含义
 
 | 指标 | 关注什么 |

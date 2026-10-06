@@ -23,7 +23,8 @@ ERROR = "ERROR: "
 # Scripts that do not live in the learn skill's scripts directory.
 OTHER_ROOTS = {"scan_wikilinks": CLARIFY_SCRIPT_ROOT, "score_pack": PLUGIN_ROOT / "evals", "score_all": PLUGIN_ROOT / "evals",
                "difficulty_digest": PLUGIN_ROOT / "evals", "gap_ledger": PLUGIN_ROOT / "evals",
-               "deepseek_build": PLUGIN_ROOT / "evals", "learning_plan_build": PLUGIN_ROOT / "evals"}
+               "deepseek_build": PLUGIN_ROOT / "evals", "learning_plan_build": PLUGIN_ROOT / "evals",
+               "prereq_seed": PLUGIN_ROOT / "evals"}
 
 # Run in a scratch directory holding: bad.json (not JSON), resp.txt, badstore/store.json (not JSON),
 # badcourse/ (outline.md, lesson-plan.json and learning-progress.json, the two JSON files broken).
@@ -68,6 +69,8 @@ WITHOUT_STORE = [
     ("deepseek_build", ["--case", "missing.json", "--out-dir", "out", "--dry-run"], 2, "stderr", ERROR),
     ("deepseek_build", ["--case", "bad.json", "--out-dir", "out", "--dry-run"], 2, "stderr", ERROR),
     ("learning_plan_build", ["--plan-dir", "missing"], 2, "stderr", ERROR),
+    ("prereq_seed", ["missing.json"], 2, "stderr", ERROR),
+    ("prereq_seed", ["bad.json"], 2, "stderr", ERROR),
     ("prerequisite_state", ["show", "--state", "missing.json"], 1, "stdout", ERROR),
     ("prerequisite_state", ["show", "--state", "bad.json"], 1, "stdout", ERROR),
     ("validate_prerequisites", ["missing.json"], 2, "stdout", ERROR),
